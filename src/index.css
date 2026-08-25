@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0F172A;
+  --panel: #1E293B;
+  --border: #334155;
+  --accent: #38BDF8;
+  --success: #4ADE80;
+  --warn: #FBBF24;
+  --text: #F1F5F9;
+  --muted: #94A3B8;
+  --mono: 'JetBrains Mono', 'Courier New', monospace;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Custom section title with Professional Polish design style */
+.pro-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: #94A3B8;
+  letter-spacing: 1px;
+  font-weight: 700;
+  border-left: 2px solid #38BDF8;
+  padding-left: 8px;
+}
+
+.pro-card {
+  background-color: #1E293B;
+  border: 1px solid #334155;
+  border-radius: 6px;
+}
+
+.status-badge-success {
+  background: rgba(74, 222, 128, 0.1);
+  border: 1px solid #4ADE80;
+  color: #4ADE80;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.status-badge-accent {
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid #38BDF8;
+  color: #38BDF8;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
