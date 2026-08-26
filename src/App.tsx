@@ -11,6 +11,7 @@ import { SecurityDebtView } from './components/SecurityDebtView';
 import { TryHackMeView } from './components/TryHackMeView';
 import { JuryDemoView } from './components/JuryDemoView';
 import { FileStructureView } from './components/FileStructureView';
+import { TerminalBootScreen } from './components/TerminalBootScreen';
 
 import {
   SECTIONS,
@@ -19,6 +20,7 @@ import {
 } from './data/reportData';
 
 export default function App() {
+  const [isBooting, setIsBooting] = useState<boolean>(true);
   const [activeSectionId, setActiveSectionId] = useState<string>('sec-1');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [doneItems, setDoneItems] = useState(INITIAL_CHECKLIST_DONE);
@@ -81,7 +83,6 @@ export default function App() {
   };
 
   const handleExportMarkdown = () => {
-    // Read or trigger download of AEGIS_v2.1_Report_and_Blueprint.md content
     const element = document.createElement('a');
     element.setAttribute(
       'href',
@@ -156,14 +157,20 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0F172A] text-[#F1F5F9] flex flex-col font-sans selection:bg-sky-500/30 selection:text-sky-200">
+    <div className="min-h-screen bg-[#0F172A] text-[#F1F5F9] flex flex-col font-sans selection:bg-sky-500/30 selection:text-sky-200 relative overflow-x-hidden">
+      {/* CRT Scanline Overlay */}
+      <div className="fixed inset-0 crt-scanlines pointer-events-none z-30" aria-hidden="true" />
+
+      {/* Terminal Boot Sequence */}
+      {isBooting && <TerminalBootScreen onComplete={() => setIsBooting(false)} />}
+
       <Header
         activeTab={activeSectionId}
         onTabChange={setActiveSectionId}
         onExportMarkdown={handleExportMarkdown}
       />
 
-      <div className="flex-1 flex flex-col lg:flex-row max-w-[1720px] w-full mx-auto">
+      <div className="flex-1 flex flex-col lg:flex-row max-w-[1720px] w-full mx-auto relative z-10">
         <Navigation
           sections={filteredSections}
           activeSection={activeSectionId}
@@ -176,14 +183,15 @@ export default function App() {
           totalLeftCount={leftItems.length}
         />
 
-        <main className="flex-1 p-4 lg:p-6 overflow-x-hidden">
+        <main key={activeSectionId} className="flex-1 p-4 lg:p-6 overflow-x-hidden">
           {renderActiveSection()}
         </main>
       </div>
 
-      <footer className="bg-[#1E293B] border-t border-[#334155] py-3 text-center text-[11px] text-[#94A3B8] font-mono">
-        AEGIS v2.1 Master Report & Blueprint · TAIBI MOHAMED ANIS (Ezio) · PFE 2026
+      <footer className="bg-[#1E293B] border-t border-[#334155] py-3 text-center text-[11px] text-[#94A3B8] font-mono relative z-10">
+        <span className="text-[#38BDF8]">[AEGIS_v2.1]</span> Sovereign Zero-Trust Defense Blueprint · TAIBI MOHAMED ANIS (Ezio) · PFE Defense 2026
       </footer>
     </div>
   );
 }
+

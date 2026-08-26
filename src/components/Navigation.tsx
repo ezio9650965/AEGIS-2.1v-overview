@@ -104,14 +104,14 @@ export const Navigation: React.FC<NavigationProps> = ({
               onClick={() => onSelectSection(sec.id)}
               className={`flex items-center justify-between px-3 py-2 rounded font-mono text-xs transition-all text-left group cursor-pointer ${
                 isActive
-                  ? 'bg-[#38BDF8]/15 border border-[#38BDF8]/40 text-[#38BDF8] font-semibold shadow-sm'
-                  : 'hover:bg-[#0F172A] border border-transparent text-[#94A3B8] hover:text-[#F1F5F9]'
+                  ? 'bg-[#38BDF8]/15 border border-[#38BDF8]/50 text-[#38BDF8] font-semibold glow-cyan-active'
+                  : 'hover:bg-[#0F172A] border border-transparent text-[#94A3B8] hover:text-[#F1F5F9] glow-cyan-hover'
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
                 <span
                   className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                    isActive ? 'bg-[#38BDF8]/25 text-[#38BDF8]' : 'bg-[#0F172A] text-[#94A3B8] group-hover:text-[#F1F5F9]'
+                    isActive ? 'bg-[#38BDF8]/25 text-[#38BDF8] border border-[#38BDF8]/40' : 'bg-[#0F172A] text-[#94A3B8] group-hover:text-[#F1F5F9]'
                   }`}
                 >
                   {sec.number}

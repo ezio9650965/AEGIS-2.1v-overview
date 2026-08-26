@@ -25,12 +25,26 @@ AEGIS v2.1 represents a tactical restructuring of the project to eliminate fragi
    - Reduced session persistence from 1 year to 72 hours to uphold continuous verification principles.
    - Applied safe SQL script password rotations across PostgreSQL accounts and purged orphaned `.env` files.
    - Switched Keycloak from `start-dev` to `start --optimized`.
-4. **Active Edge Defenses Added**: Integrated **Coraza WAF** (Caddy plugin with OWASP Core Rule Set) inline to protect target web applications, **Suricata IDS** container on `proxy_net` with Emerging Threats Open rules, and host-level **Zeek NTA** sniffing raw bridge and physical traffic.
+4. **Active Edge Defenses Added**: Integrated **Coraza WAF** (Caddy plugin with OWASP Core Rule Set) inline to protect target web applications, **Suricata IDS** container on `proxy_net` with Emerging Threats Open rules, and host-level **Zeek NTA** (5-node cluster on `br_proxy`, `ens34`, and `ens33`).
 5. **Zone 2 Enterprise Grid Expanded**: Introduced a complete 3-node corporate domain (`aegis.corp`) featuring a Windows Server 2022 Active Directory Domain Controller (`CORP-DC01`), a Windows 10 domain workstation (`CORP-PC01` "Patient Zero") instrumented with Sysmon v15 and Wazuh Agent, and an Ubuntu PostgreSQL customer database server (`CORP-DB01`).
 
-### 1.3 Current Maturity Level & Jury-Readiness Score
-- **Project Completion**: **78%** (Phase 4 complete; Phase 5 integration in progress).
-- **Jury-Readiness Score**: **8.5 / 10** (Up from 4.0/10 in v2.0). All gateway services are 100% healthy, ZTA network isolation is kernel-verified, and telemetry pipelines are operational.
+### 1.3 Honest Per-Zone Implementation Status
+- **Zone 3 Gateway Sensors & Hardening**: **Done (Operational)** — All 9 core containers healthy, dual bridge isolation (`proxy_net` DMZ + `auth_net` `internal: true`) active, Forward-Auth MFA enforced, Coraza WAF and Suricata IDS operational.
+- **Zone 2 AD Enterprise Grid**: **Not Started (Pending deployment)** — Domain controller promotion (`CORP-DC01`), workstation enrollment (`CORP-PC01`), database server setup (`CORP-DB01`), and Wazuh agent deployments pending.
+- **Zone 4 SOAR & SOC Cluster**: **Not Started (Pending deployment)** — `minisoc1` (Elasticsearch) & `minisoc2` (Wazuh Manager/Kibana) native package installations, and `minisoc3` Docker stack (Shuffle SOAR, Logstash, MISP) pending.
+- **Zone 1 Threatscape & Red Team Engine**: **Configured & Ready** — Kali Linux APT station with Sliver C2, sqlmap, mimikatz, and REMnux sandbox environment prepared.
+
+### 1.4 What AEGIS Does and How It Enforces Zero Trust
+
+AEGIS is not a firewall in the traditional sense — it's a policy enforcement point sitting at the only entrance to the protected network. Every request, internal or external, is treated as untrusted until proven otherwise: never trust, always verify.
+
+Traffic routing: Traefik is the single ingress. All external traffic hits ports 80/443/1514/1515 on the Gateway; everything else is invisible — there is no other path in. Traefik terminates TLS, then either (a) forwards to Authelia for an auth check before reaching any protected service, or (b) TCP-proxies Wazuh agent traffic straight through to the remote SOC without exposing the SOC's real address (blind routing).
+
+Enforcement, not just inspection: Two Docker bridge networks do the actual isolation. proxy_net is the DMZ — internet-facing, holds only Traefik and the inline defenses (Coraza WAF, Suricata IDS). auth_net is marked internal: true at the kernel level — Authelia, Keycloak, Postgres, Redis have no route to the internet or the host, regardless of firewall rules. This isn't application-layer policy that can be misconfigured away; it's enforced by the Linux kernel's network namespace isolation.
+
+Authentication chain: Traefik → forwardAuth → Authelia (session/MFA check) → Keycloak (OIDC identity source of truth) → per-resource ACL decision. No session, no MFA, no route — the request never reaches the backend.
+
+Continuous verification: Sessions expire in 72 hours, not a year — the "always verify" half of the model, so a stolen session doesn't grant indefinite access
 
 ---
 
@@ -65,14 +79,17 @@ graph TB
             MAILPIT["Mailpit<br/>SMTP Sinkhole"]
             PORTAINER["Portainer CE v2.39.2<br/>Management UI"]
         end
-        ZEEK["Zeek NTA (Host-Level)<br/>Sniffing eth0 & br_proxy"]
+        ZEEK["Zeek NTA (5-Node Cluster)<br/>Sniffing br_proxy, ens34 & ens33"]
         JUICESHOP["OWASP Juice Shop (192.168.19.175:3000)<br/>Vulnerable Target App"]
     end
 
     subgraph Zone4["🟣 Zone 4: MSSP SOC (10.16.64.0/24 - AlmaLinux 9.3 Cluster)"]
-        SOC1["minisoc1 (10.16.64.155)<br/>Elasticsearch 8.19.13 'The Vault'<br/>Port 9200/TLS"]
-        SOC2["minisoc2 (10.16.64.156)<br/>Wazuh Manager 4.7 + Kibana 'The Brain'<br/>Ports 1514 / 1515 / 5601"]
-        SOC3["minisoc3 (10.16.64.157)<br/>Shuffle SOAR + Logstash + MISP 'The Executor'<br/>Ports 3001 / 5044 / 8080"]
+        SOC1["minisoc1 (10.16.64.155)<br/>Elasticsearch 8.19.13 'The Vault' (Native Package)<br/>Port 9200/TLS"]
+        SOC2["minisoc2 (10.16.64.156)<br/>Wazuh Manager 4.7 + Kibana 'The Brain' (Native Package)<br/>Ports 1514 / 1515 / 5601"]
+        subgraph MiniSOC3["minisoc3 (10.16.64.157) 'The Executor' (Docker)"]
+            SOC3_SHUFFLE["Shuffle SOAR + Logstash<br/>Ports 3001 / 5044"]
+            SOC3_MISP["MISP Threat Intel<br/>Port 8080"]
+        end
     end
 
     %% Flow Connections
@@ -94,9 +111,9 @@ graph TB
     SURICATA -->|"14. EVE JSON Alerts"| SOC2
 
     SOC2 -->|"15. Index Alerts"| SOC1
-    SOC1 -->|"16. Alert Feed"| SOC3
-    SOC3 -->|"17. Threat Intel Lookup"| SOC3
-    SOC3 -->|"18. Active Response / Session Revocation"| SOC2
+    SOC1 -->|"16. Alert Feed"| SOC3_SHUFFLE
+    SOC3_SHUFFLE -->|"17. Threat Intel Lookup"| SOC3_MISP
+    SOC3_SHUFFLE -->|"18. Active Response / Session Revocation"| SOC2
     SOC2 -->|"19. Host Isolation Trigger"| PC01
 ```
 
@@ -131,7 +148,7 @@ graph TB
  |  | Redis 7 Session Cache (Port 6379)| Mailpit Sinkhole (Port 8025)    | Portainer CE v2.39.2 (Port 9000)           |  |
  |  +---------------------------------------------------------------------------------------------------------------+  |
  |                                                                                                                     |
- |  Host Extensions: Zeek NTA (sniffing eth0 & br_proxy) | Target: OWASP Juice Shop (192.168.19.175:3000)               |
+ |  Host Extensions: Zeek NTA 5-Node (sniffing br_proxy, ens34, ens33) | Target: OWASP Juice Shop (192.168.19.175:3000) |
  +---------------------------------------------------------------------------------------------------------------------+
                   |                                                  |
                   | Telemetry (TCP:1514 mTLS)                        | Filebeat Log Shipping (TCP:9200 TLS)
@@ -140,9 +157,9 @@ graph TB
  | ZONE 4: MSSP SOC CLUSTER (10.16.64.0/24 - AlmaLinux 9.3 Cluster)                                                     |
  |                                                                                                                     |
  |  minisoc1 (10.16.64.155) "The Vault"    | minisoc2 (10.16.64.156) "The Brain"   | minisoc3 (10.16.64.157) "The Executor"|
- |  - Elasticsearch 8.19.13 (Port 9200)    | - Wazuh Manager 4.7 (Port 1514/1515)  | - Shuffle SOAR (Port 3001)           |
- |  - JVM Heap: 8GB locked                 | - Kibana 8.19.13 (Port 5601)          | - Logstash 8.19.13 (Port 5044)       |
- |  - Primary Telemetry Storage            | - Active Response Engine              | - MISP Threat Intel (Port 8080)      |
+ |  - Elasticsearch 8.19.13 (Native RPM)   | - Wazuh Manager 4.7 (Native RPM)      | - Shuffle SOAR + Logstash (Docker)   |
+ |  - JVM Heap: 8GB locked                 | - Kibana 8.19.13 (Native RPM)         | - MISP Threat Intel (Port 8080)      |
+ |  - Primary Telemetry Storage            | - Active Response Engine              | - Automated Response Engine          |
  +---------------------------------------------------------------------------------------------------------------------+
 ========================================================================================================================
 ```
@@ -204,7 +221,7 @@ graph TB
   | ZONE 3: ZTA GATEWAY (192.168.19.173)                                                  |
   |                                                                                       |
   |   [ HOST NETWORKING & ZEEK ]                                                          |
-  |   Zeek NTA (node.cfg sniffing eth0 & br_proxy) ---> /opt/zeek/logs/                   |
+  |   Zeek NTA 5-node cluster (node.cfg on br_proxy, ens34, ens33) ---> /opt/zeek/logs/   |
   |                                                                                       |
   |   [ DMZ Bridge: proxy_net ]                                                           |
   |   +--------------------------------------------------------------------------------+  |
@@ -235,16 +252,17 @@ graph TB
   |                                                                                       |
   |  +---------------------------+   +---------------------------+   +------------------+ |
   |  | minisoc1 (10.16.64.155)  |   | minisoc2 (10.16.64.156)  |   | minisoc3         | |
-  |  | "The Vault"               |   | "The Brain"               |   | (10.16.64.157)   | |
+  |  | "The Vault" (Native RPM)  |   | "The Brain" (Native RPM)  |   | (10.16.64.157)   | |
   |  | - Elasticsearch 8.19.13   |<--| - Wazuh Manager 4.7       |   | "The Executor"   | |
-  |  |   (Port 9200/TLS)         |   | - Kibana 8.19.13 (:5601)  |   | - Shuffle SOAR   | |
-  |  | - Raw Indexing & Storage  |   | - Active Response Engine  |---| - Logstash 8.19  | |
-  |  +---------------------------+   +---------------------------+   | - MISP Threat    | |
-  |                ^                                                 |   Intel (:8080)  | |
-  |                | Shipping                                        +------------------+ |
-  |                +----------------------------------------------------------+           |
+  |  |   (Port 9200/TLS)         |   | - Kibana 8.19.13 (:5601)  |   | (Docker Stack)   | |
+  |  | - Raw Indexing & Storage  |   | - Active Response Engine  |---| - Shuffle SOAR   | |
+  |  +---------------------------+   +---------------------------+   | - Logstash 8.19  | |
+  |                ^                                                 | - MISP Threat    | |
+  |                | Shipping                                        |   Intel (:8080)  | |
+  |                +-------------------------------------------------+------------------+ |
   +---------------------------------------------------------------------------------------+
 ```
+- **Deployment Details**: `minisoc1` and `minisoc2` are native package installs (RPM/systemd on AlmaLinux 9.3) for bare-metal performance and stability. Only `minisoc3` utilizes a Docker Compose stack to run Shuffle SOAR, Logstash, and MISP.
 - **Pipeline Data Flow**:
   1. Telemetry arrives at `minisoc2` via Wazuh agent protocol (TCP 1514).
   2. Wazuh Manager decodes and analyzes rules; alerts are pushed to Filebeat.
@@ -261,6 +279,7 @@ graph TB
 ### 4.1 ZTA Gateway & Infrastructure Verification
 - [x] **Dual-Network Docker ZTA**: Kernel-level isolation configured with `proxy_net` (DMZ) and `auth_net` (`internal: true`).
 - [x] **Core Gateway Containers Healthy**: All 9 core containers (`traefik`, `authelia`, `keycloak`, `postgres`, `redis`, `mailpit`, `portainer`, `coraza-waf`, `suricata`) passing healthchecks.
+- [x] **Coraza WAF & Suricata IDS Active**: Inline Web Application Firewall and network intrusion detection configured and filtering traffic on `proxy_net`.
 - [x] **Authelia Forward-Auth & MFA**: Two-factor authentication policy enforced across all protected domains via Traefik.
 - [x] **Keycloak OIDC Integration**: Federated identity provider configured for SSO token delegation.
 - [x] **Edge TLS Termination**: Traefik configured for TLS termination with valid wildcard certificates.
@@ -295,9 +314,7 @@ graph TB
   - Join `CORP-PC01` (Win10) to `aegis.corp`.
   - Deploy `CORP-DB01` (Ubuntu 22.04) PostgreSQL server with customer PII table.
   - Install and register Wazuh Agents on all 3 Zone 2 nodes.
-- [ ] **Deploy Coraza WAF Container**: Mount Caddyfile with OWASP Core Rule Set in front of Juice Shop.
-- [ ] **Deploy Suricata IDS Container**: Attach to `proxy_net` with Emerging Threats Open ruleset.
-- [ ] **Configure Zeek NTA on Host**: Configure `node.cfg` for `eth0` and `br_proxy` interfaces.
+- [ ] **Configure Zeek NTA 5-Node Cluster**: Configure `node.cfg` for 5-node cluster (manager/proxy/3 workers) monitoring `br_proxy`, `ens34`, and `ens33`.
 - [ ] **Update Keycloak Admin Password**: Update `keycloak/.env` with `KC_Admin_AEGIS_2026!`.
 - [ ] **Generate Strong Session Secret**: Run `openssl rand -hex 32` and populate `AUTHELIA_SESSION_SECRET`.
 - [ ] **Set Unique Password Hash for Eagle**: Generate distinct Argon2id hash for `eagle` account in `users_database.yml`.
@@ -360,13 +377,13 @@ graph TB
 | **SOC L1 Triage** | 3 physical operational playbooks (Brute Force, Malware, Exfiltration) | Zone 4 | `soc/playbooks/*.md` |
 | **SOC Metrics** | Kibana dashboard tracking MTTD, MTTR, and alert volume | Zone 4 | `soc/dashboards/metrics.ndjson` |
 | **EDR Concepts** | Sysmon v15 + Wazuh Agent on Windows domain endpoints | Zone 2 | `grid/corp-pc01/sysmon.xml` |
-| **SIEM Operations** | Wazuh Manager + Elasticsearch 8.19 + Kibana 8.19 integration | Zone 4 | `soc/docker-compose.yml` |
-| **SOAR Automation** | Shuffle SOAR visual workflows ("Mahoraga v2.1") | Zone 4 | Shuffle Web UI / `soc/shuffle/` |
+| **SIEM Operations** | Wazuh Manager + Elasticsearch 8.19 + Kibana 8.19 integration | Zone 4 | `minisoc1/minisoc2` Native RPM & systemd services |
+| **SOAR Automation** | Shuffle SOAR visual workflows ("Mahoraga v2.1") | Zone 4 | Shuffle Web UI / `minisoc3` Docker Compose |
 | **Pyramid of Pain** | Kibana "Detection by IOC Type" visualization (Hash → IP → TTP) | Zone 4 | Kibana Dashboard |
 | **Cyber Kill Chain** | Attack scenario documentation mapping Sliver actions to CKC phases | Docs | `docs/kill-chain.md` |
 | **MITRE ATT&CK** | Custom Wazuh rules tagged with explicit `mitre.id` fields | Zone 4 | `soc/wazuh/rules/local_rules.xml` |
 | **Phishing Analysis** | Mailpit SMTP sinkhole + header analysis & link extraction playbook | Zone 3 | `soc/playbooks/phishing.md` |
-| **Network Traffic Analysis** | Zeek `conn.log`, `dns.log`, and `http.log` shipped to Elasticsearch | Zone 3 | `/opt/zeek/logs/` |
+| **Network Traffic Analysis** | Zeek 5-node cluster (`conn.log`, `dns.log`, `http.log`) shipped to Elasticsearch | Zone 3 | `/opt/zeek/logs/` |
 | **Wireshark Analysis** | Analyst station on Kali VM with exported `.pcap` files from Zeek | Zone 1 | Kali VM `/home/kali/pcaps/` |
 | **Network Security Monitoring** | Suricata IDS container running Emerging Threats Open rules | Zone 3 | `gateway/suricata/` |
 | **Web Security Essentials** | Coraza WAF container with OWASP Core Rule Set protecting Juice Shop | Zone 3 | `gateway/coraza/Caddyfile` |
@@ -461,9 +478,10 @@ graph TB
 │   │   ├── Caddyfile                   # Coraza WAF proxy configuration
 │   │   └── rules/                      # OWASP Core Rule Set rules
 │   └── zeek/
-│       └── node.cfg                    # Zeek interface binding (eth0, br_proxy)
+│       └── node.cfg                    # Zeek 5-node cluster config (br_proxy, ens34, ens33)
 ├── soc/
-│   ├── docker-compose.yml              # SOC Stack: Elasticsearch, Wazuh, Kibana, Filebeat, Shuffle, MISP
+│   ├── minisoc3-docker-compose.yml     # Docker Compose for minisoc3 ONLY (Shuffle SOAR, Logstash, MISP)
+│   │                                   # Note: minisoc1 (Elasticsearch) & minisoc2 (Wazuh/Kibana) are native RPM installs
 │   ├── playbooks/
 │   │   ├── brute-force.md              # L1 Playbook: Auth failure triage
 │   │   ├── malware.md                  # L1 Playbook: Malware containment
@@ -473,10 +491,10 @@ graph TB
 │   │   └── mitre-matrix.ndjson         # Kibana export: MITRE ATT&CK coverage
 │   ├── logstash/
 │   │   └── pipeline/
-│   │       └── logstash.conf           # Ingestion pipeline: ES feed -> Shuffle webhook
+│   │       └── logstash.conf           # Ingestion pipeline: ES feed -> Shuffle webhook (minisoc3)
 │   └── wazuh/
 │       └── rules/
-│           └── local_rules.xml         # Custom detection rules with MITRE ATT&CK tags
+│           └── local_rules.xml         # Custom detection rules with MITRE ATT&CK tags (minisoc2)
 ├── grid/
 │   ├── corp-dc01/                      # Active Directory scripts & Windows Event Forwarding configs
 │   ├── corp-pc01/                      # Sysmon v15 XML config & Wazuh agent configuration

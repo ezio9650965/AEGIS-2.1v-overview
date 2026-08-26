@@ -66,7 +66,7 @@ export const MasterTopologyView: React.FC = () => {
             <div className="text-[10px] text-[#94A3B8] space-y-1">
               <div>• proxy_net (DMZ): Traefik, Coraza, Suricata</div>
               <div>• auth_net (internal): Authelia, KC, Postgres</div>
-              <div>• Host NTA: Zeek (eth0 + br_proxy)</div>
+              <div>• Host NTA: Zeek 5-Node (br_proxy, ens34, ens33)</div>
             </div>
           </div>
 
@@ -78,9 +78,9 @@ export const MasterTopologyView: React.FC = () => {
             </div>
             <p className="text-[11px] text-[#F1F5F9] font-semibold mb-2">10.16.64.0/24 AlmaLinux Cluster</p>
             <div className="text-[10px] text-[#94A3B8] space-y-1">
-              <div>• minisoc1: Elasticsearch 8.19 (Vault)</div>
-              <div>• minisoc2: Wazuh 4.7 + Kibana (Brain)</div>
-              <div>• minisoc3: Shuffle SOAR + MISP (Executor)</div>
+              <div>• minisoc1: Elasticsearch 8.19 (Vault - Native)</div>
+              <div>• minisoc2: Wazuh 4.7 + Kibana (Brain - Native)</div>
+              <div>• minisoc3: Shuffle SOAR + MISP (Executor - Docker)</div>
             </div>
           </div>
         </div>

@@ -341,35 +341,44 @@ export const SubTopologiesView: React.FC = () => {
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                 <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
-                  <div className="font-bold text-[#38BDF8] mb-1">minisoc1 (10.16.64.155)</div>
+                  <div className="font-bold text-[#38BDF8] mb-1 flex items-center justify-between">
+                    <span>minisoc1 (10.16.64.155)</span>
+                    <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded border border-blue-500/40">Native RPM (systemd)</span>
+                  </div>
                   <div className="text-[10px] text-[#94A3B8] mb-2">"The Vault" — Primary Telemetry Indexer</div>
                   <ul className="text-[11px] text-[#F1F5F9]/80 space-y-1">
-                    <li>• Elasticsearch 8.19.13 (JVM 8GB locked)</li>
+                    <li>• Elasticsearch 8.19.13 (Native RPM / JVM 8GB locked)</li>
                     <li>• Port 9200/TCP (mTLS / TLS)</li>
-                    <li>• Stores raw Filebeat, Zeek, & Wazuh logs</li>
+                    <li>• Stores raw Filebeat, Zeek 5-node cluster, & Wazuh logs</li>
                     <li>• OS Firewall: 9200 open via firewall-cmd</li>
                   </ul>
                 </div>
 
                 <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
-                  <div className="font-bold text-[#4ADE80] mb-1">minisoc2 (10.16.64.156)</div>
+                  <div className="font-bold text-[#4ADE80] mb-1 flex items-center justify-between">
+                    <span>minisoc2 (10.16.64.156)</span>
+                    <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/40">Native RPM (systemd)</span>
+                  </div>
                   <div className="text-[10px] text-[#94A3B8] mb-2">"The Brain" — SIEM & Visualization Engine</div>
                   <ul className="text-[11px] text-[#F1F5F9]/80 space-y-1">
-                    <li>• Wazuh Manager 4.7 (Ports 1514/1515 mTLS)</li>
-                    <li>• Kibana 8.19.13 (Port 5601)</li>
-                    <li>• Decoupled native installation</li>
+                    <li>• Wazuh Manager 4.7 (Native RPM - Ports 1514/1515 mTLS)</li>
+                    <li>• Kibana 8.19.13 (Native RPM - Port 5601)</li>
+                    <li>• Bare-metal performance, no Docker overhead</li>
                     <li>• Active Response engine command controller</li>
                   </ul>
                 </div>
 
                 <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
-                  <div className="font-bold text-purple-400 mb-1">minisoc3 (10.16.64.157)</div>
+                  <div className="font-bold text-purple-400 mb-1 flex items-center justify-between">
+                    <span>minisoc3 (10.16.64.157)</span>
+                    <span className="text-[9px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded border border-purple-500/40">Docker Compose Stack</span>
+                  </div>
                   <div className="text-[10px] text-[#94A3B8] mb-2">"The Executor" — SOAR & Threat Intel</div>
                   <ul className="text-[11px] text-[#F1F5F9]/80 space-y-1">
                     <li>• Shuffle SOAR Framework (Port 3001)</li>
                     <li>• Logstash 8.19.13 (Port 5044 feed from ES)</li>
                     <li>• MISP Threat Intel Engine (Port 8080)</li>
-                    <li>• Abuse.ch Feeds + "Mahoraga v2.1" SOAR</li>
+                    <li>• Abuse.ch Feeds + "Mahoraga v2.1" SOAR Stack</li>
                   </ul>
                 </div>
               </div>

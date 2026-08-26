@@ -27,9 +27,10 @@ export const FileStructureView: React.FC = () => {
 │   │   ├── Caddyfile                   # Coraza WAF proxy configuration
 │   │   └── rules/                      # OWASP Core Rule Set rules
 │   └── zeek/
-│       └── node.cfg                    # Zeek interface binding (eth0, br_proxy)
+│       └── node.cfg                    # Zeek 5-node cluster config (br_proxy, ens34, ens33)
 ├── soc/
-│   ├── docker-compose.yml              # SOC Stack: Elasticsearch, Wazuh, Kibana, Filebeat, Shuffle, MISP
+│   ├── minisoc3-docker-compose.yml     # Docker Compose for minisoc3 ONLY (Shuffle SOAR, Logstash, MISP)
+│   │                                   # Note: minisoc1 (Elasticsearch) & minisoc2 (Wazuh/Kibana) are native RPM installs
 │   ├── playbooks/
 │   │   ├── brute-force.md              # L1 Playbook: Auth failure triage
 │   │   ├── malware.md                  # L1 Playbook: Malware containment

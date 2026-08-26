@@ -15,7 +15,26 @@
 body {
   background-color: var(--bg);
   color: var(--text);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'JetBrains Mono', 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* CRT Scanline Overlay */
+.crt-scanlines {
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0) 50%,
+    rgba(0, 255, 65, 0.025) 50%,
+    rgba(0, 255, 65, 0.025)
+  );
+  background-size: 100% 4px;
+  animation: scanlines-scroll 10s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes scanlines-scroll {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 100%; }
 }
 
 /* Custom section title with Professional Polish design style */
@@ -27,6 +46,100 @@ body {
   font-weight: 700;
   border-left: 2px solid #38BDF8;
   padding-left: 8px;
+}
+
+/* Glitch effect on section load / mount (runs once ~220ms) */
+@keyframes glitch-anim {
+  0% {
+    text-shadow: 2px 0 #ef4444, -2px 0 #38bdf8;
+    transform: translate(0);
+  }
+  25% {
+    text-shadow: -2px 0 #ef4444, 2px 0 #38bdf8;
+    transform: translate(-1px, 1px);
+  }
+  50% {
+    text-shadow: 2px 0 #4ade80, -2px 0 #a855f7;
+    transform: translate(1px, -1px);
+  }
+  75% {
+    text-shadow: -1px 0 #38bdf8, 1px 0 #ef4444;
+    transform: translate(-1px, 0);
+  }
+  100% {
+    text-shadow: none;
+    transform: translate(0);
+  }
+}
+
+.glitch-header {
+  animation: glitch-anim 0.22s ease-out 1;
+}
+
+/* Blinking terminal block cursor */
+@keyframes blink-cursor {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.terminal-cursor {
+  display: inline-block;
+  color: #4ade80;
+  animation: blink-cursor 1s steps(1) infinite;
+  font-family: var(--mono);
+  font-weight: 700;
+  margin-left: 3px;
+  line-height: 1;
+}
+
+.terminal-cursor-cyan {
+  display: inline-block;
+  color: #38bdf8;
+  animation: blink-cursor 1s steps(1) infinite;
+  font-family: var(--mono);
+  font-weight: 700;
+  margin-left: 3px;
+  line-height: 1;
+}
+
+/* Neon glow accents on hover / active */
+.glow-cyan-hover {
+  transition: all 0.2s ease-in-out;
+}
+.glow-cyan-hover:hover {
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25), inset 0 0 6px rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.6);
+}
+
+.glow-cyan-active {
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.3), inset 0 0 6px rgba(56, 189, 248, 0.15);
+  border-color: #38BDF8;
+}
+
+.glow-green-hover {
+  transition: all 0.2s ease-in-out;
+}
+.glow-green-hover:hover {
+  box-shadow: 0 0 10px rgba(74, 222, 128, 0.25), inset 0 0 6px rgba(74, 222, 128, 0.12);
+  border-color: rgba(74, 222, 128, 0.6);
+}
+
+.glow-red-hover:hover {
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.25), inset 0 0 6px rgba(239, 68, 68, 0.12);
+}
+
+.glow-amber-hover:hover {
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.25), inset 0 0 6px rgba(245, 158, 11, 0.12);
+}
+
+/* ASCII / Terminal Double Border on panel headers */
+.terminal-panel-header {
+  border-bottom: 3px double #334155;
+}
+
+.terminal-panel-box {
+  border: 1px solid #334155;
+  background-color: #1E293B;
 }
 
 .pro-card {
@@ -43,6 +156,7 @@ body {
   border-radius: 4px;
   font-size: 10px;
   font-weight: 600;
+  font-family: var(--mono);
 }
 
 .status-badge-accent {
@@ -53,4 +167,6 @@ body {
   border-radius: 4px;
   font-size: 10px;
   font-weight: 600;
+  font-family: var(--mono);
 }
+

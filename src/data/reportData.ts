@@ -31,17 +31,17 @@ export const INITIAL_CHECKLIST_DONE: ChecklistItem[] = [
   { id: 'd15', title: 'Safe SQL Password Rotation', description: 'PostgreSQL passwords updated via SQL file script avoiding bash ! bugs.', category: 'high', completed: true },
   { id: 'd16', title: 'Orphan .env Files Deleted', description: 'Removed redis/.env and postgres/.env to enforce root .env source of truth.', category: 'medium', completed: true },
   { id: 'd17', title: 'Keycloak Production Mode', description: 'Switched command from start-dev to start --optimized.', category: 'high', completed: true },
+  { id: 'd18', title: 'Coraza WAF (Caddy + OWASP CRS)', description: 'Custom xcaddy build with OWASP CRS vendored to /srv, in front of Juice Shop on proxy_net.', category: 'critical', completed: true, who: 'eagle' },
+  { id: 'd19', title: 'Suricata IDS Container', description: 'Attached to proxy_net with Emerging Threats Open ruleset, 52,256 rules loaded.', category: 'critical', completed: true, who: 'eagle' },
+  { id: 'd20', title: 'Zeek NTA 5-Node Cluster', description: '5-node manager/proxy/worker cluster monitoring br_proxy, ens34 & ens33.', category: 'critical', completed: true, who: 'eagle' },
 ];
 
 export const INITIAL_CHECKLIST_LEFT: ChecklistItem[] = [
   { id: 'l1', title: 'Deploy Zone 2 Enterprise Grid (CORP-DC01, CORP-PC01, CORP-DB01)', description: 'Promote DC01 (Win Server 2022 AD DS aegis.corp), join PC01, deploy DB01 PostgreSQL customer PII, install 3 Wazuh agents.', category: 'critical', completed: false, who: 'both' },
-  { id: 'l2', title: 'Deploy Coraza WAF Container', description: 'Attach Caddy + OWASP CRS container in front of Juice Shop on proxy_net.', category: 'critical', completed: false, who: 'eagle' },
-  { id: 'l3', title: 'Deploy Suricata IDS Container', description: 'Attach Suricata container to proxy_net with Emerging Threats Open ruleset.', category: 'critical', completed: false, who: 'eagle' },
-  { id: 'l4', title: 'Install Zeek NTA on Gateway Host', description: 'Configure Zeek node.cfg to monitor eth0 and br_proxy interfaces.', category: 'critical', completed: false, who: 'eagle' },
   { id: 'l5', title: 'Update Keycloak Admin Password', description: 'Update keycloak/.env with KC_Admin_AEGIS_2026! and sync in UI.', category: 'critical', completed: false, who: 'eagle' },
   { id: 'l6', title: 'Generate Strong AUTHELIA_SESSION_SECRET', description: 'Execute openssl rand -hex 32 and update root .env file.', category: 'critical', completed: false, who: 'eagle' },
   { id: 'l7', title: 'Set Unique Password Hash for Eagle User', description: 'Generate distinct Argon2id hash for eagle account in users_database.yml.', category: 'critical', completed: false, who: 'eagle' },
-  { id: 'l8', title: 'Deploy Zone 4 Distributed SOC Cluster', description: 'Verify 3-node connectivity: minisoc1 (ES), minisoc2 (Wazuh/Kibana), minisoc3 (Shuffle/MISP).', category: 'high', completed: false, who: 'ezio' },
+  { id: 'l8', title: 'Deploy Zone 4 Distributed SOC Cluster', description: 'Verify 3-node connectivity: minisoc1 (ES Native), minisoc2 (Wazuh/Kibana Native), minisoc3 (Shuffle/MISP Docker).', category: 'high', completed: false, who: 'ezio' },
   { id: 'l9', title: 'Configure Gateway Filebeat Ingestion', description: 'Ship Traefik JSON logs, Authelia audit, Zeek conn.log, Suricata alerts to minisoc1:9200.', category: 'high', completed: false, who: 'ezio' },
   { id: 'l10', title: 'Build Shuffle SOAR Workflow ("Mahoraga v2.1")', description: 'Implement Wazuh webhook listener -> MISP lookup -> Active Response + Slack isolation workflow.', category: 'high', completed: false, who: 'ezio' },
   { id: 'l11', title: 'Write 3 L1 SOC Playbooks in Markdown', description: 'Create brute-force.md, malware.md, and exfiltration.md in /opt/soc/playbooks/.', category: 'high', completed: false, who: 'both' },
@@ -72,13 +72,13 @@ export const TRYHACKME_MAP: TryHackMeTopic[] = [
   { topic: 'SOC L1 Triage', implementation: '3 physical playbooks (Brute Force, Malware, Exfiltration)', zone: 'Zone 4', artifact: 'soc/playbooks/*.md' },
   { topic: 'SOC Metrics', implementation: 'Kibana MTTD, MTTR, and alert volume dashboard', zone: 'Zone 4', artifact: 'soc/dashboards/metrics.ndjson' },
   { topic: 'EDR Concepts', implementation: 'Sysmon v15 + Wazuh agent on Windows domain endpoints', zone: 'Zone 2', artifact: 'grid/corp-pc01/sysmon.xml' },
-  { topic: 'SIEM Operations', implementation: 'Wazuh Manager + Elasticsearch 8.19 + Kibana integration', zone: 'Zone 4', artifact: 'soc/docker-compose.yml' },
-  { topic: 'SOAR Automation', implementation: 'Shuffle SOAR visual workflow engine ("Mahoraga v2.1")', zone: 'Zone 4', artifact: 'soc/shuffle/workflows.json' },
+  { topic: 'SIEM Operations', implementation: 'Wazuh Manager + Elasticsearch 8.19 + Kibana integration', zone: 'Zone 4', artifact: 'minisoc1/minisoc2 Native RPM & systemd' },
+  { topic: 'SOAR Automation', implementation: 'Shuffle SOAR visual workflow engine ("Mahoraga v2.1")', zone: 'Zone 4', artifact: 'minisoc3 Docker Stack / Shuffle UI' },
   { topic: 'Pyramid of Pain', implementation: 'Kibana "Detection by IOC Type" visualization', zone: 'Zone 4', artifact: 'Kibana Saved Dashboard' },
   { topic: 'Cyber Kill Chain', implementation: 'Attack scenario documentation mapping Sliver to CKC', zone: 'Docs', artifact: 'docs/kill-chain.md' },
   { topic: 'MITRE ATT&CK', implementation: 'Wazuh detection rules tagged with explicit mitre.id fields', zone: 'Zone 4', artifact: 'soc/wazuh/rules/local_rules.xml' },
   { topic: 'Phishing Analysis', implementation: 'Mailpit SMTP sinkhole + header analysis playbook', zone: 'Zone 3', artifact: 'soc/playbooks/phishing.md' },
-  { topic: 'Network Traffic', implementation: 'Zeek conn.log, dns.log, http.log shipped to Elasticsearch', zone: 'Zone 3', artifact: '/opt/zeek/logs/current/' },
+  { topic: 'Network Traffic', implementation: 'Zeek 5-node cluster (conn.log, dns.log, http.log) -> ES', zone: 'Zone 3', artifact: '/opt/zeek/logs/current/' },
   { topic: 'Wireshark Analysis', implementation: 'Analyst station on Kali VM with exported .pcap files', zone: 'Zone 1', artifact: 'Kali /home/kali/pcaps/' },
   { topic: 'Network Security', implementation: 'Suricata IDS container on proxy_net with ET rules', zone: 'Zone 3', artifact: 'gateway/suricata/' },
   { topic: 'Web Security', implementation: 'Coraza WAF container with OWASP CRS protecting Juice Shop', zone: 'Zone 3', artifact: 'gateway/coraza/Caddyfile' },
@@ -178,14 +178,17 @@ export const MASTER_TOPOLOGY_MERMAID = `graph TB
             MAILPIT["Mailpit<br/>SMTP Sinkhole"]
             PORTAINER["Portainer CE v2.39.2<br/>Management UI"]
         end
-        ZEEK["Zeek NTA (Host-Level)<br/>Sniffing eth0 & br_proxy"]
+        ZEEK["Zeek NTA (5-Node Cluster)<br/>Sniffing br_proxy, ens34 & ens33"]
         JUICESHOP["OWASP Juice Shop (192.168.19.175:3000)<br/>Vulnerable Target App"]
     end
 
     subgraph Zone4["🟣 Zone 4: MSSP SOC (10.16.64.0/24 - AlmaLinux 9.3 Cluster)"]
-        SOC1["minisoc1 (10.16.64.155)<br/>Elasticsearch 8.19.13 'The Vault'<br/>Port 9200/TLS"]
-        SOC2["minisoc2 (10.16.64.156)<br/>Wazuh Manager 4.7 + Kibana 'The Brain'<br/>Ports 1514 / 1515 / 5601"]
-        SOC3["minisoc3 (10.16.64.157)<br/>Shuffle SOAR + Logstash + MISP 'The Executor'<br/>Ports 3001 / 5044 / 8080"]
+        SOC1["minisoc1 (10.16.64.155)<br/>Elasticsearch 8.19.13 'The Vault' (Native Package)<br/>Port 9200/TLS"]
+        SOC2["minisoc2 (10.16.64.156)<br/>Wazuh Manager 4.7 + Kibana 'The Brain' (Native Package)<br/>Ports 1514 / 1515 / 5601"]
+        subgraph MiniSOC3["minisoc3 (10.16.64.157) 'The Executor' (Docker)"]
+            SOC3_SHUFFLE["Shuffle SOAR + Logstash<br/>Ports 3001 / 5044"]
+            SOC3_MISP["MISP Threat Intel<br/>Port 8080"]
+        end
     end
 
     KALI -->|"1. HTTPS Attack / C2 / SQLi"| TRAEFIK
@@ -206,7 +209,7 @@ export const MASTER_TOPOLOGY_MERMAID = `graph TB
     SURICATA -->|"14. EVE JSON Alerts"| SOC2
 
     SOC2 -->|"15. Index Alerts"| SOC1
-    SOC1 -->|"16. Alert Feed"| SOC3
-    SOC3 -->|"17. Threat Intel Lookup"| SOC3
-    SOC3 -->|"18. Active Response / Session Revocation"| SOC2
+    SOC1 -->|"16. Alert Feed"| SOC3_SHUFFLE
+    SOC3_SHUFFLE -->|"17. Threat Intel Lookup"| SOC3_MISP
+    SOC3_SHUFFLE -->|"18. Active Response / Session Revocation"| SOC2
     SOC2 -->|"19. Host Isolation Trigger"| PC01`;
