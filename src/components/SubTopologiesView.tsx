@@ -24,7 +24,8 @@ import {
 
 export const SubTopologiesView: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'z1' | 'z2' | 'z3' | 'z4'>('z3');
-  const [activeMispTab, setActiveMispTab] = useState<'feeds' | 'manual' | 'soar'>('feeds');
+  const [activeMispTab, setActiveMispTab] = useState<'stack' | 'feeds' | 'manual' | 'soar'>('stack');
+  const [activeSocConfigTab, setActiveSocConfigTab] = useState<'compose' | 'env' | 'logstash' | 'logstash_yml'>('compose');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   // Manual IOC Form State for Simulation
@@ -343,42 +344,42 @@ export const SubTopologiesView: React.FC = () => {
                 <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
                   <div className="font-bold text-[#38BDF8] mb-1 flex items-center justify-between">
                     <span>minisoc1 (10.16.64.155)</span>
-                    <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded border border-blue-500/40">Native RPM (systemd)</span>
+                    <span className="text-[9px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded border border-blue-500/40 font-bold">Native RPM (systemd)</span>
                   </div>
                   <div className="text-[10px] text-[#94A3B8] mb-2">"The Vault" — Primary Telemetry Indexer</div>
                   <ul className="text-[11px] text-[#F1F5F9]/80 space-y-1">
                     <li>• Elasticsearch 8.19.13 (Native RPM / JVM 8GB locked)</li>
-                    <li>• Port 9200/TCP (mTLS / TLS)</li>
-                    <li>• Stores raw Filebeat, Zeek 5-node cluster, & Wazuh logs</li>
-                    <li>• OS Firewall: 9200 open via firewall-cmd</li>
+                    <li>• Port 9200/TCP (TLS / Basic Auth)</li>
+                    <li>• Stores raw Filebeat, Zeek 5-node cluster, & Wazuh alerts</li>
+                    <li>• Direct query verified healthy from minisoc3 Logstash</li>
                   </ul>
                 </div>
 
                 <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
                   <div className="font-bold text-[#4ADE80] mb-1 flex items-center justify-between">
                     <span>minisoc2 (10.16.64.156)</span>
-                    <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/40">Native RPM (systemd)</span>
+                    <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/40 font-bold">Native RPM (systemd)</span>
                   </div>
                   <div className="text-[10px] text-[#94A3B8] mb-2">"The Brain" — SIEM & Visualization Engine</div>
                   <ul className="text-[11px] text-[#F1F5F9]/80 space-y-1">
                     <li>• Wazuh Manager 4.7 (Native RPM - Ports 1514/1515 mTLS)</li>
                     <li>• Kibana 8.19.13 (Native RPM - Port 5601)</li>
-                    <li>• Bare-metal performance, no Docker overhead</li>
+                    <li>• Bare-metal performance with zero Docker virtualization overhead</li>
                     <li>• Active Response engine command controller</li>
                   </ul>
                 </div>
 
-                <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
+                <div className="bg-[#1E293B] p-4 rounded border border-purple-500/40 glow-purple-hover">
                   <div className="font-bold text-purple-400 mb-1 flex items-center justify-between">
                     <span>minisoc3 (10.16.64.157)</span>
-                    <span className="text-[9px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded border border-purple-500/40">Docker Compose Stack</span>
+                    <span className="text-[9px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded border border-purple-500/40 font-bold">Docker Compose (9 Containers)</span>
                   </div>
                   <div className="text-[10px] text-[#94A3B8] mb-2">"The Executor" — SOAR & Threat Intel</div>
                   <ul className="text-[11px] text-[#F1F5F9]/80 space-y-1">
-                    <li>• Shuffle SOAR Framework (Port 3001)</li>
-                    <li>• Logstash 8.19.13 (Port 5044 feed from ES)</li>
-                    <li>• MISP Threat Intel Engine (Port 8080)</li>
-                    <li>• Abuse.ch Feeds + "Mahoraga v2.1" SOAR Stack</li>
+                    <li>• <strong className="text-white">Shuffle SOAR (4):</strong> frontend (:3001), backend, orborus, mongo:6</li>
+                    <li>• <strong className="text-white">MISP Official (4):</strong> core (:8080), modules, db, redis</li>
+                    <li>• <strong className="text-white">Logstash 8.19.13 (:5044):</strong> rule.level &gt;= 12 query to Shuffle hook</li>
+                    <li>• <strong className="text-white">Mailpit (:8025):</strong> SMTP sinkhole moved to minisoc3</li>
                   </ul>
                 </div>
               </div>
@@ -393,16 +394,26 @@ export const SubTopologiesView: React.FC = () => {
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-white uppercase tracking-wider">
-                      MISP Threat Intelligence & SOAR Enrichment Hub
+                      minisoc3 Architecture, Threat Intelligence & SOAR Operations Hub
                     </h4>
                     <p className="text-[11px] text-[#94A3B8]">
-                      minisoc3 (10.16.64.157:8080) · Abuse.ch Feed Auto-Ingestion & Shuffle SOAR Workflow Orchestration
+                      minisoc3 (10.16.64.157) · 9-Container Stack (Shuffle + MISP + Logstash + Mailpit on `soc_net`)
                     </p>
                   </div>
                 </div>
 
                 {/* Sub-tab switcher inside Zone 4 MISP Hub */}
                 <div className="flex items-center gap-1 bg-[#1E293B] p-1 rounded border border-[#334155]">
+                  <button
+                    onClick={() => setActiveMispTab('stack')}
+                    className={`px-3 py-1 rounded text-xs font-semibold transition-all cursor-pointer ${
+                      activeMispTab === 'stack'
+                        ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                        : 'text-[#94A3B8] hover:text-[#F1F5F9]'
+                    }`}
+                  >
+                    1. 9-Container Stack & Configs
+                  </button>
                   <button
                     onClick={() => setActiveMispTab('feeds')}
                     className={`px-3 py-1 rounded text-xs font-semibold transition-all cursor-pointer ${
@@ -411,7 +422,7 @@ export const SubTopologiesView: React.FC = () => {
                         : 'text-[#94A3B8] hover:text-[#F1F5F9]'
                     }`}
                   >
-                    1. Abuse.ch Feed Ingestion
+                    2. Abuse.ch Feeds
                   </button>
                   <button
                     onClick={() => setActiveMispTab('manual')}
@@ -421,7 +432,7 @@ export const SubTopologiesView: React.FC = () => {
                         : 'text-[#94A3B8] hover:text-[#F1F5F9]'
                     }`}
                   >
-                    2. Manual IOC & API Setup
+                    3. Manual IOC & API Setup
                   </button>
                   <button
                     onClick={() => setActiveMispTab('soar')}
@@ -431,12 +442,400 @@ export const SubTopologiesView: React.FC = () => {
                         : 'text-[#94A3B8] hover:text-[#F1F5F9]'
                     }`}
                   >
-                    3. Live SOAR Simulator
+                    4. Live SOAR Simulator
                   </button>
                 </div>
               </div>
 
-              {/* Sub-tab 1: Abuse.ch Auto Feed Ingestion */}
+              {/* Sub-tab 1: 9-Container Stack Breakdown & Sanitized Configs */}
+              {activeMispTab === 'stack' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+                    {/* Shuffle Group */}
+                    <div className="bg-[#1E293B] p-3 rounded border border-purple-500/30">
+                      <div className="font-bold text-purple-300 mb-1 flex items-center justify-between">
+                        <span>Shuffle SOAR (4)</span>
+                        <span className="text-[9px] text-[#4ADE80] font-mono">[HEALTHY]</span>
+                      </div>
+                      <p className="text-[10px] text-[#94A3B8] mb-2">Visual Automation & Webhook Orchestrator</p>
+                      <ul className="text-[10px] text-[#F1F5F9]/80 space-y-1">
+                        <li>• <code className="text-purple-300">shuffle</code>: ghcr.io/shuffle/shuffle-frontend (:3001)</li>
+                        <li>• <code className="text-purple-300">shuffle-backend</code>: ghcr.io/shuffle/shuffle-backend</li>
+                        <li>• <code className="text-purple-300">shuffle-orborus</code>: ghcr.io/shuffle/shuffle-orborus</li>
+                        <li>• <code className="text-purple-300">shuffle-database</code>: mongo:6</li>
+                      </ul>
+                    </div>
+
+                    {/* MISP Group */}
+                    <div className="bg-[#1E293B] p-3 rounded border border-purple-500/30">
+                      <div className="font-bold text-purple-300 mb-1 flex items-center justify-between">
+                        <span>MISP Official (4)</span>
+                        <span className="text-[9px] text-[#4ADE80] font-mono">[HEALTHY]</span>
+                      </div>
+                      <p className="text-[10px] text-[#94A3B8] mb-2">Threat Intelligence Management Platform</p>
+                      <ul className="text-[10px] text-[#F1F5F9]/80 space-y-1">
+                        <li>• <code className="text-cyan-300">misp-core</code>: ghcr.io/misp/misp-docker/misp-core (:8080)</li>
+                        <li>• <code className="text-cyan-300">misp-modules</code>: ghcr.io/misp/misp-docker/misp-modules</li>
+                        <li>• <code className="text-cyan-300">misp-db</code>: mariadb:10.11</li>
+                        <li>• <code className="text-cyan-300">misp-redis</code>: valkey/valkey:7.2</li>
+                      </ul>
+                    </div>
+
+                    {/* Logstash */}
+                    <div className="bg-[#1E293B] p-3 rounded border border-purple-500/30">
+                      <div className="font-bold text-[#38BDF8] mb-1 flex items-center justify-between">
+                        <span>Logstash Pipeline</span>
+                        <span className="text-[9px] text-[#4ADE80] font-mono">[HEALTHY]</span>
+                      </div>
+                      <p className="text-[10px] text-[#94A3B8] mb-2">ES Alert Poller & SOAR Forwarder</p>
+                      <ul className="text-[10px] text-[#F1F5F9]/80 space-y-1">
+                        <li>• <code className="text-[#38BDF8]">logstash</code>: docker.elastic.co/logstash/logstash:8.19.13 (:5044)</li>
+                        <li>• Scheduled query on <code className="text-[#38BDF8]">minisoc1:9200</code></li>
+                        <li>• Filter: <code className="text-emerald-400">rule.level &gt;= 12</code></li>
+                        <li>• Action: HTTP POST to Shuffle webhook</li>
+                      </ul>
+                    </div>
+
+                    {/* Mailpit */}
+                    <div className="bg-[#1E293B] p-3 rounded border border-purple-500/30">
+                      <div className="font-bold text-[#F59E0B] mb-1 flex items-center justify-between">
+                        <span>Mailpit Sinkhole</span>
+                        <span className="text-[9px] text-[#4ADE80] font-mono">[HEALTHY]</span>
+                      </div>
+                      <p className="text-[10px] text-[#94A3B8] mb-2">Phishing Payload Trap</p>
+                      <ul className="text-[10px] text-[#F1F5F9]/80 space-y-1">
+                        <li>• <code className="text-[#F59E0B]">mailpit</code>: axllent/mailpit (:8025 / :1025)</li>
+                        <li>• Moved from Gateway to minisoc3 in v2.1</li>
+                        <li>• Traps phishing simulation emails</li>
+                        <li>• REST API for header & link extraction</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  {/* Sanitized Configuration Viewer */}
+                  <div className="bg-[#1E293B] p-4 rounded border border-[#334155] space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#334155] pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-purple-300 uppercase">minisoc3 Configuration Blueprint</span>
+                        <span className="text-[10px] text-[#4ADE80] bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                          Zero-Secret Policy Enforced (Variables Only)
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1 bg-[#0F172A] p-1 rounded border border-[#334155]">
+                        <button
+                          onClick={() => setActiveSocConfigTab('compose')}
+                          className={`px-2.5 py-0.5 rounded text-[11px] font-semibold cursor-pointer ${
+                            activeSocConfigTab === 'compose'
+                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                              : 'text-[#94A3B8] hover:text-[#F1F5F9]'
+                          }`}
+                        >
+                          soc/docker-compose.yml
+                        </button>
+                        <button
+                          onClick={() => setActiveSocConfigTab('env')}
+                          className={`px-2.5 py-0.5 rounded text-[11px] font-semibold cursor-pointer ${
+                            activeSocConfigTab === 'env'
+                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                              : 'text-[#94A3B8] hover:text-[#F1F5F9]'
+                          }`}
+                        >
+                          soc/.env.example
+                        </button>
+                        <button
+                          onClick={() => setActiveSocConfigTab('logstash')}
+                          className={`px-2.5 py-0.5 rounded text-[11px] font-semibold cursor-pointer ${
+                            activeSocConfigTab === 'logstash'
+                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                              : 'text-[#94A3B8] hover:text-[#F1F5F9]'
+                          }`}
+                        >
+                          logstash.conf
+                        </button>
+                        <button
+                          onClick={() => setActiveSocConfigTab('logstash_yml')}
+                          className={`px-2.5 py-0.5 rounded text-[11px] font-semibold cursor-pointer ${
+                            activeSocConfigTab === 'logstash_yml'
+                              ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                              : 'text-[#94A3B8] hover:text-[#F1F5F9]'
+                          }`}
+                        >
+                          logstash.yml
+                        </button>
+                      </div>
+                    </div>
+
+                    {activeSocConfigTab === 'compose' && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-[11px] text-[#94A3B8]">
+                          <span>`~/aegis/soc/docker-compose.yml` (9 Services on `soc_net` bridge):</span>
+                          <button
+                            onClick={() =>
+                              handleCopy(
+                                `version: '3.8'\n\nnetworks:\n  soc_net:\n    driver: bridge\n\nservices:\n  # --- SHUFFLE SOAR (4 Services) ---\n  shuffle:\n    image: ghcr.io/shuffle/shuffle-frontend:latest\n    container_name: shuffle-frontend\n    ports:\n      - "3001:80"\n    networks:\n      - soc_net\n    restart: unless-stopped\n\n  shuffle-backend:\n    image: ghcr.io/shuffle/shuffle-backend:latest\n    container_name: shuffle-backend\n    environment:\n      - SHUFFLE_MONGO_DATABASE=shuffle\n      - SHUFFLE_MONGO_HOST=shuffle-database\n    networks:\n      - soc_net\n    restart: unless-stopped\n\n  shuffle-orborus:\n    image: ghcr.io/shuffle/shuffle-orborus:latest\n    container_name: shuffle-orborus\n    volumes:\n      - /var/run/docker.sock:/var/run/docker.sock\n    networks:\n      - soc_net\n    restart: unless-stopped\n\n  shuffle-database:\n    image: mongo:6\n    container_name: shuffle-database\n    volumes:\n      - shuffle_db:/data/db\n    networks:\n      - soc_net\n    restart: unless-stopped\n\n  # --- MISP THREAT INTEL (4 Official Services) ---\n  misp-core:\n    image: ghcr.io/misp/misp-docker/misp-core:latest\n    container_name: misp-core\n    ports:\n      - "8080:80"\n    environment:\n      - ADMIN_PASSPHRASE=\${MISP_ADMIN_PASSWORD}\n      - MYSQL_HOST=misp-db\n      - MYSQL_DATABASE=misp\n      - MYSQL_USER=misp\n      - MYSQL_PASSWORD=\${MISP_MYSQL_PASSWORD}\n      - REDIS_HOST=misp-redis\n      - REDIS_PASSWORD=\${REDIS_PASSWORD}\n      - GPG_PASSPHRASE=\${MISP_GPG_PASSPHRASE}\n    networks:\n      - soc_net\n    restart: unless-stopped\n\n  misp-modules:\n    image: ghcr.io/misp/misp-docker/misp-modules:latest\n    container_name: misp-modules\n    networks:\n      - soc_net\n    restart: unless-stopped\n\n  misp-db:\n    image: mariadb:10.11\n    container_name: misp-db\n    environment:\n      - MYSQL_ROOT_PASSWORD=\${MISP_MYSQL_ROOT_PASSWORD}\n      - MYSQL_DATABASE=misp\n      - MYSQL_USER=misp\n      - MYSQL_PASSWORD=\${MISP_MYSQL_PASSWORD}\n    volumes:\n      - misp_db_data:/var/lib/mysql\n    networks:\n      - soc_net\n    restart: unless-stopped\n\n  misp-redis:\n    image: valkey/valkey:7.2\n    container_name: misp-redis\n    command: ["valkey-server", "--requirepass", "\${REDIS_PASSWORD}"]\n    networks:\n      - soc_net\n    restart: unless-stopped\n\n  # --- LOGSTASH INGESTION & PIPELINE ---\n  logstash:\n    image: docker.elastic.co/logstash/logstash:8.19.13\n    container_name: soc-logstash\n    ports:\n      - "5044:5044"\n    volumes:\n      - ./logstash/pipeline/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro\n      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro\n    environment:\n      - ES_USER=\${ES_USER}\n      - ES_PASSWORD=\${ES_PASSWORD}\n    networks:\n      - soc_net\n    restart: unless-stopped\n\n  # --- MAILPIT SMTP SINKHOLE ---\n  mailpit:\n    image: axllent/mailpit:latest\n    container_name: soc-mailpit\n    ports:\n      - "8025:8025"\n      - "1025:1025"\n    networks:\n      - soc_net\n    restart: unless-stopped\n\nvolumes:\n  shuffle_db:\n  misp_db_data:`,
+                                'compose_code'
+                              )
+                            }
+                            className="text-[#38BDF8] hover:underline flex items-center gap-1 cursor-pointer text-[10px]"
+                          >
+                            {copiedCode === 'compose_code' ? <Check className="w-3 h-3 text-[#4ADE80]" /> : <Copy className="w-3 h-3" />}
+                            <span>{copiedCode === 'compose_code' ? 'Copied!' : 'Copy YAML'}</span>
+                          </button>
+                        </div>
+                        <div className="bg-[#0F172A] p-3 rounded border border-[#334155] text-[10px] font-mono text-[#4ADE80] max-h-72 overflow-y-auto whitespace-pre">
+{`version: '3.8'
+
+networks:
+  soc_net:
+    driver: bridge
+
+services:
+  # --- SHUFFLE SOAR (4 Services) ---
+  shuffle:
+    image: ghcr.io/shuffle/shuffle-frontend:latest
+    container_name: shuffle-frontend
+    ports:
+      - "3001:80"
+    networks:
+      - soc_net
+    restart: unless-stopped
+
+  shuffle-backend:
+    image: ghcr.io/shuffle/shuffle-backend:latest
+    container_name: shuffle-backend
+    environment:
+      - SHUFFLE_MONGO_DATABASE=shuffle
+      - SHUFFLE_MONGO_HOST=shuffle-database
+    networks:
+      - soc_net
+    restart: unless-stopped
+
+  shuffle-orborus:
+    image: ghcr.io/shuffle/shuffle-orborus:latest
+    container_name: shuffle-orborus
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - soc_net
+    restart: unless-stopped
+
+  shuffle-database:
+    image: mongo:6
+    container_name: shuffle-database
+    volumes:
+      - shuffle_db:/data/db
+    networks:
+      - soc_net
+    restart: unless-stopped
+
+  # --- MISP THREAT INTEL (4 Official Services) ---
+  misp-core:
+    image: ghcr.io/misp/misp-docker/misp-core:latest
+    container_name: misp-core
+    ports:
+      - "8080:80"
+    environment:
+      - ADMIN_PASSPHRASE=\${MISP_ADMIN_PASSWORD}
+      - MYSQL_HOST=misp-db
+      - MYSQL_DATABASE=misp
+      - MYSQL_USER=misp
+      - MYSQL_PASSWORD=\${MISP_MYSQL_PASSWORD}
+      - REDIS_HOST=misp-redis
+      - REDIS_PASSWORD=\${REDIS_PASSWORD}
+      - GPG_PASSPHRASE=\${MISP_GPG_PASSPHRASE}
+    networks:
+      - soc_net
+    restart: unless-stopped
+
+  misp-modules:
+    image: ghcr.io/misp/misp-docker/misp-modules:latest
+    container_name: misp-modules
+    networks:
+      - soc_net
+    restart: unless-stopped
+
+  misp-db:
+    image: mariadb:10.11
+    container_name: misp-db
+    environment:
+      - MYSQL_ROOT_PASSWORD=\${MISP_MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=misp
+      - MYSQL_USER=misp
+      - MYSQL_PASSWORD=\${MISP_MYSQL_PASSWORD}
+    volumes:
+      - misp_db_data:/var/lib/mysql
+    networks:
+      - soc_net
+    restart: unless-stopped
+
+  misp-redis:
+    image: valkey/valkey:7.2
+    container_name: misp-redis
+    command: ["valkey-server", "--requirepass", "\${REDIS_PASSWORD}"]
+    networks:
+      - soc_net
+    restart: unless-stopped
+
+  # --- LOGSTASH INGESTION & PIPELINE ---
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.19.13
+    container_name: soc-logstash
+    ports:
+      - "5044:5044"
+    volumes:
+      - ./logstash/pipeline/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+    environment:
+      - ES_USER=\${ES_USER}
+      - ES_PASSWORD=\${ES_PASSWORD}
+    networks:
+      - soc_net
+    restart: unless-stopped
+
+  # --- MAILPIT SMTP SINKHOLE ---
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: soc-mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    networks:
+      - soc_net
+    restart: unless-stopped
+
+volumes:
+  shuffle_db:
+  misp_db_data:`}
+                        </div>
+                      </div>
+                    )}
+
+                    {activeSocConfigTab === 'env' && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-[11px] text-[#94A3B8]">
+                          <span>`~/aegis/soc/.env.example` (Committed Template with Variable Placeholders):</span>
+                          <button
+                            onClick={() =>
+                              handleCopy(
+                                `# Elasticsearch credentials on minisoc1 (10.16.64.155)\nES_USER=logstash_internal\nES_PASSWORD=\${ES_PASSWORD}\n\n# MISP Official Stack Variables on minisoc3 (10.16.64.157)\nMISP_ADMIN_PASSWORD=\${MISP_ADMIN_PASSWORD}\nMISP_MYSQL_ROOT_PASSWORD=\${MISP_MYSQL_ROOT_PASSWORD}\nMISP_MYSQL_PASSWORD=\${MISP_MYSQL_PASSWORD}\nMISP_GPG_PASSPHRASE=\${MISP_GPG_PASSPHRASE}\nREDIS_PASSWORD=\${REDIS_PASSWORD}`,
+                                'env_code'
+                              )
+                            }
+                            className="text-[#38BDF8] hover:underline flex items-center gap-1 cursor-pointer text-[10px]"
+                          >
+                            {copiedCode === 'env_code' ? <Check className="w-3 h-3 text-[#4ADE80]" /> : <Copy className="w-3 h-3" />}
+                            <span>{copiedCode === 'env_code' ? 'Copied!' : 'Copy .env.example'}</span>
+                          </button>
+                        </div>
+                        <div className="bg-[#0F172A] p-3 rounded border border-[#334155] text-[11px] font-mono text-[#F1F5F9]/90 whitespace-pre">
+{`# Elasticsearch credentials on minisoc1 (10.16.64.155)
+ES_USER=logstash_internal
+ES_PASSWORD=\${ES_PASSWORD}
+
+# MISP Official Stack Variables on minisoc3 (10.16.64.157)
+MISP_ADMIN_PASSWORD=\${MISP_ADMIN_PASSWORD}
+MISP_MYSQL_ROOT_PASSWORD=\${MISP_MYSQL_ROOT_PASSWORD}
+MISP_MYSQL_PASSWORD=\${MISP_MYSQL_PASSWORD}
+MISP_GPG_PASSPHRASE=\${MISP_GPG_PASSPHRASE}
+REDIS_PASSWORD=\${REDIS_PASSWORD}`}
+                        </div>
+                        <p className="text-[10px] text-[#94A3B8]">
+                          * Note: The real `.env` is gitignored on the AlmaLinux host. No actual secrets are stored in git or blueprints.
+                        </p>
+                      </div>
+                    )}
+
+                    {activeSocConfigTab === 'logstash' && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-[11px] text-[#94A3B8]">
+                          <span>`~/aegis/soc/logstash/pipeline/logstash.conf` (Scheduled ES Query & Shuffle Hook):</span>
+                          <button
+                            onClick={() =>
+                              handleCopy(
+                                `input {\n  elasticsearch {\n    hosts => ["https://10.16.64.155:9200"]\n    index => "wazuh-alerts-*"\n    user => "\${ES_USER}"\n    password => "\${ES_PASSWORD}"\n    ssl => true\n    ssl_certificate_verification => false\n    query => '{ "query": { "range": { "rule.level": { "gte": 12 } } } }'\n    schedule => "* * * * *"\n  }\n}\n\nfilter {\n  mutate {\n    add_field => { "[soar][source]" => "wazuh_critical_feed" }\n  }\n}\n\noutput {\n  http {\n    url => "http://shuffle-backend:5001/api/v1/hooks/webhook_misp_enrichment"\n    http_method => "post"\n    format => "json"\n    mapping => {\n      "rule_id" => "%{[rule][id]}"\n      "rule_description" => "%{[rule][description]}"\n      "rule_level" => "%{[rule][level]}"\n      "agent_id" => "%{[agent][id]}"\n      "agent_name" => "%{[agent][name]}"\n      "agent_ip" => "%{[agent][ip]}"\n      "src_ip" => "%{[data][srcip]}"\n      "dest_ip" => "%{[data][dstip]}"\n      "full_log" => "%{[full_log]}"\n    }\n  }\n  stdout { codec => rubydebug }\n}`,
+                                'logstash_conf'
+                              )
+                            }
+                            className="text-[#38BDF8] hover:underline flex items-center gap-1 cursor-pointer text-[10px]"
+                          >
+                            {copiedCode === 'logstash_conf' ? <Check className="w-3 h-3 text-[#4ADE80]" /> : <Copy className="w-3 h-3" />}
+                            <span>{copiedCode === 'logstash_conf' ? 'Copied!' : 'Copy Pipeline'}</span>
+                          </button>
+                        </div>
+                        <div className="bg-[#0F172A] p-3 rounded border border-[#334155] text-[10px] font-mono text-[#38BDF8] max-h-72 overflow-y-auto whitespace-pre">
+{`input {
+  elasticsearch {
+    hosts => ["https://10.16.64.155:9200"]
+    index => "wazuh-alerts-*"
+    user => "\${ES_USER}"
+    password => "\${ES_PASSWORD}"
+    ssl => true
+    ssl_certificate_verification => false
+    query => '{ "query": { "range": { "rule.level": { "gte": 12 } } } }'
+    schedule => "* * * * *"
+  }
+}
+
+filter {
+  mutate {
+    add_field => { "[soar][source]" => "wazuh_critical_feed" }
+  }
+}
+
+output {
+  http {
+    url => "http://shuffle-backend:5001/api/v1/hooks/webhook_misp_enrichment"
+    http_method => "post"
+    format => "json"
+    mapping => {
+      "rule_id" => "%{[rule][id]}"
+      "rule_description" => "%{[rule][description]}"
+      "rule_level" => "%{[rule][level]}"
+      "agent_id" => "%{[agent][id]}"
+      "agent_name" => "%{[agent][name]}"
+      "agent_ip" => "%{[agent][ip]}"
+      "src_ip" => "%{[data][srcip]}"
+      "dest_ip" => "%{[data][dstip]}"
+      "full_log" => "%{[full_log]}"
+    }
+  }
+  stdout { codec => rubydebug }
+}`}
+                        </div>
+                      </div>
+                    )}
+
+                    {activeSocConfigTab === 'logstash_yml' && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-[11px] text-[#94A3B8]">
+                          <span>`~/aegis/soc/logstash/config/logstash.yml`:</span>
+                          <button
+                            onClick={() =>
+                              handleCopy(
+                                `http.host: "0.0.0.0"\nxpack.monitoring.enabled: false\npipeline.workers: 2\npipeline.batch.size: 125`,
+                                'logstash_yml_code'
+                              )
+                            }
+                            className="text-[#38BDF8] hover:underline flex items-center gap-1 cursor-pointer text-[10px]"
+                          >
+                            {copiedCode === 'logstash_yml_code' ? <Check className="w-3 h-3 text-[#4ADE80]" /> : <Copy className="w-3 h-3" />}
+                            <span>{copiedCode === 'logstash_yml_code' ? 'Copied!' : 'Copy YAML'}</span>
+                          </button>
+                        </div>
+                        <div className="bg-[#0F172A] p-3 rounded border border-[#334155] text-[11px] font-mono text-[#F1F5F9]/90 whitespace-pre">
+{`http.host: "0.0.0.0"
+xpack.monitoring.enabled: false
+pipeline.workers: 2
+pipeline.batch.size: 125`}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Sub-tab 2: Abuse.ch Auto Feed Ingestion */}
               {activeMispTab === 'feeds' && (
                 <div className="space-y-4">
                   <div className="text-xs text-[#94A3B8]">
@@ -507,9 +906,9 @@ export const SubTopologiesView: React.FC = () => {
 
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-[11px] text-[#94A3B8]">
-                        <span>1. MISP CLI Cake Console Feed Synchronization Command (minisoc3 container):</span>
+                        <span>1. MISP Cake Console Feed Sync Command (`misp-core` container on minisoc3):</span>
                         <button
-                          onClick={() => handleCopy('docker exec -it misp_container /var/www/MISP/app/Console/cake Server fetchFeed all', 'cake')}
+                          onClick={() => handleCopy('docker exec -it misp-core /var/www/MISP/app/Console/cake Server fetchFeed all', 'cake')}
                           className="text-[#38BDF8] hover:underline flex items-center gap-1 cursor-pointer text-[10px]"
                         >
                           {copiedCode === 'cake' ? <Check className="w-3 h-3 text-[#4ADE80]" /> : <Copy className="w-3 h-3" />}
@@ -517,13 +916,13 @@ export const SubTopologiesView: React.FC = () => {
                         </button>
                       </div>
                       <div className="bg-[#0F172A] p-2.5 rounded border border-[#334155] text-xs font-mono text-[#4ADE80]">
-                        docker exec -it misp_container /var/www/MISP/app/Console/cake Server fetchFeed all
+                        docker exec -it misp-core /var/www/MISP/app/Console/cake Server fetchFeed all
                       </div>
 
                       <div className="flex items-center justify-between text-[11px] text-[#94A3B8] mt-2">
-                        <span>2. Automated System Cron Schedule (`/etc/cron.d/misp-abusech` on minisoc3):</span>
+                        <span>2. Automated Host Cron Schedule (`/etc/cron.d/misp-abusech` on minisoc3):</span>
                         <button
-                          onClick={() => handleCopy('0 */2 * * * www-data /var/www/MISP/app/Console/cake Server fetchFeed all\n0 3 * * * www-data /var/www/MISP/app/Console/cake Server cacheFeeds all', 'cron')}
+                          onClick={() => handleCopy('0 */2 * * * root docker exec misp-core /var/www/MISP/app/Console/cake Server fetchFeed all\n0 3 * * * root docker exec misp-core /var/www/MISP/app/Console/cake Server cacheFeeds all', 'cron')}
                           className="text-[#38BDF8] hover:underline flex items-center gap-1 cursor-pointer text-[10px]"
                         >
                           {copiedCode === 'cron' ? <Check className="w-3 h-3 text-[#4ADE80]" /> : <Copy className="w-3 h-3" />}
@@ -531,16 +930,16 @@ export const SubTopologiesView: React.FC = () => {
                         </button>
                       </div>
                       <div className="bg-[#0F172A] p-2.5 rounded border border-[#334155] text-xs font-mono text-[#94A3B8]">
-                        <div className="text-[#38BDF8]"># Auto-fetch Abuse.ch feeds every 2 hours and cache attributes</div>
-                        <div>0 */2 * * * www-data /var/www/MISP/app/Console/cake Server fetchFeed all</div>
-                        <div>0 3 * * * www-data /var/www/MISP/app/Console/cake Server cacheFeeds all</div>
+                        <div className="text-[#38BDF8]"># Auto-fetch Abuse.ch feeds every 2 hours via official misp-core container</div>
+                        <div>0 */2 * * * root docker exec misp-core /var/www/MISP/app/Console/cake Server fetchFeed all</div>
+                        <div>0 3 * * * root docker exec misp-core /var/www/MISP/app/Console/cake Server cacheFeeds all</div>
                       </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Sub-tab 2: Manual IOC Addition Instructions & REST API */}
+              {/* Sub-tab 3: Manual IOC Addition Instructions & REST API */}
               {activeMispTab === 'manual' && (
                 <div className="space-y-4">
                   <div className="text-xs text-[#94A3B8]">
@@ -618,14 +1017,14 @@ export const SubTopologiesView: React.FC = () => {
                       </div>
 
                       <div className="text-[10px] text-[#94A3B8]">
-                        <strong className="text-white">Note:</strong> When posted, MISP automatically triggers Shuffle SOAR at <code className="text-purple-300">http://10.16.64.157:3001/api/v1/hooks/webhook_misp_enrichment</code>.
+                        <strong className="text-white">Note:</strong> When posted, MISP triggers Shuffle SOAR webhook listener on <code className="text-purple-300">http://10.16.64.157:3001/api/v1/hooks/webhook_misp_enrichment</code>.
                       </div>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Sub-tab 3: Interactive Live SOAR Workflow Simulator */}
+              {/* Sub-tab 4: Interactive Live SOAR Workflow Simulator */}
               {activeMispTab === 'soar' && (
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">

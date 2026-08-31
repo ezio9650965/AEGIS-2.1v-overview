@@ -6,7 +6,7 @@ export const FileStructureView: React.FC = () => {
 
   const fileTreeText = `~/aegis/
 ├── gateway/
-│   ├── docker-compose.yml              # Core Gateway: Traefik, Authelia, Keycloak, Postgres, Redis, Mailpit, Portainer
+│   ├── docker-compose.yml              # Core Gateway: Traefik, Authelia, Keycloak, Postgres, Redis, Portainer, Coraza, Suricata
 │   ├── .env                            # Centralized active secrets (single source of truth)
 │   ├── traefik/
 │   │   ├── traefik.yml                 # Static config (entrypoints, logging, providers)
@@ -29,8 +29,14 @@ export const FileStructureView: React.FC = () => {
 │   └── zeek/
 │       └── node.cfg                    # Zeek 5-node cluster config (br_proxy, ens34, ens33)
 ├── soc/
-│   ├── minisoc3-docker-compose.yml     # Docker Compose for minisoc3 ONLY (Shuffle SOAR, Logstash, MISP)
-│   │                                   # Note: minisoc1 (Elasticsearch) & minisoc2 (Wazuh/Kibana) are native RPM installs
+│   ├── docker-compose.yml              # 9 services: 4 Shuffle, 4 MISP, Logstash, Mailpit
+│   ├── .env                            # NOT committed — real secrets, gitignored
+│   ├── .env.example                    # Committed — same variable names, placeholder values
+│   ├── logstash/
+│   │   ├── pipeline/
+│   │   │   └── logstash.conf           # ES query (rule.level >= 12) -> Shuffle webhook
+│   │   └── config/
+│   │       └── logstash.yml
 │   ├── playbooks/
 │   │   ├── brute-force.md              # L1 Playbook: Auth failure triage
 │   │   ├── malware.md                  # L1 Playbook: Malware containment
@@ -38,15 +44,9 @@ export const FileStructureView: React.FC = () => {
 │   ├── dashboards/
 │   │   ├── metrics.ndjson              # Kibana export: MTTD/MTTR metrics
 │   │   └── mitre-matrix.ndjson         # Kibana export: MITRE ATT&CK coverage
-│   ├── logstash/
-│   │   └── pipeline/
-│   │       └── logstash.conf           # Ingestion pipeline: ES feed -> Shuffle webhook
-│   ├── misp/
-│   │   ├── feeds_config.json           # Abuse.ch feeds auto-ingestion config (URLhaus, MalwareBazaar, Feodo)
-│   │   └── trigger_soar.py             # PyMISP script for manual IOC submission & Shuffle SOAR hook
 │   └── wazuh/
 │       └── rules/
-│           └── local_rules.xml         # Custom detection rules with MITRE ATT&CK tags
+│           └── local_rules.xml         # Custom detection rules with MITRE ATT&CK tags (minisoc2)
 ├── grid/
 │   ├── corp-dc01/                      # Active Directory scripts & Windows Event Forwarding configs
 │   ├── corp-pc01/                      # Sysmon v15 XML config & Wazuh agent configuration

@@ -15,7 +15,7 @@ export const SECTIONS: Section[] = [
 
 export const INITIAL_CHECKLIST_DONE: ChecklistItem[] = [
   { id: 'd1', title: 'Dual-Network Docker ZTA Isolation', description: 'Kernel-level bridge separation with proxy_net (DMZ) and auth_net (internal: true).', category: 'critical', completed: true },
-  { id: 'd2', title: 'All 9 Core Containers Healthy', description: 'traefik, authelia, keycloak, postgres, redis, mailpit, portainer, coraza-waf, suricata running.', category: 'critical', completed: true },
+  { id: 'd2', title: 'Core Gateway Containers Healthy', description: 'traefik, authelia, keycloak, postgres, redis, portainer, coraza-waf, suricata running.', category: 'critical', completed: true },
   { id: 'd3', title: 'Authelia Forward-Auth & MFA', description: 'Two-factor authentication policies enforced across all zero-trust subdomains.', category: 'critical', completed: true },
   { id: 'd4', title: 'Keycloak OIDC Integration', description: 'Federated Identity Provider configured for OAuth2/OIDC SSO delegation.', category: 'high', completed: true },
   { id: 'd5', title: 'TLS Termination at Traefik', description: 'Edge HTTPS entrypoints with wildcard certificates (*.zerotrust.lan).', category: 'high', completed: true },
@@ -34,6 +34,7 @@ export const INITIAL_CHECKLIST_DONE: ChecklistItem[] = [
   { id: 'd18', title: 'Coraza WAF (Caddy + OWASP CRS)', description: 'Custom xcaddy build with OWASP CRS vendored to /srv, in front of Juice Shop on proxy_net.', category: 'critical', completed: true, who: 'eagle' },
   { id: 'd19', title: 'Suricata IDS Container', description: 'Attached to proxy_net with Emerging Threats Open ruleset, 52,256 rules loaded.', category: 'critical', completed: true, who: 'eagle' },
   { id: 'd20', title: 'Zeek NTA 5-Node Cluster', description: '5-node manager/proxy/worker cluster monitoring br_proxy, ens34 & ens33.', category: 'critical', completed: true, who: 'eagle' },
+  { id: 'd21', title: 'Deploy Zone 4 minisoc3 automation stack (Shuffle + Logstash + MISP)', description: '9-container stack verified healthy, Elasticsearch connectivity confirmed via direct query against minisoc1, MISP/Shuffle web UIs reachable.', category: 'critical', completed: true, who: 'ezio' },
 ];
 
 export const INITIAL_CHECKLIST_LEFT: ChecklistItem[] = [
@@ -41,9 +42,9 @@ export const INITIAL_CHECKLIST_LEFT: ChecklistItem[] = [
   { id: 'l5', title: 'Update Keycloak Admin Password', description: 'Update keycloak/.env with KC_Admin_AEGIS_2026! and sync in UI.', category: 'critical', completed: false, who: 'eagle' },
   { id: 'l6', title: 'Generate Strong AUTHELIA_SESSION_SECRET', description: 'Execute openssl rand -hex 32 and update root .env file.', category: 'critical', completed: false, who: 'eagle' },
   { id: 'l7', title: 'Set Unique Password Hash for Eagle User', description: 'Generate distinct Argon2id hash for eagle account in users_database.yml.', category: 'critical', completed: false, who: 'eagle' },
-  { id: 'l8', title: 'Deploy Zone 4 Distributed SOC Cluster', description: 'Verify 3-node connectivity: minisoc1 (ES Native), minisoc2 (Wazuh/Kibana Native), minisoc3 (Shuffle/MISP Docker).', category: 'high', completed: false, who: 'ezio' },
   { id: 'l9', title: 'Configure Gateway Filebeat Ingestion', description: 'Ship Traefik JSON logs, Authelia audit, Zeek conn.log, Suricata alerts to minisoc1:9200.', category: 'high', completed: false, who: 'ezio' },
-  { id: 'l10', title: 'Build Shuffle SOAR Workflow ("Mahoraga v2.1")', description: 'Implement Wazuh webhook listener -> MISP lookup -> Active Response + Slack isolation workflow.', category: 'high', completed: false, who: 'ezio' },
+  { id: 'l10', title: 'Build the Shuffle SOAR workflow itself (webhook receiver -> MISP lookup -> Keycloak session revocation / Wazuh Active Response)', description: 'Containers are running on minisoc3 but the workflow graph is not yet built in Shuffle UI.', category: 'high', completed: false, who: 'ezio' },
+  { id: 'l10b', title: 'End-to-end live-alert test (trigger a real attack, confirm it flows Wazuh -> Elasticsearch -> Logstash -> Shuffle webhook)', description: 'Trigger real attack and verify full pipeline flow from endpoint detection to SOAR webhook execution.', category: 'high', completed: false, who: 'ezio' },
   { id: 'l11', title: 'Write 3 L1 SOC Playbooks in Markdown', description: 'Create brute-force.md, malware.md, and exfiltration.md in /opt/soc/playbooks/.', category: 'high', completed: false, who: 'both' },
   { id: 'l12', title: 'Map Custom Wazuh Rules to MITRE ATT&CK', description: 'Tag all local Wazuh rules with explicit mitre.id fields in local_rules.xml.', category: 'high', completed: false, who: 'ezio' },
   { id: 'l13', title: 'Build Kibana Dashboards', description: 'Import and build SOC Morning, Network Traffic, Phishing Analysis, and MITRE Matrix views.', category: 'high', completed: false, who: 'ezio' },
@@ -65,6 +66,7 @@ export const SECURITY_DEBT: SecurityDebtItem[] = [
   { flaw: 'Custom ML black box unverified', severity: 'High', fix: 'Replaced with Shuffle SOAR + Logstash + MISP', evidence: 'Shuffle visual execution graph' },
   { flaw: 'Single flat Docker network (no ZTA)', severity: 'Critical', fix: 'Implemented dual bridge: proxy_net + auth_net (internal: true)', evidence: 'docker network inspect internal: true' },
   { flaw: 'All ports exposed to host interface', severity: 'Critical', fix: 'Unbound internal ports; exposed only 80/443/1514/1515', evidence: 'Host nmap scan showing closed 5432/6379' },
+  { flaw: 'coolacid/misp-docker image deprecated/unavailable', severity: 'Medium', fix: 'Replaced with official ghcr.io/misp/misp-docker images (misp-core, misp-modules, misp-db, misp-redis split)', evidence: 'docker compose ps — all containers healthy' },
 ];
 
 export const TRYHACKME_MAP: TryHackMeTopic[] = [
@@ -175,7 +177,6 @@ export const MASTER_TOPOLOGY_MERMAID = `graph TB
             KEYCLOAK["Keycloak v26.6.2<br/>OIDC Identity Provider"]
             POSTGRES["PostgreSQL 16<br/>Identity Vault"]
             REDIS["Redis 7<br/>Session Cache"]
-            MAILPIT["Mailpit<br/>SMTP Sinkhole"]
             PORTAINER["Portainer CE v2.39.2<br/>Management UI"]
         end
         ZEEK["Zeek NTA (5-Node Cluster)<br/>Sniffing br_proxy, ens34 & ens33"]
@@ -185,9 +186,11 @@ export const MASTER_TOPOLOGY_MERMAID = `graph TB
     subgraph Zone4["🟣 Zone 4: MSSP SOC (10.16.64.0/24 - AlmaLinux 9.3 Cluster)"]
         SOC1["minisoc1 (10.16.64.155)<br/>Elasticsearch 8.19.13 'The Vault' (Native Package)<br/>Port 9200/TLS"]
         SOC2["minisoc2 (10.16.64.156)<br/>Wazuh Manager 4.7 + Kibana 'The Brain' (Native Package)<br/>Ports 1514 / 1515 / 5601"]
-        subgraph MiniSOC3["minisoc3 (10.16.64.157) 'The Executor' (Docker)"]
-            SOC3_SHUFFLE["Shuffle SOAR + Logstash<br/>Ports 3001 / 5044"]
-            SOC3_MISP["MISP Threat Intel<br/>Port 8080"]
+        subgraph MiniSOC3["minisoc3 (10.16.64.157) 'The Executor' (soc_net Bridge)"]
+            SOC3_SHUFFLE["Shuffle SOAR (4 Containers)<br/>frontend (:3001), backend, orborus, mongo:6"]
+            SOC3_MISP["MISP Official (4 Containers)<br/>core (:8080), modules, mariadb, valkey"]
+            SOC3_LOGSTASH["Logstash 8.19.13 (:5044)<br/>Level 12+ ES Query -> Shuffle Hook"]
+            SOC3_MAILPIT["Mailpit SMTP Sinkhole (:8025)<br/>Phishing Triage"]
         end
     end
 
@@ -209,7 +212,8 @@ export const MASTER_TOPOLOGY_MERMAID = `graph TB
     SURICATA -->|"14. EVE JSON Alerts"| SOC2
 
     SOC2 -->|"15. Index Alerts"| SOC1
-    SOC1 -->|"16. Alert Feed"| SOC3_SHUFFLE
-    SOC3_SHUFFLE -->|"17. Threat Intel Lookup"| SOC3_MISP
-    SOC3_SHUFFLE -->|"18. Active Response / Session Revocation"| SOC2
-    SOC2 -->|"19. Host Isolation Trigger"| PC01`;
+    SOC1 -->|"16. Alert Feed (rule.level >= 12)"| SOC3_LOGSTASH
+    SOC3_LOGSTASH -->|"17. Trigger Webhook"| SOC3_SHUFFLE
+    SOC3_SHUFFLE -->|"18. Threat Intel Lookup"| SOC3_MISP
+    SOC3_SHUFFLE -->|"19. Active Response / Session Revocation"| SOC2
+    SOC2 -->|"20. Host Isolation Trigger"| PC01`;
