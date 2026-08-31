@@ -20,10 +20,23 @@ import {
   Send,
   ExternalLink,
   CheckCircle2,
+  Users,
+  Key,
+  Lock,
+  ShieldCheck,
+  UserCheck,
+  Clock,
+  Building,
+  ArrowRight,
+  Mail,
+  FileCheck,
+  CheckSquare,
+  ShieldAlert,
+  Briefcase,
 } from 'lucide-react';
 
 export const SubTopologiesView: React.FC = () => {
-  const [activeSubTab, setActiveSubTab] = useState<'z1' | 'z2' | 'z3' | 'z4'>('z3');
+  const [activeSubTab, setActiveSubTab] = useState<'z1' | 'z2' | 'z3' | 'z4' | 'governance'>('z3');
   const [activeMispTab, setActiveMispTab] = useState<'stack' | 'feeds' | 'manual' | 'soar'>('stack');
   const [activeSocConfigTab, setActiveSocConfigTab] = useState<'compose' | 'env' | 'logstash' | 'logstash_yml'>('compose');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -112,7 +125,7 @@ export const SubTopologiesView: React.FC = () => {
           </div>
 
           {/* Sub-tabs */}
-          <div className="flex items-center gap-1 bg-[#0F172A] p-1 border border-[#334155] rounded font-mono">
+          <div className="flex flex-wrap items-center gap-1 bg-[#0F172A] p-1 border border-[#334155] rounded font-mono">
             <button
               onClick={() => setActiveSubTab('z1')}
               className={`px-3 py-1.5 rounded text-xs font-semibold transition-all cursor-pointer ${
@@ -144,6 +157,15 @@ export const SubTopologiesView: React.FC = () => {
               }`}
             >
               Zone 4: MSSP SOC
+            </button>
+            <button
+              onClick={() => setActiveSubTab('governance')}
+              className={`px-3 py-1.5 rounded text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeSubTab === 'governance' ? 'bg-emerald-500/20 text-[#4ADE80] border border-emerald-500/40' : 'text-[#94A3B8] hover:text-[#F1F5F9]'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Identity & Governance</span>
             </button>
           </div>
         </div>
@@ -231,6 +253,94 @@ export const SubTopologiesView: React.FC = () => {
                     <li>• Wazuh Agent v4.7 (HIDS & Vulnerability Detection)</li>
                     <li>• Telemetry: Traefik L7 JSON, SQLi/XSS Alerts, WAF Blocks</li>
                   </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* NEW SUBSECTION: Role-Based Access Mapping (Zone 2) */}
+            <div className="bg-[#0F172A] border border-[#FBBF24]/30 rounded-lg p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded bg-[#FBBF24]/10 text-[#FBBF24] border border-[#FBBF24]/30">
+                    <Users className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-[#FBBF24] uppercase tracking-wider">
+                      Role-Based Access Mapping (Zone 2 — Active Directory)
+                    </h4>
+                    <p className="text-[11px] text-[#94A3B8]">
+                      Mapping organizational AD security groups to gateway policy and session enforcement parameters
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-[#FBBF24]/10 text-[#FBBF24] border border-[#FBBF24]/30 px-2 py-0.5 rounded font-mono">
+                  AD DS: aegis.corp
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-[11px] text-left border-collapse">
+                  <thead>
+                    <tr className="bg-[#1E293B] text-[#FBBF24] border-b border-[#334155]">
+                      <th className="p-2.5 font-bold">AD Group</th>
+                      <th className="p-2.5 font-bold">Example Role</th>
+                      <th className="p-2.5 font-bold">Session Length</th>
+                      <th className="p-2.5 font-bold">MFA Re-check Interval</th>
+                      <th className="p-2.5 font-bold">Enforced Access Scope</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#334155] text-[#F1F5F9]/80">
+                    <tr className="hover:bg-[#1E293B]/40 transition-colors">
+                      <td className="p-2.5 font-bold text-white">Marketing</td>
+                      <td className="p-2.5 text-[#94A3B8]">Marketing staff</td>
+                      <td className="p-2.5 text-[#38BDF8] font-semibold">8h</td>
+                      <td className="p-2.5 text-[#4ADE80]">Login only</td>
+                      <td className="p-2.5">Marketing CRM / shared department drive</td>
+                    </tr>
+                    <tr className="hover:bg-[#1E293B]/40 transition-colors">
+                      <td className="p-2.5 font-bold text-white">HR</td>
+                      <td className="p-2.5 text-[#94A3B8]">HR staff</td>
+                      <td className="p-2.5 text-[#38BDF8] font-semibold">8h</td>
+                      <td className="p-2.5 text-amber-400 font-semibold">Every 2h</td>
+                      <td className="p-2.5">HR system, payroll & confidential employee records</td>
+                    </tr>
+                    <tr className="hover:bg-[#1E293B]/40 transition-colors">
+                      <td className="p-2.5 font-bold text-white">Developers</td>
+                      <td className="p-2.5 text-[#94A3B8]">Web developers</td>
+                      <td className="p-2.5 text-[#38BDF8] font-semibold">8h</td>
+                      <td className="p-2.5 text-[#38BDF8]">Login only (general); two_factor on admin paths</td>
+                      <td className="p-2.5">Dev tools + scoped juiceshop-admins access</td>
+                    </tr>
+                    <tr className="hover:bg-[#1E293B]/40 transition-colors">
+                      <td className="p-2.5 font-bold text-white">DevOps</td>
+                      <td className="p-2.5 text-[#94A3B8]">Infrastructure ops</td>
+                      <td className="p-2.5 text-[#38BDF8] font-semibold">4h</td>
+                      <td className="p-2.5 text-amber-400 font-semibold">Every 2h</td>
+                      <td className="p-2.5">Portainer CE, monitoring, CI/CD deploy pipelines</td>
+                    </tr>
+                    <tr className="hover:bg-[#1E293B]/40 transition-colors">
+                      <td className="p-2.5 font-bold text-white">IT</td>
+                      <td className="p-2.5 text-[#94A3B8]">Gateway / network admin</td>
+                      <td className="p-2.5 text-red-400 font-semibold">2h</td>
+                      <td className="p-2.5 text-red-400 font-bold">Every 1h or hardware key (FIDO2)</td>
+                      <td className="p-2.5">Portainer, mail relay admin, Traefik dynamic config</td>
+                    </tr>
+                    <tr className="hover:bg-[#1E293B]/40 transition-colors">
+                      <td className="p-2.5 font-bold text-white">Executive</td>
+                      <td className="p-2.5 text-[#94A3B8]">CEO / corporate leadership</td>
+                      <td className="p-2.5 text-[#38BDF8] font-semibold">8h</td>
+                      <td className="p-2.5 text-[#4ADE80]">Login only</td>
+                      <td className="p-2.5 text-amber-300">Read-only high-level posture dashboard; <strong className="text-red-400">NOT</strong> raw SOC tools</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Explicit Architectural Note */}
+              <div className="bg-[#1E293B] border border-[#FBBF24]/40 rounded p-3 text-[11px] text-[#F1F5F9]/90 flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-[#FBBF24] shrink-0 mt-0.5" />
+                <div>
+                  <strong className="text-[#FBBF24]">Core Governance Directive:</strong> Privilege maps strictly to <span className="text-white underline font-bold">job function</span> via Active Directory group membership, never to hierarchical org-chart title. An executive account does <span className="text-red-400 font-bold">NOT</span> automatically inherit admin-panel, gateway config, or SOC tool access.
                 </div>
               </div>
             </div>
@@ -326,6 +436,119 @@ export const SubTopologiesView: React.FC = () => {
                     </tr>
                   </tbody>
                 </table>
+              </div>
+            </div>
+
+            {/* NEW SECTION: Access Control Model — Customers vs. Employees */}
+            <div className="bg-[#0F172A] border border-[#38BDF8]/30 rounded-lg p-5 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-[#334155]">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/30">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-[#38BDF8] uppercase tracking-wider">
+                      Access Control Model — Customers vs. Employees
+                    </h4>
+                    <p className="text-[11px] text-[#94A3B8]">
+                      Dual Authentication Domains & Gateway Policy Enforcement (Authelia + Traefik Forward-Auth)
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-emerald-500/10 text-[#4ADE80] border border-emerald-500/30 px-2 py-0.5 rounded font-mono">
+                  Production Policy Rule
+                </span>
+              </div>
+
+              {/* Two Authentication Domains Comparison */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
+                  <div className="font-bold text-[#4ADE80] mb-2 flex items-center justify-between">
+                    <span>(a) Customer-Facing Domain</span>
+                    <span className="text-[10px] bg-emerald-500/20 text-[#4ADE80] px-1.5 py-0.5 rounded font-mono">policy: bypass</span>
+                  </div>
+                  <p className="text-[11px] text-[#F1F5F9]/80 mb-2 leading-relaxed">
+                    Customer-facing paths (e.g. <span className="text-[#38BDF8] font-bold">shop.zerotrust.lan</span> / OWASP Juice Shop storefront) use <code className="text-[#4ADE80] bg-black/40 px-1 py-0.5 rounded">policy: bypass</code> in Authelia — zero MFA and zero employee SSO.
+                  </p>
+                  <ul className="text-[11px] text-[#94A3B8] space-y-1 list-disc list-inside">
+                    <li>Customers authenticate via the application's native account system.</li>
+                    <li><strong className="text-white">Conversion Preservation:</strong> Enterprise-style MFA on a public e-commerce storefront would destroy user conversion and is explicitly <em>NOT</em> how AEGIS is designed.</li>
+                  </ul>
+                </div>
+
+                <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
+                  <div className="font-bold text-[#38BDF8] mb-2 flex items-center justify-between">
+                    <span>(b) Employee / Admin Domain</span>
+                    <span className="text-[10px] bg-blue-500/20 text-[#38BDF8] px-1.5 py-0.5 rounded font-mono">policy: two_factor</span>
+                  </div>
+                  <p className="text-[11px] text-[#F1F5F9]/80 mb-2 leading-relaxed">
+                    Employee and administration paths (internal tools, management consoles, admin panels, SOC access) strictly mandate <code className="text-[#38BDF8] bg-black/40 px-1 py-0.5 rounded">policy: two_factor</code> via Authelia.
+                  </p>
+                  <ul className="text-[11px] text-[#94A3B8] space-y-1 list-disc list-inside">
+                    <li>Federated identity mapped and scoped by Active Directory group membership through Keycloak OIDC.</li>
+                    <li>Granular RBAC ensures users only access resources authorized for their specific job role.</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Authelia Access Control YAML Example */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[11px] text-[#94A3B8]">
+                  <span>Authelia Gateway Configuration (<code className="text-[#38BDF8]">authelia/configuration.yml</code>):</span>
+                  <button
+                    onClick={() =>
+                      handleCopy(
+                        `access_control:\n  default_policy: deny\n  rules:\n    # 1. Customer Storefront (Public access without employee SSO)\n    - domain: "shop.zerotrust.lan"\n      policy: bypass\n\n    # 2. Storefront Admin Panel (Step-up MFA scoped to juice-shop admin group)\n    - domain: "shop.zerotrust.lan"\n      resources: ["^/admin.*"]\n      policy: two_factor\n      subject: "group:juiceshop-admins"\n\n    # 3. Internal Engineering & SOC Domains (Strict 2FA)\n    - domain: "*.zerotrust.lan"\n      policy: two_factor`,
+                        'authelia_ac'
+                      )
+                    }
+                    className="text-[#38BDF8] hover:underline flex items-center gap-1 cursor-pointer text-[10px]"
+                  >
+                    {copiedCode === 'authelia_ac' ? <Check className="w-3 h-3 text-[#4ADE80]" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedCode === 'authelia_ac' ? 'Copied!' : 'Copy YAML'}</span>
+                  </button>
+                </div>
+                <div className="bg-[#0F172A] p-3 rounded border border-[#334155] text-[11px] font-mono text-[#38BDF8] whitespace-pre overflow-x-auto">
+{`access_control:
+  default_policy: deny
+  rules:
+    # 1. Customer Storefront (Public access without employee SSO)
+    - domain: "shop.zerotrust.lan"
+      policy: bypass
+
+    # 2. Storefront Admin Panel (Step-up MFA scoped to juice-shop admin group)
+    - domain: "shop.zerotrust.lan"
+      resources: ["^/admin.*"]
+      policy: two_factor
+      subject: "group:juiceshop-admins"
+
+    # 3. Internal Engineering & SOC Domains (Strict 2FA)
+    - domain: "*.zerotrust.lan"
+      policy: two_factor`}
+                </div>
+              </div>
+
+              {/* Hijacking Mitigation & TOTP Clarification Callouts */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs pt-1">
+                <div className="bg-[#1E293B] border border-[#38BDF8]/40 rounded p-3 text-[11px] text-[#F1F5F9]/90 space-y-1">
+                  <div className="font-bold text-[#38BDF8] flex items-center gap-1.5">
+                    <Shield className="w-3.5 h-3.5" />
+                    <span>Session-Cookie Hijacking Mitigation</span>
+                  </div>
+                  <p className="text-[#94A3B8] leading-relaxed">
+                    Admin-path MFA re-validates even within an already-valid general session. If an attacker hijacks a standard user session cookie, they cannot silently pivot to <code className="text-white">/admin</code> without completing a secondary hardware/TOTP challenge.
+                  </p>
+                </div>
+
+                <div className="bg-[#1E293B] border border-emerald-500/40 rounded p-3 text-[11px] text-[#F1F5F9]/90 space-y-1">
+                  <div className="font-bold text-[#4ADE80] flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>TOTP MFA Security Boundary</span>
+                  </div>
+                  <p className="text-[#94A3B8] leading-relaxed">
+                    TOTP MFA secrets are rendered <span className="text-white font-semibold">once in-browser</span> during authenticated enrollment and <span className="text-[#4ADE80] font-semibold">NEVER transit email / Mailpit</span>. This is safe by design and entirely immune to mail-sinkhole exposure.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -1203,6 +1426,419 @@ pipeline.batch.size: 125`}
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* NEW SUBSECTION: MSSP Service Tiering (Zone 4) */}
+            <div className="bg-[#0F172A] border border-purple-500/30 rounded-lg p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/30">
+                    <Briefcase className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-purple-400 uppercase tracking-wider">
+                      MSSP Service Tiering & Access Governance (Zone 4)
+                    </h4>
+                    <p className="text-[11px] text-[#94A3B8]">
+                      Tiered role boundaries isolating SOC operations, client engineering, and corporate leadership
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] bg-purple-500/10 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded font-mono">
+                  Managed SOC Model
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <div className="bg-[#1E293B] p-4 rounded border border-purple-500/40">
+                  <div className="font-bold text-purple-300 mb-1 flex items-center justify-between">
+                    <span>Tier 1: AEGIS SOC Analysts</span>
+                    <span className="text-[9px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded font-bold">Core Operators</span>
+                  </div>
+                  <div className="text-[10px] text-[#94A3B8] mb-2">The Primary Paid Service</div>
+                  <ul className="text-[11px] text-[#F1F5F9]/80 space-y-1 list-disc list-inside">
+                    <li>Full raw Kibana 8.19 console access on <span className="text-[#38BDF8]">minisoc2</span></li>
+                    <li>Real-time triage of all MITRE-tagged Wazuh & Suricata alerts</li>
+                    <li>Direct MISP threat intel feed correlation & IOC database access</li>
+                    <li>Shuffle SOAR automated active response execution</li>
+                  </ul>
+                </div>
+
+                <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
+                  <div className="font-bold text-[#38BDF8] mb-1 flex items-center justify-between">
+                    <span>Tier 2: Client IT & DevOps</span>
+                    <span className="text-[9px] bg-blue-500/20 text-[#38BDF8] px-1.5 py-0.5 rounded font-bold">Scoped Escalation</span>
+                  </div>
+                  <div className="text-[10px] text-[#94A3B8] mb-2">Tenant-Scoped Visibility</div>
+                  <ul className="text-[11px] text-[#F1F5F9]/80 space-y-1 list-disc list-inside">
+                    <li>Restricted dashboard showing only their own confirmed incidents</li>
+                    <li>Summarized alert severity and remediation advisories</li>
+                    <li>Notified automatically upon verified Level 12+ alert escalations</li>
+                    <li><strong className="text-amber-400">Restricted:</strong> No raw Kibana access to shared multi-tenant SOC infrastructure</li>
+                  </ul>
+                </div>
+
+                <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
+                  <div className="font-bold text-[#4ADE80] mb-1 flex items-center justify-between">
+                    <span>Tier 3: Client Executives</span>
+                    <span className="text-[9px] bg-emerald-500/20 text-[#4ADE80] px-1.5 py-0.5 rounded font-bold">Posture Rollup</span>
+                  </div>
+                  <div className="text-[10px] text-[#94A3B8] mb-2">High-Level Executive Metrics</div>
+                  <ul className="text-[11px] text-[#F1F5F9]/80 space-y-1 list-disc list-inside">
+                    <li>High-level posture rollup (Red / Yellow / Green status)</li>
+                    <li>SLA compliance, MTTD, MTTR, and threat landscape trends</li>
+                    <li>Zero alert-level noise or technical raw telemetry</li>
+                    <li>Quarterly executive reporting and risk scorecards</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Explicit Business Model Note */}
+              <div className="bg-[#1E293B] border border-purple-500/30 rounded p-3 text-[11px] text-[#F1F5F9]/90 flex items-start gap-2.5">
+                <ShieldCheck className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="text-purple-400">Business Model Value & Tenant Isolation:</strong> This service tiering represents the fundamental business value of the MSSP model. Exposing raw Kibana access or internal SOC tooling directly to client teams would undercut the value proposition of AEGIS managed triage and risk leaking cross-tenant telemetry.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Sub-tab 5: Identity & Governance Tab */}
+        {activeSubTab === 'governance' && (
+          <div className="space-y-6 font-mono">
+            {/* Header Card */}
+            <div className="bg-[#0F172A] border border-emerald-500/40 rounded-lg p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#334155]">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded bg-emerald-500/20 text-[#4ADE80] border border-emerald-500/40">
+                    <ShieldCheck className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                      <span>Identity, Access & Service Governance Model</span>
+                      <span className="text-[10px] text-[#4ADE80] bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30 font-normal">
+                        AEGIS v2.1 Policy Architecture
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-[#94A3B8]">
+                      Architectural decisions governing customer vs. employee authentication domains, AD role mapping, lifecycle onboarding, and MSSP service tiers.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] bg-sky-500/10 text-[#38BDF8] border border-sky-500/30 px-2.5 py-1 rounded">
+                    Keycloak + Authelia ZTA
+                  </span>
+                </div>
+              </div>
+
+              {/* Governance Grid Overview */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4 text-xs">
+                <div className="bg-[#1E293B] p-3 rounded border border-[#334155]">
+                  <div className="text-[10px] text-[#94A3B8] uppercase font-bold">1. Customer Realm</div>
+                  <div className="text-sm font-bold text-[#4ADE80] mt-0.5">policy: bypass</div>
+                  <p className="text-[10px] text-[#94A3B8] mt-1">Zero MFA/SSO on public storefront to protect conversion.</p>
+                </div>
+                <div className="bg-[#1E293B] p-3 rounded border border-[#334155]">
+                  <div className="text-[10px] text-[#94A3B8] uppercase font-bold">2. Employee Realm</div>
+                  <div className="text-sm font-bold text-[#38BDF8] mt-0.5">policy: two_factor</div>
+                  <p className="text-[10px] text-[#94A3B8] mt-1">Scoped by AD security groups with re-auth on /admin.</p>
+                </div>
+                <div className="bg-[#1E293B] p-3 rounded border border-[#334155]">
+                  <div className="text-[10px] text-[#94A3B8] uppercase font-bold">3. Account Lifecycle</div>
+                  <div className="text-sm font-bold text-[#FBBF24] mt-0.5">6-Step Symmetric</div>
+                  <p className="text-[10px] text-[#94A3B8] mt-1">Single-use activation + on-screen TOTP enrollment.</p>
+                </div>
+                <div className="bg-[#1E293B] p-3 rounded border border-[#334155]">
+                  <div className="text-[10px] text-[#94A3B8] uppercase font-bold">4. MSSP Delivery</div>
+                  <div className="text-sm font-bold text-purple-400 mt-0.5">3-Tier Isolation</div>
+                  <p className="text-[10px] text-[#94A3B8] mt-1">Analysts (Raw SOC) vs DevOps (Scoped) vs Exec (Rollup).</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Access Control Model Card */}
+            <div className="bg-[#0F172A] border border-[#38BDF8]/30 rounded-lg p-5 space-y-4">
+              <h4 className="text-sm font-bold text-[#38BDF8] uppercase tracking-wider flex items-center justify-between pb-2 border-b border-[#334155]">
+                <span>1. Access Control Model — Customers vs. Employees</span>
+                <span className="text-[10px] text-[#94A3B8] font-normal">Authelia + Traefik Forward-Auth</span>
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
+                  <div className="font-bold text-[#4ADE80] mb-2 flex items-center justify-between">
+                    <span>(a) Customer-Facing Domain (`shop.zerotrust.lan`)</span>
+                    <span className="text-[10px] bg-emerald-500/20 text-[#4ADE80] px-1.5 py-0.5 rounded font-mono">policy: bypass</span>
+                  </div>
+                  <p className="text-[11px] text-[#F1F5F9]/80 mb-2 leading-relaxed">
+                    Public customer paths use <code className="text-[#4ADE80] bg-black/40 px-1 py-0.5 rounded">policy: bypass</code> in Authelia — no MFA, no corporate SSO. Customers use the application's own account database.
+                  </p>
+                  <div className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/30 p-2.5 rounded">
+                    <strong>Design Rationale:</strong> Enterprise-style MFA on a public storefront kills consumer conversion. Customer access is decoupled entirely from corporate AD identity.
+                  </div>
+                </div>
+
+                <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
+                  <div className="font-bold text-[#38BDF8] mb-2 flex items-center justify-between">
+                    <span>(b) Employee / Admin Domain (`*.zerotrust.lan`)</span>
+                    <span className="text-[10px] bg-blue-500/20 text-[#38BDF8] px-1.5 py-0.5 rounded font-mono">policy: two_factor</span>
+                  </div>
+                  <p className="text-[11px] text-[#F1F5F9]/80 mb-2 leading-relaxed">
+                    Internal tools, administration portals, and SOC access require <code className="text-[#38BDF8] bg-black/40 px-1 py-0.5 rounded">policy: two_factor</code> via Authelia, scoped by AD group membership via Keycloak.
+                  </p>
+                  <div className="text-[11px] text-sky-300/90 bg-sky-500/10 border border-sky-500/30 p-2.5 rounded">
+                    <strong>Session Hijacking Protection:</strong> Admin-path MFA re-validates even within an already-valid general session, stopping stolen session cookies from granting silent admin access.
+                  </div>
+                </div>
+              </div>
+
+              {/* YAML Code Snippet */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[11px] text-[#94A3B8]">
+                  <span>Enforced Authelia Access Control Configuration:</span>
+                  <button
+                    onClick={() =>
+                      handleCopy(
+                        `access_control:\n  default_policy: deny\n  rules:\n    # 1. Customer Storefront (Public access without employee SSO)\n    - domain: "shop.zerotrust.lan"\n      policy: bypass\n\n    # 2. Storefront Admin Panel (Step-up MFA scoped to juice-shop admin group)\n    - domain: "shop.zerotrust.lan"\n      resources: ["^/admin.*"]\n      policy: two_factor\n      subject: "group:juiceshop-admins"\n\n    # 3. Internal Engineering & SOC Domains (Strict 2FA)\n    - domain: "*.zerotrust.lan"\n      policy: two_factor`,
+                        'gov_authelia'
+                      )
+                    }
+                    className="text-[#38BDF8] hover:underline flex items-center gap-1 cursor-pointer text-[10px]"
+                  >
+                    {copiedCode === 'gov_authelia' ? <Check className="w-3 h-3 text-[#4ADE80]" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedCode === 'gov_authelia' ? 'Copied!' : 'Copy YAML'}</span>
+                  </button>
+                </div>
+                <div className="bg-[#0F172A] p-3 rounded border border-[#334155] text-[11px] font-mono text-[#38BDF8] whitespace-pre overflow-x-auto">
+{`access_control:
+  default_policy: deny
+  rules:
+    # 1. Customer Storefront (Public access without employee SSO)
+    - domain: "shop.zerotrust.lan"
+      policy: bypass
+
+    # 2. Storefront Admin Panel (Step-up MFA scoped to juice-shop admin group)
+    - domain: "shop.zerotrust.lan"
+      resources: ["^/admin.*"]
+      policy: two_factor
+      subject: "group:juiceshop-admins"
+
+    # 3. Internal Engineering & SOC Domains (Strict 2FA)
+    - domain: "*.zerotrust.lan"
+      policy: two_factor`}
+                </div>
+              </div>
+            </div>
+
+            {/* Role-Based Access Mapping Table */}
+            <div className="bg-[#0F172A] border border-[#FBBF24]/30 rounded-lg p-5 space-y-3">
+              <h4 className="text-sm font-bold text-[#FBBF24] uppercase tracking-wider flex items-center justify-between pb-2 border-b border-[#334155]">
+                <span>2. Role-Based Access Mapping (Zone 2 AD Groups)</span>
+                <span className="text-[10px] text-[#94A3B8] font-normal">Active Directory Domain `aegis.corp`</span>
+              </h4>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-[11px] text-left border-collapse">
+                  <thead>
+                    <tr className="bg-[#1E293B] text-[#FBBF24] border-b border-[#334155]">
+                      <th className="p-2.5 font-bold">AD Group</th>
+                      <th className="p-2.5 font-bold">Example Role</th>
+                      <th className="p-2.5 font-bold">Session Length</th>
+                      <th className="p-2.5 font-bold">MFA Re-check Interval</th>
+                      <th className="p-2.5 font-bold">Enforced Scope</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#334155] text-[#F1F5F9]/80">
+                    <tr className="hover:bg-[#1E293B]/40 transition-colors">
+                      <td className="p-2.5 font-bold text-white">Marketing</td>
+                      <td className="p-2.5 text-[#94A3B8]">Marketing staff</td>
+                      <td className="p-2.5 text-[#38BDF8] font-semibold">8h</td>
+                      <td className="p-2.5 text-[#4ADE80]">Login only</td>
+                      <td className="p-2.5">Marketing CRM / drive</td>
+                    </tr>
+                    <tr className="hover:bg-[#1E293B]/40 transition-colors">
+                      <td className="p-2.5 font-bold text-white">HR</td>
+                      <td className="p-2.5 text-[#94A3B8]">HR staff</td>
+                      <td className="p-2.5 text-[#38BDF8] font-semibold">8h</td>
+                      <td className="p-2.5 text-amber-400 font-semibold">Every 2h</td>
+                      <td className="p-2.5">HR system, employee records</td>
+                    </tr>
+                    <tr className="hover:bg-[#1E293B]/40 transition-colors">
+                      <td className="p-2.5 font-bold text-white">Developers</td>
+                      <td className="p-2.5 text-[#94A3B8]">Web developers</td>
+                      <td className="p-2.5 text-[#38BDF8] font-semibold">8h</td>
+                      <td className="p-2.5 text-[#38BDF8]">Login only (general); two_factor on admin paths</td>
+                      <td className="p-2.5">Dev tools + scoped admin access</td>
+                    </tr>
+                    <tr className="hover:bg-[#1E293B]/40 transition-colors">
+                      <td className="p-2.5 font-bold text-white">DevOps</td>
+                      <td className="p-2.5 text-[#94A3B8]">Infrastructure ops</td>
+                      <td className="p-2.5 text-[#38BDF8] font-semibold">4h</td>
+                      <td className="p-2.5 text-amber-400 font-semibold">Every 2h</td>
+                      <td className="p-2.5">Portainer, monitoring, deploy pipelines</td>
+                    </tr>
+                    <tr className="hover:bg-[#1E293B]/40 transition-colors">
+                      <td className="p-2.5 font-bold text-white">IT</td>
+                      <td className="p-2.5 text-[#94A3B8]">Gateway / network admin</td>
+                      <td className="p-2.5 text-red-400 font-semibold">2h</td>
+                      <td className="p-2.5 text-red-400 font-bold">Every 1h or hardware key (FIDO2)</td>
+                      <td className="p-2.5">Portainer, mail relay admin, Traefik config</td>
+                    </tr>
+                    <tr className="hover:bg-[#1E293B]/40 transition-colors">
+                      <td className="p-2.5 font-bold text-white">Executive</td>
+                      <td className="p-2.5 text-[#94A3B8]">CEO / corporate leadership</td>
+                      <td className="p-2.5 text-[#38BDF8] font-semibold">8h</td>
+                      <td className="p-2.5 text-[#4ADE80]">Login only</td>
+                      <td className="p-2.5 text-amber-300">Read-only high-level posture dashboard; <strong className="text-red-400">NOT</strong> raw SOC tools</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="bg-[#1E293B] border border-[#FBBF24]/40 rounded p-3 text-[11px] text-[#F1F5F9]/90 flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-[#FBBF24] shrink-0 mt-0.5" />
+                <div>
+                  <strong className="text-[#FBBF24]">Core Governance Directive:</strong> Privilege maps strictly to <span className="text-white underline font-bold">job function</span> via Active Directory group membership, never to hierarchical org-chart title. An executive account does <span className="text-red-400 font-bold">NOT</span> automatically inherit admin-panel or SOC access.
+                </div>
+              </div>
+            </div>
+
+            {/* 6-Step Secure Onboarding Flow */}
+            <div className="bg-[#0F172A] border border-emerald-500/30 rounded-lg p-5 space-y-4">
+              <h4 className="text-sm font-bold text-[#4ADE80] uppercase tracking-wider flex items-center justify-between pb-2 border-b border-[#334155]">
+                <span>3. Secure Onboarding & Offboarding Lifecycle (6-Step Sequence)</span>
+                <span className="text-[10px] text-[#94A3B8] font-normal">Symmetric Single Source of Truth</span>
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                <div className="bg-[#1E293B] p-3.5 rounded border border-[#334155] space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-[#38BDF8] bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/30">Step 1</span>
+                    <Users className="w-3.5 h-3.5 text-[#38BDF8]" />
+                  </div>
+                  <div className="font-bold text-white text-[12px]">AD Account & Group Assignment</div>
+                  <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+                    IT/HR creates the AD entry and assigns the correct group (e.g. <em>Developers</em>) at creation time. Group membership silently shapes all future access — no manual per-app grants.
+                  </p>
+                </div>
+
+                <div className="bg-[#1E293B] p-3.5 rounded border border-[#334155] space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-[#FBBF24] bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/30">Step 2</span>
+                    <Mail className="w-3.5 h-3.5 text-[#FBBF24]" />
+                  </div>
+                  <div className="font-bold text-white text-[12px]">Outbound Mail Relay Activation</div>
+                  <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+                    A real hardened SMTP relay (not Mailpit) sends <strong className="text-white">ONE</strong> single-use activation link with a strict 24–48 hour expiration window.
+                  </p>
+                </div>
+
+                <div className="bg-[#1E293B] p-3.5 rounded border border-[#334155] space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-[#4ADE80] bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/30">Step 3</span>
+                    <Key className="w-3.5 h-3.5 text-[#4ADE80]" />
+                  </div>
+                  <div className="font-bold text-white text-[12px]">Keycloak Session & Password Setup</div>
+                  <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+                    Employee clicks link and lands directly in an authenticated Keycloak session (link is the one-time credential). Sets initial password (Argon2id hashed server-side, 64MB memory, 3 iterations).
+                  </p>
+                </div>
+
+                <div className="bg-[#1E293B] p-3.5 rounded border border-[#334155] space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/30">Step 4</span>
+                    <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+                  </div>
+                  <div className="font-bold text-white text-[12px]">On-Screen TOTP QR Enrollment</div>
+                  <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+                    In the same session immediately, Keycloak displays the TOTP QR code once on-screen. Employee scans with authenticator app. Link is now dead and cannot be reused.
+                  </p>
+                </div>
+
+                <div className="bg-[#1E293B] p-3.5 rounded border border-[#334155] space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-[#38BDF8] bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/30">Step 5</span>
+                    <Lock className="w-3.5 h-3.5 text-[#38BDF8]" />
+                  </div>
+                  <div className="font-bold text-white text-[12px]">Future Logins: Password + TOTP</div>
+                  <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+                    All future logins require password + TOTP. Email is <strong className="text-emerald-400">never part of the auth loop again</strong> after Step 4, closing off email interception attacks.
+                  </p>
+                </div>
+
+                <div className="bg-[#1E293B] p-3.5 rounded border border-red-500/40 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/30">Step 6</span>
+                    <UserCheck className="w-3.5 h-3.5 text-red-400" />
+                  </div>
+                  <div className="font-bold text-white text-[12px]">Symmetric Offboarding</div>
+                  <p className="text-[11px] text-[#94A3B8] leading-relaxed">
+                    Offboarding is completely symmetric: disabling the Active Directory account immediately closes every access path simultaneously across the gateway and all apps.
+                  </p>
+                </div>
+              </div>
+
+              {/* Clarifying Box on TOTP vs Mailpit */}
+              <div className="bg-[#1E293B] border border-emerald-500/30 rounded p-3 text-[11px] text-[#F1F5F9]/90 flex items-start gap-2.5">
+                <CheckCircle2 className="w-4 h-4 text-[#4ADE80] shrink-0 mt-0.5" />
+                <div>
+                  <strong className="text-[#4ADE80]">TOTP MFA Safety by Design:</strong> TOTP MFA secrets are rendered <span className="text-white font-semibold">once in-browser</span> during authenticated enrollment and <span className="text-[#4ADE80] font-semibold">NEVER transit email / Mailpit</span>. This is safe by design and completely distinct from the mail-path sinkhole issue documented in the Security Debt Register.
+                </div>
+              </div>
+            </div>
+
+            {/* MSSP Service Tiering Card */}
+            <div className="bg-[#0F172A] border border-purple-500/30 rounded-lg p-5 space-y-3">
+              <h4 className="text-sm font-bold text-purple-400 uppercase tracking-wider flex items-center justify-between pb-2 border-b border-[#334155]">
+                <span>4. MSSP Service Tiering (Zone 4 Support Model)</span>
+                <span className="text-[10px] text-[#94A3B8] font-normal">Commercial SOC Delivery</span>
+              </h4>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <div className="bg-[#1E293B] p-4 rounded border border-purple-500/40">
+                  <div className="font-bold text-purple-300 mb-1 flex items-center justify-between">
+                    <span>Tier 1: AEGIS SOC Analysts</span>
+                    <span className="text-[9px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded font-bold">Paid Service Core</span>
+                  </div>
+                  <p className="text-[11px] text-[#F1F5F9]/80 mb-2">Full raw Kibana, all MITRE-tagged alerts, MISP threat intel correlation, primary triage.</p>
+                  <ul className="text-[10px] text-[#94A3B8] space-y-1 list-disc list-inside">
+                    <li>Direct access to Elasticsearch 8.19 & Wazuh 4.7</li>
+                    <li>Shuffle SOAR automated playbooks</li>
+                  </ul>
+                </div>
+
+                <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
+                  <div className="font-bold text-[#38BDF8] mb-1 flex items-center justify-between">
+                    <span>Tier 2: Client IT & DevOps</span>
+                    <span className="text-[9px] bg-blue-500/20 text-[#38BDF8] px-1.5 py-0.5 rounded font-bold">Scoped Escalations</span>
+                  </div>
+                  <p className="text-[11px] text-[#F1F5F9]/80 mb-2">Restricted dashboard (own incidents, summarized severity) or notified only on confirmed escalations.</p>
+                  <ul className="text-[10px] text-[#94A3B8] space-y-1 list-disc list-inside">
+                    <li><strong className="text-amber-400">Restricted:</strong> No raw Kibana console access</li>
+                    <li>Actionable remediation advisories</li>
+                  </ul>
+                </div>
+
+                <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
+                  <div className="font-bold text-[#4ADE80] mb-1 flex items-center justify-between">
+                    <span>Tier 3: Client Executives</span>
+                    <span className="text-[9px] bg-emerald-500/20 text-[#4ADE80] px-1.5 py-0.5 rounded font-bold">Rollup Scorecard</span>
+                  </div>
+                  <p className="text-[11px] text-[#F1F5F9]/80 mb-2">High-level posture rollup only (Red / Yellow / Green), zero technical alert clutter.</p>
+                  <ul className="text-[10px] text-[#94A3B8] space-y-1 list-disc list-inside">
+                    <li>SLA compliance & MTTR trends</li>
+                    <li>Executive quarterly summaries</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="bg-[#1E293B] border border-purple-500/30 rounded p-3 text-[11px] text-[#F1F5F9]/90 flex items-start gap-2.5">
+                <Briefcase className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="text-purple-400">Business Model Value & Tenant Isolation:</strong> This tiering is the actual business value of the MSSP model — giving clients raw SOC access would undercut the service AEGIS sells.
+                </div>
+              </div>
             </div>
           </div>
         )}

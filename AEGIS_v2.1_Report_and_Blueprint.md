@@ -215,6 +215,18 @@ graph TB
   - `CORP-PC01`: Sysmon v15 (SwiftOnSecurity rules) tracking process creation (ID 1), network connections (ID 3), image loads (ID 7), LSASS access (ID 10), file creation (ID 11), registry changes (ID 12/13), DNS queries (ID 22).
   - `CORP-DB01`: `auditd` rules monitoring execution of system binaries, `/etc/shadow` modifications, and PostgreSQL query execution logs.
 
+#### 3.2.1 Role-Based Access Mapping (Zone 2 — Active Directory)
+| AD Security Group | Example Role | Session Length | MFA Re-check Interval | Enforced Scope |
+| :--- | :--- | :--- | :--- | :--- |
+| **Marketing** | Marketing staff | 8 hours | Login only | Marketing CRM, shared department drive |
+| **HR** | HR personnel | 8 hours | Every 2 hours | HR system, payroll & confidential employee records |
+| **Developers** | Web developers | 8 hours | Login only (general); two_factor on `/admin.*` | Dev tools + scoped `juiceshop-admins` access |
+| **DevOps** | Infrastructure ops | 4 hours | Every 2 hours | Portainer CE, monitoring, CI/CD deploy pipelines |
+| **IT** | Gateway / network admin | 2 hours | Every 1 hour or hardware key (FIDO2) | Portainer, mail relay admin, Traefik dynamic config |
+| **Executive** | CEO / leadership | 8 hours | Login only | Read-only high-level posture dashboard; **NOT** raw SOC tools |
+
+> **Core Governance Directive:** Privilege maps strictly to **job function** via Active Directory group membership, never to hierarchical org-chart title. An executive account does **NOT** automatically inherit admin-panel or SOC access.
+
 ### 3.3 Zone 3 Sub-Topology (ZTA Gateway Container Architecture)
 ```
   +---------------------------------------------------------------------------------------+
@@ -245,6 +257,33 @@ graph TB
   - `1515/TCP`: Host exposed → Traefik TCP Proxy → `minisoc2:1515` (Wazuh agent enrollment).
   - `5432, 6379, 8025, 8080, 9000, 9091`: **HOST BLOCKED** (`auth_net` internal: true).
 
+#### 3.3.1 Access Control Model — Customers vs. Employees
+Two distinct authentication domains exist behind the same edge gateway:
+1. **Customer-Facing Paths** (e.g. `shop.zerotrust.lan` / Juice Shop storefront) use `policy: bypass` in Authelia — no MFA, no employee SSO. Customers authenticate via the application's native account system. Enterprise-style MFA on a public storefront would destroy user conversion and is explicitly **NOT** how AEGIS is designed.
+2. **Employee / Admin Paths** (internal tools, admin panels, SOC access) require `policy: two_factor` via Authelia, scoped by Active Directory group membership via Keycloak.
+
+```yaml
+# authelia/configuration.yml
+access_control:
+  default_policy: deny
+  rules:
+    # 1. Customer Storefront (Public access without employee SSO)
+    - domain: "shop.zerotrust.lan"
+      policy: bypass
+
+    # 2. Storefront Admin Panel (Step-up MFA scoped to juice-shop admin group)
+    - domain: "shop.zerotrust.lan"
+      resources: ["^/admin.*"]
+      policy: two_factor
+      subject: "group:juiceshop-admins"
+
+    # 3. Internal Engineering & SOC Domains (Strict 2FA)
+    - domain: "*.zerotrust.lan"
+      policy: two_factor
+```
+- **Session-Cookie Hijacking Mitigation**: Admin-path MFA re-validates even within an already-valid general session. If an attacker hijacks a standard user session cookie, they cannot silently pivot to `/admin` without completing a secondary hardware/TOTP challenge.
+- **TOTP MFA Security Boundary**: TOTP MFA secrets are rendered **once in-browser** during authenticated enrollment and **NEVER transit email / Mailpit**. This is safe by design and entirely immune to mail-sinkhole exposure.
+
 ### 3.4 Zone 4 Sub-Topology (MSSP SOC Processing Pipeline)
 ```
   +---------------------------------------------------------------------------------------+
@@ -271,6 +310,20 @@ graph TB
   5. Logstash triggers **Shuffle SOAR** webhook (`minisoc3:3001`).
   6. Shuffle queries **MISP** (`minisoc3:8080`) for IOC enrichment (hash/IP reputation).
   7. If severe, Shuffle calls Wazuh Active Response API on `minisoc2` and Keycloak Admin REST API to revoke active user tokens and isolate the compromised endpoint.
+
+#### 3.4.1 MSSP Service Tiering & Support Model
+- **Tier 1: AEGIS SOC Analysts**: Full raw Kibana access on `minisoc2`, all MITRE-tagged alerts, MISP threat intel correlation, primary alert triage. (The primary paid service).
+- **Tier 2: Client IT & DevOps**: Restricted dashboard showing only their own confirmed incidents and summarized severity, or notified only on confirmed Level 12+ escalations. **Not** given raw Kibana access to the shared multi-tenant SOC console.
+- **Tier 3: Client Executives**: High-level posture rollup only (Red / Yellow / Green status, MTTD, MTTR, SLA compliance), zero technical alert-level noise.
+- **Business Model Value**: This service tiering represents the fundamental business value of the MSSP model — giving clients raw SOC access would undercut the value proposition of managed triage and risk cross-tenant data exposure.
+
+### 3.5 Secure Onboarding & Offboarding Lifecycle Flow (6 Steps)
+1. **Step 1 (AD Account & Group Assignment)**: IT/HR creates the AD entry, assigns the correct group (e.g. *Developers*) at creation time. Group membership silently shapes all future access across the gateway.
+2. **Step 2 (Outbound Mail Relay Activation Link)**: A real hardened SMTP relay (not Mailpit) sends **ONE** single-use activation link with a 24–48 hour expiration window.
+3. **Step 3 (Keycloak Session & Argon2id Password Setup)**: Employee clicks the link and lands directly in an authenticated Keycloak session (the link is the one-time credential). Sets password (Argon2id hashed server-side: 64MB memory, 3 iterations).
+4. **Step 4 (On-Screen TOTP QR Enrollment)**: In the same session immediately, Keycloak displays the TOTP QR code once on-screen. Employee scans with authenticator app. The activation link is now dead and cannot be reused.
+5. **Step 5 (Future Logins: Password + TOTP)**: All future logins require password + TOTP. Email is never part of the authentication loop again, closing off email interception attack vectors.
+6. **Step 6 (Symmetric Offboarding)**: Offboarding is completely symmetric: disabling the Active Directory account immediately closes every access path simultaneously across the gateway and all applications.
 
 ---
 
@@ -366,6 +419,7 @@ graph TB
 | **Custom ML Black Box Failure** | High | Replaced with deterministic Shuffle SOAR + Logstash + MISP pipeline. | Shuffle UI workflow execution logs. |
 | **Single Flat Docker Network** | Critical | Implemented dual-network isolation (`proxy_net` + `auth_net` `internal: true`). | `docker network inspect` confirmation. |
 | **Unrestricted Host Port Exposures** | Critical | Unbound internal service ports; exposed only 80, 443, 1514, and 1515. | Host `nmap` port scan proof. |
+| **Mailpit Used as System's Only Mail Path** | High | Mailpit is DEV/TEST-ONLY; must be replaced by a real authenticated SMTP relay (Postfix/Sendgrid) with SPF/DKIM/DMARC in production. Account activation links in Mailpit are readable by anyone with access to port 8025. | Architectural debt acknowledgment & onboarding flow isolation audit. |
 
 ---
 

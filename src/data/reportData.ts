@@ -67,6 +67,7 @@ export const SECURITY_DEBT: SecurityDebtItem[] = [
   { flaw: 'Single flat Docker network (no ZTA)', severity: 'Critical', fix: 'Implemented dual bridge: proxy_net + auth_net (internal: true)', evidence: 'docker network inspect internal: true' },
   { flaw: 'All ports exposed to host interface', severity: 'Critical', fix: 'Unbound internal ports; exposed only 80/443/1514/1515', evidence: 'Host nmap scan showing closed 5432/6379' },
   { flaw: 'coolacid/misp-docker image deprecated/unavailable', severity: 'Medium', fix: 'Replaced with official ghcr.io/misp/misp-docker images (misp-core, misp-modules, misp-db, misp-redis split)', evidence: 'docker compose ps — all containers healthy' },
+  { flaw: "Mailpit used as the system's only mail path", severity: 'High', fix: "Mailpit sinks ALL outbound mail including account-activation and password-reset links; if an attacker reaches Mailpit's UI via any session compromise, every such link in the system is exposed. In production, replace with a hardened SMTP relay (SPF/DKIM/DMARC, TLS), keep Mailpit dev/test-only, and make activation/reset links single-use with a 24-48h expiry.", evidence: 'Confirm Mailpit is not reachable from any production domain; confirm relay has SPF/DKIM configured' },
 ];
 
 export const TRYHACKME_MAP: TryHackMeTopic[] = [
