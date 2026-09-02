@@ -4,6 +4,7 @@ export const SECTIONS: Section[] = [
   { id: 'sec-1', number: 1, title: 'Executive Summary', shortTitle: 'Exec Summary', icon: 'Shield', badge: 'v2.1 Identity' },
   { id: 'sec-2', number: 2, title: 'Full Architecture Topology', shortTitle: 'Master Topology', icon: 'Network', badge: '4 Zones' },
   { id: 'sec-3', number: 3, title: 'Sub-Topologies', shortTitle: 'Sub-Topologies', icon: 'Layers', badge: 'Deep Dive' },
+  { id: 'sec-11', number: 11, title: 'Identity & Governance Policy', shortTitle: 'Governance & RBAC', icon: 'ShieldCheck', badge: 'Policy Matrix' },
   { id: 'sec-4', number: 4, title: 'Current State Checklist', shortTitle: 'What Is Done', icon: 'CheckCircle2', badge: 'Completed' },
   { id: 'sec-5', number: 5, title: 'Remaining Work Checklist', shortTitle: 'What Is Left', icon: 'ListTodo', badge: 'Action Items' },
   { id: 'sec-6', number: 6, title: 'Roadmap & Execution Plan', shortTitle: '4-Week Roadmap', icon: 'Calendar', badge: 'Timeline' },

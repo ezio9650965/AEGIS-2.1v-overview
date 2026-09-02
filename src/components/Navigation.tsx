@@ -2,6 +2,7 @@ import React from 'react';
 import { Section } from '../types';
 import {
   Shield,
+  ShieldCheck,
   Network,
   Layers,
   CheckCircle2,
@@ -28,6 +29,7 @@ interface NavigationProps {
 
 const ICON_MAP: Record<string, React.ElementType> = {
   Shield,
+  ShieldCheck,
   Network,
   Layers,
   CheckCircle2,

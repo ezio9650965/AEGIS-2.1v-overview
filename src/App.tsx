@@ -5,6 +5,7 @@ import { Navigation } from './components/Navigation';
 import { ExecutiveSummaryView } from './components/ExecutiveSummaryView';
 import { MasterTopologyView } from './components/MasterTopologyView';
 import { SubTopologiesView } from './components/SubTopologiesView';
+import { GovernancePolicyView } from './components/GovernancePolicyView';
 import { ChecklistsView } from './components/ChecklistsView';
 import { RoadmapView } from './components/RoadmapView';
 import { SecurityDebtView } from './components/SecurityDebtView';
@@ -115,6 +116,8 @@ export default function App() {
         return <MasterTopologyView />;
       case 'sec-3':
         return <SubTopologiesView />;
+      case 'sec-11':
+        return <GovernancePolicyView />;
       case 'sec-4':
         return (
           <ChecklistsView
