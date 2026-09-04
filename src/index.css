@@ -170,3 +170,52 @@ body {
   font-family: var(--mono);
 }
 
+/* Unified Governance Dashboard Layout */
+.governance-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  width: 100%;
+}
+
+.governance-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+@media (min-width: 1280px) {
+  .governance-grid-2col {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .governance-grid-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.governance-table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #38BDF8 #0F172A;
+}
+
+.governance-table-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.governance-table-container::-webkit-scrollbar-track {
+  background: #0F172A;
+}
+
+.governance-table-container::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 3px;
+}
+
+.governance-table-container::-webkit-scrollbar-thumb:hover {
+  background: #38BDF8;
+}
+

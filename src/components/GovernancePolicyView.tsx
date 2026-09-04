@@ -25,6 +25,8 @@ import {
   Workflow,
   Network,
   GitBranch,
+  Info,
+  HelpCircle,
 } from 'lucide-react';
 
 interface RoleMapping {
@@ -215,6 +217,88 @@ export const CUSTOMER_VS_EMPLOYEE_AUTH_MERMAID = `graph TB
     class DENY_BLOCK deny
     class CUST_OK success
 `;
+
+interface ColumnHeaderTooltipProps {
+  title: string;
+  tooltipTitle: string;
+  definition: string;
+  spec?: string;
+  align?: 'left' | 'center' | 'right';
+}
+
+const ColumnHeaderTooltip: React.FC<ColumnHeaderTooltipProps> = ({
+  title,
+  tooltipTitle,
+  definition,
+  spec,
+  align = 'left',
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <th className="p-3 font-bold relative group/th select-none text-left">
+      <div
+        className={`inline-flex items-center gap-1.5 cursor-help ${
+          align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start'
+        }`}
+        onClick={() => setIsOpen(!isOpen)}
+        onMouseEnter={() => setIsOpen(true)}
+        onMouseLeave={() => setIsOpen(false)}
+        onFocus={() => setIsOpen(true)}
+        onBlur={() => setIsOpen(false)}
+        tabIndex={0}
+        role="button"
+        aria-label={`Definition for ${title}`}
+      >
+        <span className="text-[#FBBF24] border-b border-dashed border-[#FBBF24]/60 group-hover/th:border-[#38BDF8] group-hover/th:text-[#38BDF8] transition-colors">
+          {title}
+        </span>
+        <span className="w-3.5 h-3.5 rounded-full bg-[#1E293B] border border-[#FBBF24]/50 text-[#FBBF24] group-hover/th:border-[#38BDF8] group-hover/th:text-[#38BDF8] group-hover/th:bg-sky-500/20 flex items-center justify-center text-[9px] font-mono shrink-0 transition-colors">
+          ?
+        </span>
+      </div>
+
+      {/* Interactive Tooltip Popover */}
+      <div
+        className={`absolute z-50 top-full mt-2 w-72 md:w-80 p-3.5 bg-[#0B1120] border border-[#38BDF8]/60 rounded-lg shadow-2xl text-left pointer-events-auto transition-all duration-200 font-sans ${
+          align === 'right'
+            ? 'right-0'
+            : align === 'center'
+            ? 'left-1/2 -translate-x-1/2'
+            : 'left-0'
+        } ${
+          isOpen
+            ? 'opacity-100 translate-y-0 visible pointer-events-auto'
+            : 'opacity-0 -translate-y-1 invisible pointer-events-none group-hover/th:opacity-100 group-hover/th:translate-y-0 group-hover/th:visible group-hover/th:pointer-events-auto'
+        }`}
+      >
+        {/* Tooltip Header */}
+        <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-[#334155] font-mono text-[11px]">
+          <span className="text-[#38BDF8] font-bold flex items-center gap-1.5">
+            <Info className="w-3.5 h-3.5 text-[#38BDF8] shrink-0" />
+            <span>{tooltipTitle}</span>
+          </span>
+          <span className="text-[9px] text-[#94A3B8] bg-[#0F172A] px-1.5 py-0.5 rounded border border-[#334155]">
+            GOVERNANCE DEF
+          </span>
+        </div>
+
+        {/* Tooltip Body */}
+        <p className="text-xs text-[#F1F5F9] mt-2 leading-relaxed font-normal">
+          {definition}
+        </p>
+
+        {/* Technical Architecture Footnote */}
+        {spec && (
+          <div className="mt-2.5 pt-2 border-t border-[#1E293B] flex items-start gap-1.5 text-[10px] text-[#94A3B8] font-mono">
+            <span className="text-[#FBBF24] font-bold shrink-0">[AEGIS_SPEC]</span>
+            <span className="leading-tight">{spec}</span>
+          </div>
+        )}
+      </div>
+    </th>
+  );
+};
 
 export const GovernancePolicyView: React.FC = () => {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -436,7 +520,7 @@ export const GovernancePolicyView: React.FC = () => {
   const simResult = evaluatePolicy();
 
   return (
-    <div className="space-y-8 font-mono">
+    <div className="governance-dashboard font-mono">
       {/* SECTION HEADER CARD */}
       <div className="pro-card p-6 relative overflow-hidden shadow-lg border-[#38BDF8]/40">
         <div className="absolute top-0 right-0 w-96 h-96 bg-sky-500/5 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
@@ -743,7 +827,7 @@ export const GovernancePolicyView: React.FC = () => {
         </div>
       </section>
 
-      {/* 2. ROLE-BASED ACCESS MAPPING TABLE */}
+      {/* 2. ROLE-BASED ACCESS MAPPING TABLE (DASHBOARD CORE) */}
       <section className="space-y-4">
         <div className="terminal-panel-header flex flex-wrap items-center justify-between gap-3 pb-2">
           <div className="flex items-center gap-2">
@@ -752,116 +836,213 @@ export const GovernancePolicyView: React.FC = () => {
               2. Role-Based Access Mapping (Zone 2 — Active Directory)
             </h3>
           </div>
-          <span className="text-xs text-[#FBBF24] bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/30 font-mono">
-            Domain: aegis.corp
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[#FBBF24] bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/30 font-mono">
+              Domain: aegis.corp
+            </span>
+            <span className="text-xs text-[#94A3B8] bg-[#0F172A] px-2.5 py-1 rounded border border-[#334155] font-mono">
+              {ROLE_MAPPINGS.length} AD Security Groups
+            </span>
+          </div>
         </div>
 
-        {/* Filter Controls */}
-        <div className="pro-card p-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Filter className="w-3.5 h-3.5 text-[#94A3B8]" />
-            <span className="text-xs text-[#94A3B8] font-mono">Filter by Group:</span>
-            <div className="flex flex-wrap gap-1">
+        {/* Responsive Filter Bar */}
+        <div className="pro-card p-3.5 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3.5">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+            <div className="flex items-center gap-1.5 text-xs text-[#94A3B8] font-mono shrink-0">
+              <Filter className="w-3.5 h-3.5 text-[#FBBF24]" />
+              <span>Filter by Group:</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
               <button
                 onClick={() => setSelectedGroup('all')}
-                className={`px-2.5 py-1 rounded text-xs transition-colors cursor-pointer font-mono ${
-                  selectedGroup === 'all' ? 'bg-[#38BDF8] text-black font-bold shadow-sm' : 'bg-[#0F172A] text-[#94A3B8] hover:text-white border border-[#334155]'
+                className={`px-2.5 py-1 rounded text-xs transition-all cursor-pointer font-mono ${
+                  selectedGroup === 'all'
+                    ? 'bg-[#38BDF8] text-black font-bold shadow-sm glow-cyan-active'
+                    : 'bg-[#0F172A] text-[#94A3B8] hover:text-white border border-[#334155]'
                 }`}
               >
-                All Groups ({ROLE_MAPPINGS.length})
+                All ({ROLE_MAPPINGS.length})
               </button>
               {ROLE_MAPPINGS.map((r) => (
                 <button
                   key={r.group}
                   onClick={() => setSelectedGroup(r.group)}
-                  className={`px-2 py-1 rounded text-xs transition-colors cursor-pointer font-mono ${
-                    selectedGroup === r.group ? 'bg-[#FBBF24] text-black font-bold shadow-sm' : 'bg-[#0F172A] text-[#94A3B8] hover:text-white border border-[#334155]'
+                  className={`px-2 py-1 rounded text-xs transition-all cursor-pointer font-mono flex items-center gap-1.5 ${
+                    selectedGroup === r.group
+                      ? 'bg-[#FBBF24] text-black font-bold shadow-sm glow-amber-hover'
+                      : 'bg-[#0F172A] text-[#94A3B8] hover:text-white border border-[#334155]'
                   }`}
                 >
-                  {r.group}
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    r.color === 'emerald' ? 'bg-emerald-400' :
+                    r.color === 'amber' ? 'bg-amber-400' :
+                    r.color === 'sky' ? 'bg-sky-400' :
+                    r.color === 'blue' ? 'bg-blue-400' :
+                    r.color === 'rose' ? 'bg-rose-400' : 'bg-purple-400'
+                  }`}></span>
+                  <span>{r.group}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="relative w-full sm:w-64">
+          {/* Search Box */}
+          <div className="relative w-full xl:w-72 shrink-0">
             <Search className="w-3.5 h-3.5 text-[#94A3B8] absolute left-2.5 top-2.5" />
             <input
               type="text"
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="Search roles or scopes..."
-              className="w-full pl-8 pr-3 py-1 bg-[#0F172A] border border-[#334155] rounded text-xs text-[#F1F5F9] placeholder-[#94A3B8]/60 focus:outline-none focus:border-[#38BDF8] font-sans"
+              placeholder="Search group, role, or scope..."
+              className="w-full pl-8 pr-7 py-1.5 bg-[#0F172A] border border-[#334155] rounded text-xs text-[#F1F5F9] placeholder-[#94A3B8]/60 focus:outline-none focus:border-[#38BDF8] font-sans"
             />
+            {searchFilter && (
+              <button
+                onClick={() => setSearchFilter('')}
+                className="absolute right-2 top-2 text-[#94A3B8] hover:text-white text-xs font-mono"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Interactive Mapping Table */}
-        <div className="pro-card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left border-collapse font-sans">
+        {/* Readability-Prioritized Interactive Mapping Table */}
+        <div className="pro-card overflow-hidden shadow-xl border-[#334155]">
+          {/* Header Banner */}
+          <div className="px-4 py-2.5 bg-[#0B1120] border-b border-[#334155] flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#94A3B8] font-mono">
+            <span className="flex items-center gap-1.5 text-white/90">
+              <HelpCircle className="w-3.5 h-3.5 text-[#FBBF24]" />
+              <span className="font-bold text-[#FBBF24]">Interactive Column Dictionary:</span>
+              <span className="hidden sm:inline text-[#94A3B8]">Hover over or tap any column header for technical definitions.</span>
+            </span>
+            <span className="text-[#38BDF8] flex items-center gap-1">
+              <span>Displaying {filteredRoles.length} of {ROLE_MAPPINGS.length} security mappings</span>
+            </span>
+          </div>
+
+          {/* Table Container with Smooth Scroll & Min-Width for Pristine Readability */}
+          <div className="governance-table-container">
+            <table className="w-full min-w-[960px] text-xs text-left border-collapse font-sans">
               <thead>
                 <tr className="terminal-panel-header bg-[#0F172A] text-[#FBBF24] font-mono">
-                  <th className="p-3 font-bold">AD Security Group</th>
-                  <th className="p-3 font-bold">Example Role</th>
-                  <th className="p-3 font-bold">Session Duration</th>
-                  <th className="p-3 font-bold">MFA Re-check Interval</th>
-                  <th className="p-3 font-bold">Enforced Access Scope</th>
-                  <th className="p-3 font-bold">Explicit Restrictions</th>
+                  <ColumnHeaderTooltip
+                    title="AD Security Group"
+                    tooltipTitle="Active Directory Security Group"
+                    definition="The primary identity container in Active Directory (aegis.corp). Access policies, token claims, and gateway permissions bind strictly to group membership rather than individual user accounts or corporate hierarchy."
+                    spec="Queried via LDAP/Kerberos and mapped to Keycloak OIDC group claims."
+                    align="left"
+                  />
+                  <ColumnHeaderTooltip
+                    title="Example Role"
+                    tooltipTitle="Organizational Job Role"
+                    definition="Representative business title corresponding to the Active Directory group to demonstrate typical user responsibilities within the organization."
+                    spec="Assigned during Step 1 (AD Provisioning) of the onboarding lifecycle."
+                    align="left"
+                  />
+                  <ColumnHeaderTooltip
+                    title="Session Duration"
+                    tooltipTitle="Session Lifetime (TTL)"
+                    definition="The maximum active time-to-live (TTL) for Keycloak authentication tokens and Authelia session cookies before a full credential re-authentication is strictly required."
+                    spec="Enforced via Redis session cache and HTTP-only forward-auth session cookies."
+                    align="left"
+                  />
+                  <ColumnHeaderTooltip
+                    title="MFA Re-check Interval"
+                    tooltipTitle="MFA Re-check & Step-Up Interval"
+                    definition="The maximum duration an authenticated session may access sensitive or protected resources before requiring a fresh TOTP or hardware FIDO2 verification challenge."
+                    spec="Mitigates session-cookie hijacking by enforcing step-up verification on privileged endpoints (e.g. /admin.*)."
+                    align="left"
+                  />
+                  <ColumnHeaderTooltip
+                    title="Enforced Access Scope"
+                    tooltipTitle="Enforced Authorization Scope"
+                    definition="The designated internal applications, development repositories, and departmental systems accessible to members of this group according to Authelia gateway forward-auth rules."
+                    spec="Evaluated dynamically at Traefik reverse proxy based on AD group claims."
+                    align="left"
+                  />
+                  <ColumnHeaderTooltip
+                    title="Explicit Restrictions"
+                    tooltipTitle="Explicit Security Denials"
+                    definition="Administrative consoles, container orchestrators, and raw SOC telemetry backends strictly denied to this group to maintain least-privilege isolation and prevent lateral movement."
+                    spec="Enforced via default-deny gateway access control rules."
+                    align="left"
+                  />
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#334155] text-[#F1F5F9]/90">
-                {filteredRoles.map((r, index) => (
-                  <motion.tr
-                    key={r.group}
-                    initial={{ opacity: 0, y: 14 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      duration: 0.35,
-                      delay: index * 0.06,
-                      ease: [0.25, 0.1, 0.25, 1],
-                    }}
-                    className="hover:bg-[#0F172A]/70 transition-colors"
-                  >
-                    <td className="p-3 font-mono font-bold text-white flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${
-                        r.color === 'emerald' ? 'bg-emerald-400' :
-                        r.color === 'amber' ? 'bg-amber-400' :
-                        r.color === 'sky' ? 'bg-sky-400' :
-                        r.color === 'blue' ? 'bg-blue-400' :
-                        r.color === 'rose' ? 'bg-rose-400' : 'bg-purple-400'
-                      }`}></span>
-                      <span>{r.group}</span>
+                {filteredRoles.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-[#94A3B8] font-mono">
+                      No Active Directory group mappings match current filter "{searchFilter}".
                     </td>
-                    <td className="p-3 text-[#94A3B8] font-medium">{r.role}</td>
-                    <td className="p-3 font-mono font-semibold text-[#38BDF8]">{r.sessionLength}</td>
-                    <td className="p-3 font-mono">
-                      <span className={`px-2 py-0.5 rounded text-[11px] ${
-                        r.mfaInterval.includes('1h') || r.mfaInterval.includes('hardware') ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold' :
-                        r.mfaInterval.includes('2h') ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold' :
-                        'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                      }`}>
-                        {r.mfaInterval}
-                      </span>
-                    </td>
-                    <td className="p-3">
-                      <div className="font-medium text-white">{r.scope}</div>
-                      <div className="text-[11px] text-[#94A3B8] mt-0.5">{r.description}</div>
-                    </td>
-                    <td className="p-3 text-[11px]">
-                      <div className="flex flex-wrap gap-1">
-                        {r.deniedDomains.map((d) => (
-                          <span key={d} className="bg-rose-500/10 text-rose-300 border border-rose-500/30 px-1.5 py-0.5 rounded font-mono">
-                            ✕ {d}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                  </motion.tr>
-                ))}
+                  </tr>
+                ) : (
+                  filteredRoles.map((r, index) => (
+                    <motion.tr
+                      key={r.group}
+                      initial={{ opacity: 0, y: 14 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{
+                        duration: 0.35,
+                        delay: index * 0.06,
+                        ease: [0.25, 0.1, 0.25, 1],
+                      }}
+                      className="hover:bg-[#0F172A]/70 transition-colors"
+                    >
+                      <td className="p-3.5 font-mono font-bold text-white whitespace-nowrap min-w-[190px]">
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2.5 h-2.5 rounded-full shrink-0 shadow-sm ${
+                            r.color === 'emerald' ? 'bg-emerald-400' :
+                            r.color === 'amber' ? 'bg-amber-400' :
+                            r.color === 'sky' ? 'bg-sky-400' :
+                            r.color === 'blue' ? 'bg-blue-400' :
+                            r.color === 'rose' ? 'bg-rose-400' : 'bg-purple-400'
+                          }`}></span>
+                          <span>{r.group}</span>
+                        </div>
+                      </td>
+                      <td className="p-3.5 text-[#94A3B8] font-medium min-w-[130px] whitespace-nowrap">{r.role}</td>
+                      <td className="p-3.5 font-mono font-semibold text-[#38BDF8] min-w-[120px] whitespace-nowrap">{r.sessionLength}</td>
+                      <td className="p-3.5 font-mono min-w-[160px] whitespace-nowrap">
+                        <span className={`px-2.5 py-1 rounded text-[11px] inline-block font-mono ${
+                          r.mfaInterval.includes('1h') || r.mfaInterval.includes('hardware') ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold' :
+                          r.mfaInterval.includes('2h') ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold' :
+                          'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                        }`}>
+                          {r.mfaInterval}
+                        </span>
+                      </td>
+                      <td className="p-3.5 min-w-[280px]">
+                        <div className="font-medium text-white">{r.scope}</div>
+                        <div className="text-[11px] text-[#94A3B8] mt-0.5 leading-relaxed">{r.description}</div>
+                      </td>
+                      <td className="p-3.5 text-[11px] min-w-[220px]">
+                        <div className="flex flex-wrap gap-1.5">
+                          {r.deniedDomains.map((d) => (
+                            <span key={d} className="bg-rose-500/10 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded font-mono whitespace-nowrap">
+                              ✕ {d}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))
+                )}
               </tbody>
             </table>
+          </div>
+
+          {/* Table Footer Summary Bar */}
+          <div className="px-4 py-2.5 bg-[#0B1120] border-t border-[#334155] flex flex-wrap items-center justify-between gap-3 text-[11px] text-[#94A3B8] font-mono">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span>All policies strictly enforced at Traefik Forward-Auth & Keycloak OIDC layer</span>
+            </div>
+            <div className="text-xs">
+              Filter: <strong className="text-white">{selectedGroup === 'all' ? 'All AD Groups' : selectedGroup}</strong>
+            </div>
           </div>
         </div>
 
@@ -1229,3 +1410,4 @@ export const GovernancePolicyView: React.FC = () => {
     </div>
   );
 };
+
