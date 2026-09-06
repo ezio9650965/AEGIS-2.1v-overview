@@ -4,7 +4,6 @@ import {
   INITIAL_CHECKLIST_LEFT,
   SECURITY_DEBT,
   DEMO_ACTS,
-  TRYHACKME_MAP,
 } from '../data/reportData';
 
 export interface PdfExportOptions {
@@ -633,40 +632,8 @@ export async function exportAegisPdf(options: PdfExportOptions = {}): Promise<vo
   }
 
   // ==========================================
-  // 9. TRYHACKME INTEGRATION MATRIX
+  // 9. JURY DEMO HIGHLIGHTS
   // ==========================================
-  if (mode === 'full') {
-    checkPageBreak(35);
-    drawSectionHeading('8', 'TryHackMe Competency & Topic Mapping (19 Topics)');
-
-    const thmTopics = TRYHACKME_MAP.slice(0, 6);
-    thmTopics.forEach((thm) => {
-      checkPageBreak(7);
-      doc.setFont('courier', 'bold');
-      doc.setFontSize(7);
-      doc.setTextColor(...colors.primary);
-      doc.text(`[${thm.zone}]`, marginX, cursorY + 3.5);
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7);
-      doc.setTextColor(...colors.textPrimary);
-      doc.text(thm.topic, marginX + 22, cursorY + 3.5);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(6.5);
-      doc.setTextColor(...colors.textSecondary);
-      doc.text(thm.implementation.substring(0, 60), marginX + 65, cursorY + 3.5);
-
-      doc.setFont('courier', 'normal');
-      doc.setFontSize(5.8);
-      doc.setTextColor(...colors.textMuted);
-      doc.text(thm.artifact.substring(0, 35), pageWidth - marginX, cursorY + 3.5, { align: 'right' });
-
-      cursorY += 6;
-    });
-
-    cursorY += 6;
-  }
 
   // ==========================================
   // 10. FORMAL SIGN-OFF & VERIFICATION SEAL

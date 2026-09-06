@@ -9,7 +9,6 @@ import { GovernancePolicyView } from './components/GovernancePolicyView';
 import { ChecklistsView } from './components/ChecklistsView';
 import { RoadmapView } from './components/RoadmapView';
 import { SecurityDebtView } from './components/SecurityDebtView';
-import { TryHackMeView } from './components/TryHackMeView';
 import { JuryDemoView } from './components/JuryDemoView';
 import { FileStructureView } from './components/FileStructureView';
 import { TerminalBootScreen } from './components/TerminalBootScreen';
@@ -148,8 +147,6 @@ export default function App() {
         return <RoadmapView />;
       case 'sec-7':
         return <SecurityDebtView />;
-      case 'sec-8':
-        return <TryHackMeView />;
       case 'sec-9':
         return <JuryDemoView />;
       case 'sec-10':

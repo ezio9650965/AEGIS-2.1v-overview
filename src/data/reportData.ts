@@ -1,4 +1,4 @@
-import { Section, ChecklistItem, SecurityDebtItem, TryHackMeTopic, DemoAct } from '../types';
+import { Section, ChecklistItem, SecurityDebtItem, DemoAct } from '../types';
 
 export const SECTIONS: Section[] = [
   { id: 'sec-1', number: 1, title: 'Executive Summary', shortTitle: 'Exec Summary', icon: 'Shield', badge: 'v2.1 Identity' },
@@ -9,7 +9,6 @@ export const SECTIONS: Section[] = [
   { id: 'sec-5', number: 5, title: 'Remaining Work Checklist', shortTitle: 'What Is Left', icon: 'ListTodo', badge: 'Action Items' },
   { id: 'sec-6', number: 6, title: 'Roadmap & Execution Plan', shortTitle: '4-Week Roadmap', icon: 'Calendar', badge: 'Timeline' },
   { id: 'sec-7', number: 7, title: 'Security Debt Register', shortTitle: 'Security Debt', icon: 'Bug', badge: 'Hardening' },
-  { id: 'sec-8', number: 8, title: 'TryHackMe Integration Map', shortTitle: 'TryHackMe Map', icon: 'GraduationCap', badge: '19 Topics' },
   { id: 'sec-9', number: 9, title: 'Jury Demo Script', shortTitle: 'Jury Demo', icon: 'Play', badge: '15 Min Script' },
   { id: 'sec-10', number: 10, title: 'File Structure Blueprint', shortTitle: 'File Structure', icon: 'FolderTree', badge: 'Directory Tree' },
 ];
@@ -74,28 +73,6 @@ export const SECURITY_DEBT: SecurityDebtItem[] = [
   { flaw: 'Healthcheck commands (curl-based) silently failing on Mailpit, Portainer, and Keycloak containers because those images don\'t ship curl — containers were fully healthy in reality but reported "unhealthy" in docker compose ps', severity: 'Low', fix: 'Mailpit switched to wget (present in image); Portainer switched to its own --version CLI check; Keycloak switched to a bash /dev/tcp port-open check (no external binary dependency)', evidence: 'All 8 containers now report healthy accurately in docker compose ps' },
 ];
 
-export const TRYHACKME_MAP: TryHackMeTopic[] = [
-  { topic: 'Blue Team Intro', implementation: 'SOC tier documentation (L1/L2/L3) & threat modeling', zone: 'Docs', artifact: 'docs/architecture.md' },
-  { topic: 'SOC L1 Triage', implementation: '3 physical playbooks (Brute Force, Malware, Exfiltration)', zone: 'Zone 4', artifact: 'soc/playbooks/*.md' },
-  { topic: 'SOC Metrics', implementation: 'Kibana MTTD, MTTR, and alert volume dashboard', zone: 'Zone 4', artifact: 'soc/dashboards/metrics.ndjson' },
-  { topic: 'EDR Concepts', implementation: 'Sysmon v15 + Wazuh agent on Windows domain endpoints', zone: 'Zone 2', artifact: 'grid/corp-pc01/sysmon.xml' },
-  { topic: 'SIEM Operations', implementation: 'Wazuh Manager + Elasticsearch 8.19 + Kibana integration', zone: 'Zone 4', artifact: 'minisoc1/minisoc2 Native RPM & systemd' },
-  { topic: 'SOAR Automation', implementation: 'Shuffle SOAR visual workflow engine ("Mahoraga v2.1")', zone: 'Zone 4', artifact: 'minisoc3 Docker Stack / Shuffle UI' },
-  { topic: 'Pyramid of Pain', implementation: 'Kibana "Detection by IOC Type" visualization', zone: 'Zone 4', artifact: 'Kibana Saved Dashboard' },
-  { topic: 'Cyber Kill Chain', implementation: 'Attack scenario documentation mapping Sliver to CKC', zone: 'Docs', artifact: 'docs/kill-chain.md' },
-  { topic: 'MITRE ATT&CK', implementation: 'Wazuh detection rules tagged with explicit mitre.id fields', zone: 'Zone 4', artifact: 'soc/wazuh/rules/local_rules.xml' },
-  { topic: 'Phishing Analysis', implementation: 'Mailpit SMTP sinkhole + header analysis playbook', zone: 'Zone 3', artifact: 'soc/playbooks/phishing.md' },
-  { topic: 'Network Traffic', implementation: 'Zeek 5-node cluster (conn.log, dns.log, http.log) -> ES', zone: 'Zone 3', artifact: '/opt/zeek/logs/current/' },
-  { topic: 'Wireshark Analysis', implementation: 'Analyst station on Kali VM with exported .pcap files', zone: 'Zone 1', artifact: 'Kali /home/kali/pcaps/' },
-  { topic: 'Network Security', implementation: 'Suricata IDS container on proxy_net with ET rules', zone: 'Zone 3', artifact: 'gateway/suricata/' },
-  { topic: 'Web Security', implementation: 'Coraza WAF container with OWASP CRS protecting Juice Shop', zone: 'Zone 3', artifact: 'gateway/coraza/Caddyfile' },
-  { topic: 'Windows Threat Detection', implementation: 'Sysmon Event IDs 1, 3, 7, 10, 11, 12, 13, 22 -> Wazuh', zone: 'Zone 2', artifact: 'Windows Event Collector' },
-  { topic: 'Linux Threat Detection', implementation: 'auditd execution & FIM rules on CORP-DB01', zone: 'Zone 2', artifact: 'grid/corp-db01/audit.rules' },
-  { topic: 'Malware Analysis', implementation: 'REMnux VM in Zone 1 for static YARA/PE analysis', zone: 'Zone 1', artifact: 'REMnux Sandbox' },
-  { topic: 'Threat Intelligence', implementation: 'MISP instance on minisoc3 with Abuse.ch feeds', zone: 'Zone 4', artifact: 'http://10.16.64.157:8080' },
-  { topic: 'Log Analysis', implementation: 'Kibana Discover saved searches & structured queries', zone: 'Zone 4', artifact: 'Kibana Saved Searches' },
-];
-
 export const DEMO_ACTS: DemoAct[] = [
   {
     act: 'Act I',
@@ -158,67 +135,3 @@ export const DEMO_ACTS: DemoAct[] = [
     narrative: 'From initial LSASS credential dump to full network isolation: 47 seconds. Shuffle SOAR enriched the alert via MISP Abuse.ch feeds and commanded Wazuh to sever the host network connection.'
   }
 ];
-
-export const MASTER_TOPOLOGY_MERMAID = `graph TB
-    subgraph Zone1["🔴 Zone 1: Threatscape (Internet & Red Team)"]
-        KALI["Kali Linux APT (192.168.1.50)<br/>Sliver C2 / sqlmap / mimikatz"]
-        REMNUX["REMnux Malware Sandbox<br/>YARA / Static / Dynamic Analysis"]
-    end
-
-    subgraph Zone2["🟡 Zone 2: The Small Enterprise (aegis.corp - 192.168.20.0/24)"]
-        DC01["CORP-DC01 (192.168.20.10)<br/>Win Server 2022 AD DS / DNS / DHCP<br/>Wazuh Agent"]
-        PC01["CORP-PC01 (192.168.20.100)<br/>Win10 Workstation 'Patient Zero'<br/>Sysmon v15 + Wazuh Agent"]
-        DB01["CORP-DB01 (192.168.20.50)<br/>Ubuntu 22.04 PostgreSQL (Customer PII)<br/>Wazuh Agent + auditd"]
-    end
-
-    subgraph Zone3["🔵 Zone 3: ZTA Gateway (192.168.19.173 - Ubuntu 24.04 LTS)"]
-        subgraph ProxyNet["proxy_net (DMZ Bridge)"]
-            TRAEFIK["Traefik v3.6.1 Edge Router<br/>Ports 80 / 443 / 1514 / 1515"]
-            CORAZA["Coraza WAF (Caddy + OWASP CRS)<br/>Inline Web Defense"]
-            SURICATA["Suricata IDS<br/>Emerging Threats Rules"]
-        end
-        subgraph AuthNet["auth_net (internal: true Secure Enclave)"]
-            AUTHELIA["Authelia v4.39.20<br/>Forward-Auth / MFA / OIDC"]
-            KEYCLOAK["Keycloak v26.6.2<br/>OIDC Identity Provider"]
-            POSTGRES["PostgreSQL 16<br/>Identity Vault"]
-            REDIS["Redis 7<br/>Session Cache"]
-            PORTAINER["Portainer CE v2.39.2<br/>Management UI"]
-        end
-        ZEEK["Zeek NTA (5-Node Cluster)<br/>Sniffing br_proxy, ens34 & ens33"]
-        JUICESHOP["OWASP Juice Shop (192.168.19.175:3000)<br/>Vulnerable Target App"]
-    end
-
-    subgraph Zone4["🟣 Zone 4: MSSP SOC (10.16.64.0/24 - AlmaLinux 9.3 Cluster)"]
-        SOC1["minisoc1 (10.16.64.155)<br/>Elasticsearch 8.19.13 'The Vault' (Native Package)<br/>Port 9200/TLS"]
-        SOC2["minisoc2 (10.16.64.156)<br/>Wazuh Manager 4.7 + Kibana 'The Brain' (Native Package)<br/>Ports 1514 / 1515 / 5601"]
-        subgraph MiniSOC3["minisoc3 (10.16.64.157) 'The Executor' (soc_net Bridge)"]
-            SOC3_SHUFFLE["Shuffle SOAR (4 Containers)<br/>frontend (:3001), backend, orborus, mongo:6"]
-            SOC3_MISP["MISP Official (4 Containers)<br/>core (:8080), modules, mariadb, valkey"]
-            SOC3_LOGSTASH["Logstash 8.19.13 (:5044)<br/>Level 12+ ES Query -> Shuffle Hook"]
-            SOC3_MAILPIT["Mailpit SMTP Sinkhole (:8025)<br/>Phishing Triage"]
-        end
-    end
-
-    KALI -->|"1. HTTPS Attack / C2 / SQLi"| TRAEFIK
-    TRAEFIK -->|"2. Forward Auth Request (:9091)"| AUTHELIA
-    AUTHELIA -->|"3. Check Sessions / Auth"| REDIS
-    AUTHELIA -->|"4. User Credential Query"| POSTGRES
-    AUTHELIA -->|"5. OIDC Delegation"| KEYCLOAK
-    TRAEFIK -->|"6. Proxy Clean Request"| CORAZA
-    CORAZA -->|"7. Clean Web Traffic"| JUICESHOP
-
-    PC01 -->|"8. Sysmon / Security Logs (TCP 1514 mTLS)"| TRAEFIK
-    DC01 -->|"9. AD Event Logs (TCP 1514 mTLS)"| TRAEFIK
-    DB01 -->|"10. auditd / DB Logs (TCP 1514 mTLS)"| TRAEFIK
-    TRAEFIK -->|"11. Blind Proxy Pass-through"| SOC2
-
-    TRAEFIK -->|"12. JSON Access Logs (Filebeat)"| SOC1
-    ZEEK -->|"13. Network Traffic Logs (Filebeat)"| SOC1
-    SURICATA -->|"14. EVE JSON Alerts"| SOC2
-
-    SOC2 -->|"15. Index Alerts"| SOC1
-    SOC1 -->|"16. Alert Feed (rule.level >= 12)"| SOC3_LOGSTASH
-    SOC3_LOGSTASH -->|"17. Trigger Webhook"| SOC3_SHUFFLE
-    SOC3_SHUFFLE -->|"18. Threat Intel Lookup"| SOC3_MISP
-    SOC3_SHUFFLE -->|"19. Active Response / Session Revocation"| SOC2
-    SOC2 -->|"20. Host Isolation Trigger"| PC01`;

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { MermaidDiagram } from './MermaidDiagram';
+import { CustomerVsEmployeeFlow } from './CustomerVsEmployeeFlow';
 import {
   ShieldCheck,
   Users,
@@ -150,73 +150,6 @@ const ENDPOINTS: DestinationEndpoint[] = [
   { id: 'e6', name: 'Kibana 8.19 Raw Multi-Tenant SOC', url: 'https://minisoc2.zerotrust.lan/kibana', domain: 'minisoc2.zerotrust.lan', path: '/kibana', zone: 'Zone 4 (MSSP SOC)', description: 'Raw SIEM telemetry, MITRE alerts & elasticsearch index viewer' },
   { id: 'e7', name: 'Executive Posture Rollup Portal', url: 'https://executive.zerotrust.lan/scorecard', domain: 'executive.zerotrust.lan', path: '/scorecard', zone: 'Zone 3 (Corporate)', description: 'High-level Red/Yellow/Green SLA and MTTD rollups' },
 ];
-
-export const CUSTOMER_VS_EMPLOYEE_AUTH_MERMAID = `graph TB
-    subgraph Inbound["🌐 Inbound Traffic & Identity Context"]
-        CUST["🛍️ Public Consumer / Customer<br/>(Anonymous Web Browser)"]
-        EMP["💼 Internal Employee / Admin<br/>(aegis.corp AD Principal)"]
-    end
-
-    subgraph EdgeGateway["🛡️ Zone 3: Traefik v3 Edge Gateway (Reverse Proxy)"]
-        TRAEFIK["Traefik Ingress Router<br/>TLS Termination (*.zerotrust.lan)"]
-        ROUTER{"Host & Path Evaluation<br/>(shop.zerotrust.lan vs *.zerotrust.lan)"}
-    end
-
-    subgraph CustomerPath["🟢 Customer Authentication Path (policy: bypass)"]
-        BYPASS["Authelia Rule: bypass<br/>Zero Enterprise SSO / No Corporate MFA"]
-        SHOP["OWASP Juice Shop Storefront<br/>Local SQLite / Native App Auth"]
-        CUST_OK["✅ Instant Storefront Access & Fast Checkout<br/>HTTP 200 OK (Preserves Consumer Conversion)"]
-    end
-
-    subgraph EmployeePath["🔵 Employee / Admin Authentication Path (policy: two_factor)"]
-        FORWARD_AUTH["Authelia Forward-Auth Middleware<br/>/api/authz/forward-auth"]
-        SESSION_CHECK{"Valid Session in<br/>Redis Cache?"}
-        KEYCLOAK["Keycloak Identity Provider<br/>OIDC SSO Token Broker"]
-        AD["Active Directory (aegis.corp)<br/>LDAP / Kerberos / Group Claims"]
-        MFA{"TOTP / Hardware MFA Challenge<br/>(Step-Up Re-auth on /admin.*)"}
-        RBAC{"AD Group Authorized<br/>for Target Service?"}
-        PROTECTED_APPS["Protected Enclave Applications<br/>(Portainer / Traefik / HRIS / Store Admin)"]
-        DENY_BLOCK["🛑 HTTP 401 / 403 Access Denied<br/>Unauthorized or Missing Group Claim"]
-    end
-
-    CUST -->|"1. GET /shop"| TRAEFIK
-    EMP -->|"1. GET /dashboard or /admin"| TRAEFIK
-
-    TRAEFIK --> ROUTER
-
-    ROUTER -->|"Domain: shop.zerotrust.lan"| BYPASS
-    BYPASS --> SHOP
-    SHOP --> CUST_OK
-
-    ROUTER -->|"Domain: *.zerotrust.lan or Path: /admin.*"| FORWARD_AUTH
-    FORWARD_AUTH --> SESSION_CHECK
-    SESSION_CHECK -->|"No / Expired Session"| KEYCLOAK
-    KEYCLOAK --> AD
-    AD --> MFA
-    SESSION_CHECK -->|"Valid Session"| MFA
-
-    MFA -->|"Valid TOTP Code"| RBAC
-    MFA -->|"Invalid / Canceled"| DENY_BLOCK
-
-    RBAC -->|"Group Match (e.g. IT, Developers)"| PROTECTED_APPS
-    RBAC -->|"Group Mismatch / Forbidden"| DENY_BLOCK
-
-    classDef customer fill:#052e16,stroke:#4ADE80,stroke-width:2px,color:#f0fdf4
-    classDef employee fill:#082f49,stroke:#38BDF8,stroke-width:2px,color:#f0f9ff
-    classDef edge fill:#0f172a,stroke:#64748b,stroke-width:2px,color:#f8fafc
-    classDef decision fill:#1e1b4b,stroke:#a855f7,stroke-width:2px,color:#faf5ff
-    classDef mfa fill:#451a03,stroke:#FBBF24,stroke-width:2px,color:#fefce8
-    classDef deny fill:#4c0519,stroke:#F43F5E,stroke-width:2px,color:#fff1f2
-    classDef success fill:#022c22,stroke:#10b981,stroke-width:2px,color:#ecfdf5
-
-    class CUST,BYPASS,SHOP customer
-    class EMP,FORWARD_AUTH,KEYCLOAK,AD,PROTECTED_APPS employee
-    class TRAEFIK,ROUTER edge
-    class SESSION_CHECK,RBAC decision
-    class MFA mfa
-    class DENY_BLOCK deny
-    class CUST_OK success
-`;
 
 interface ColumnHeaderTooltipProps {
   title: string;
@@ -711,7 +644,7 @@ export const GovernancePolicyView: React.FC = () => {
           </div>
         </div>
 
-        {/* VISUAL FLOW CHART (MERMAID.JS) */}
+        {/* VISUAL FLOW CHART (INTERACTIVE CUSTOM COMPONENT) */}
         <div className="pro-card p-5 space-y-3 border-[#38BDF8]/40 shadow-lg">
           <div className="terminal-panel-header flex flex-wrap items-center justify-between gap-3 pb-2">
             <div className="flex items-center gap-2">
@@ -721,7 +654,7 @@ export const GovernancePolicyView: React.FC = () => {
                   <span>Visual Authentication Flow — Customer Bypass vs. Employee 2FA Gate</span>
                 </h4>
                 <p className="text-[11px] text-[#94A3B8] font-sans mt-0.5">
-                  Path-based decision tree executed at the Traefik v3 reverse proxy and Authelia v4.38 forward-auth layer.
+                  Path-based decision tree executed at the Traefik v3 reverse proxy and Authelia v4.39 forward-auth layer.
                 </p>
               </div>
             </div>
@@ -732,49 +665,8 @@ export const GovernancePolicyView: React.FC = () => {
             </div>
           </div>
 
-          {/* Interactive Flow Diagram Container */}
-          <div className="bg-[#0F172A] p-3 rounded-lg border border-[#334155]">
-            <MermaidDiagram
-              chart={CUSTOMER_VS_EMPLOYEE_AUTH_MERMAID}
-              id="customer-vs-employee-auth-flow"
-              title="Customer vs. Employee Authentication Path Separation"
-            />
-          </div>
-
-          {/* Diagram Legend & Architecture Notes */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1 text-[11px] font-sans">
-            <div className="bg-[#0B1120] p-2.5 rounded border border-emerald-500/30 flex items-start gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0 mt-0.5 shadow-sm"></span>
-              <div>
-                <strong className="text-emerald-300 font-mono block text-[10px]">🟢 Customer Path (Bypass):</strong>
-                <span className="text-[#94A3B8]">Direct proxy to store app. Preserves checkout UX & conversion rate.</span>
-              </div>
-            </div>
-
-            <div className="bg-[#0B1120] p-2.5 rounded border border-sky-500/30 flex items-start gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-sky-400 shrink-0 mt-0.5 shadow-sm"></span>
-              <div>
-                <strong className="text-sky-300 font-mono block text-[10px]">🔵 Employee Path (2FA):</strong>
-                <span className="text-[#94A3B8]">Authelia forward-auth checks Redis cache & Keycloak AD token claims.</span>
-              </div>
-            </div>
-
-            <div className="bg-[#0B1120] p-2.5 rounded border border-amber-500/30 flex items-start gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0 mt-0.5 shadow-sm"></span>
-              <div>
-                <strong className="text-amber-300 font-mono block text-[10px]">🟡 Step-Up Challenge:</strong>
-                <span className="text-[#94A3B8]">Re-authenticates TOTP on <code className="text-white font-mono">/admin.*</code> against cookie hijacking.</span>
-              </div>
-            </div>
-
-            <div className="bg-[#0B1120] p-2.5 rounded border border-rose-500/30 flex items-start gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-rose-400 shrink-0 mt-0.5 shadow-sm"></span>
-              <div>
-                <strong className="text-rose-300 font-mono block text-[10px]">🔴 Access Denied:</strong>
-                <span className="text-[#94A3B8]">Immediate 401/403 for unauthorized users or group mismatches.</span>
-              </div>
-            </div>
-          </div>
+          {/* Interactive Flow Diagram Container (Mermaid-Free Native React/SVG) */}
+          <CustomerVsEmployeeFlow />
         </div>
 
         {/* Authelia Access Control YAML Code Block */}
@@ -908,140 +800,143 @@ export const GovernancePolicyView: React.FC = () => {
           </div>
         </div>
 
-        {/* Readability-Prioritized Interactive Mapping Table */}
-        <div className="pro-card overflow-hidden shadow-xl border-[#334155]">
-          {/* Header Banner */}
-          <div className="px-4 py-2.5 bg-[#0B1120] border-b border-[#334155] flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#94A3B8] font-mono">
-            <span className="flex items-center gap-1.5 text-white/90">
-              <HelpCircle className="w-3.5 h-3.5 text-[#FBBF24]" />
-              <span className="font-bold text-[#FBBF24]">Interactive Column Dictionary:</span>
-              <span className="hidden sm:inline text-[#94A3B8]">Hover over or tap any column header for technical definitions.</span>
-            </span>
-            <span className="text-[#38BDF8] flex items-center gap-1">
-              <span>Displaying {filteredRoles.length} of {ROLE_MAPPINGS.length} security mappings</span>
-            </span>
-          </div>
-
-          {/* Table Container with Smooth Scroll & Min-Width for Pristine Readability */}
-          <div className="governance-table-container">
-            <table className="w-full min-w-[960px] text-xs text-left border-collapse font-sans">
-              <thead>
-                <tr className="terminal-panel-header bg-[#0F172A] text-[#FBBF24] font-mono">
-                  <ColumnHeaderTooltip
-                    title="AD Security Group"
-                    tooltipTitle="Active Directory Security Group"
-                    definition="The primary identity container in Active Directory (aegis.corp). Access policies, token claims, and gateway permissions bind strictly to group membership rather than individual user accounts or corporate hierarchy."
-                    spec="Queried via LDAP/Kerberos and mapped to Keycloak OIDC group claims."
-                    align="left"
-                  />
-                  <ColumnHeaderTooltip
-                    title="Example Role"
-                    tooltipTitle="Organizational Job Role"
-                    definition="Representative business title corresponding to the Active Directory group to demonstrate typical user responsibilities within the organization."
-                    spec="Assigned during Step 1 (AD Provisioning) of the onboarding lifecycle."
-                    align="left"
-                  />
-                  <ColumnHeaderTooltip
-                    title="Session Duration"
-                    tooltipTitle="Session Lifetime (TTL)"
-                    definition="The maximum active time-to-live (TTL) for Keycloak authentication tokens and Authelia session cookies before a full credential re-authentication is strictly required."
-                    spec="Enforced via Redis session cache and HTTP-only forward-auth session cookies."
-                    align="left"
-                  />
-                  <ColumnHeaderTooltip
-                    title="MFA Re-check Interval"
-                    tooltipTitle="MFA Re-check & Step-Up Interval"
-                    definition="The maximum duration an authenticated session may access sensitive or protected resources before requiring a fresh TOTP or hardware FIDO2 verification challenge."
-                    spec="Mitigates session-cookie hijacking by enforcing step-up verification on privileged endpoints (e.g. /admin.*)."
-                    align="left"
-                  />
-                  <ColumnHeaderTooltip
-                    title="Enforced Access Scope"
-                    tooltipTitle="Enforced Authorization Scope"
-                    definition="The designated internal applications, development repositories, and departmental systems accessible to members of this group according to Authelia gateway forward-auth rules."
-                    spec="Evaluated dynamically at Traefik reverse proxy based on AD group claims."
-                    align="left"
-                  />
-                  <ColumnHeaderTooltip
-                    title="Explicit Restrictions"
-                    tooltipTitle="Explicit Security Denials"
-                    definition="Administrative consoles, container orchestrators, and raw SOC telemetry backends strictly denied to this group to maintain least-privilege isolation and prevent lateral movement."
-                    spec="Enforced via default-deny gateway access control rules."
-                    align="left"
-                  />
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#334155] text-[#F1F5F9]/90">
-                {filteredRoles.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="p-8 text-center text-[#94A3B8] font-mono">
-                      No Active Directory group mappings match current filter "{searchFilter}".
-                    </td>
-                  </tr>
-                ) : (
-                  filteredRoles.map((r, index) => (
-                    <motion.tr
-                      key={r.group}
-                      initial={{ opacity: 0, y: 14 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{
-                        duration: 0.35,
-                        delay: index * 0.06,
-                        ease: [0.25, 0.1, 0.25, 1],
-                      }}
-                      className="hover:bg-[#0F172A]/70 transition-colors"
-                    >
-                      <td className="p-3.5 font-mono font-bold text-white whitespace-nowrap min-w-[190px]">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-2.5 h-2.5 rounded-full shrink-0 shadow-sm ${
-                            r.color === 'emerald' ? 'bg-emerald-400' :
-                            r.color === 'amber' ? 'bg-amber-400' :
-                            r.color === 'sky' ? 'bg-sky-400' :
-                            r.color === 'blue' ? 'bg-blue-400' :
-                            r.color === 'rose' ? 'bg-rose-400' : 'bg-purple-400'
-                          }`}></span>
-                          <span>{r.group}</span>
-                        </div>
-                      </td>
-                      <td className="p-3.5 text-[#94A3B8] font-medium min-w-[130px] whitespace-nowrap">{r.role}</td>
-                      <td className="p-3.5 font-mono font-semibold text-[#38BDF8] min-w-[120px] whitespace-nowrap">{r.sessionLength}</td>
-                      <td className="p-3.5 font-mono min-w-[160px] whitespace-nowrap">
-                        <span className={`px-2.5 py-1 rounded text-[11px] inline-block font-mono ${
-                          r.mfaInterval.includes('1h') || r.mfaInterval.includes('hardware') ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold' :
-                          r.mfaInterval.includes('2h') ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold' :
-                          'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                        }`}>
-                          {r.mfaInterval}
-                        </span>
-                      </td>
-                      <td className="p-3.5 min-w-[280px]">
-                        <div className="font-medium text-white">{r.scope}</div>
-                        <div className="text-[11px] text-[#94A3B8] mt-0.5 leading-relaxed">{r.description}</div>
-                      </td>
-                      <td className="p-3.5 text-[11px] min-w-[220px]">
-                        <div className="flex flex-wrap gap-1.5">
-                          {r.deniedDomains.map((d) => (
-                            <span key={d} className="bg-rose-500/10 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded font-mono whitespace-nowrap">
-                              ✕ {d}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                    </motion.tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Table Footer Summary Bar */}
-          <div className="px-4 py-2.5 bg-[#0B1120] border-t border-[#334155] flex flex-wrap items-center justify-between gap-3 text-[11px] text-[#94A3B8] font-mono">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span>All policies strictly enforced at Traefik Forward-Auth & Keycloak OIDC layer</span>
+        {/* Wrap tables in governance-dashboard grid */}
+        <div className="governance-dashboard">
+          {/* Readability-Prioritized Interactive Mapping Table */}
+          <div className="pro-card overflow-hidden shadow-xl border-[#334155]">
+            {/* Header Banner */}
+            <div className="px-4 py-2.5 bg-[#0B1120] border-b border-[#334155] flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#94A3B8] font-mono">
+              <span className="flex items-center gap-1.5 text-white/90">
+                <HelpCircle className="w-3.5 h-3.5 text-[#FBBF24]" />
+                <span className="font-bold text-[#FBBF24]">Interactive Column Dictionary:</span>
+                <span className="hidden sm:inline text-[#94A3B8]">Hover over or tap any column header for technical definitions.</span>
+              </span>
+              <span className="text-[#38BDF8] flex items-center gap-1">
+                <span>Displaying {filteredRoles.length} of {ROLE_MAPPINGS.length} security mappings</span>
+              </span>
             </div>
-            <div className="text-xs">
-              Filter: <strong className="text-white">{selectedGroup === 'all' ? 'All AD Groups' : selectedGroup}</strong>
+
+            {/* Table Container with Smooth Scroll & Min-Width for Pristine Readability */}
+            <div className="governance-table-container">
+              <table className="w-full min-w-[960px] text-xs text-left border-collapse font-sans">
+                <thead>
+                  <tr className="terminal-panel-header bg-[#0F172A] text-[#FBBF24] font-mono">
+                    <ColumnHeaderTooltip
+                      title="AD Security Group"
+                      tooltipTitle="Active Directory Security Group"
+                      definition="The primary identity container in Active Directory (aegis.corp). Access policies, token claims, and gateway permissions bind strictly to group membership rather than individual user accounts or corporate hierarchy."
+                      spec="Queried via LDAP/Kerberos and mapped to Keycloak OIDC group claims."
+                      align="left"
+                    />
+                    <ColumnHeaderTooltip
+                      title="Example Role"
+                      tooltipTitle="Organizational Job Role"
+                      definition="Representative business title corresponding to the Active Directory group to demonstrate typical user responsibilities within the organization."
+                      spec="Assigned during Step 1 (AD Provisioning) of the onboarding lifecycle."
+                      align="left"
+                    />
+                    <ColumnHeaderTooltip
+                      title="Session Length"
+                      tooltipTitle="Session Length (Session Lifetime / TTL)"
+                      definition="The maximum active duration (Session Length / TTL) for Keycloak authentication tokens and Authelia session cookies before a full credential re-authentication is strictly required."
+                      spec="Enforced via Redis session cache and HTTP-only forward-auth session cookies."
+                      align="left"
+                    />
+                    <ColumnHeaderTooltip
+                      title="MFA Re-check Interval"
+                      tooltipTitle="MFA Re-check Interval"
+                      definition="The maximum duration an authenticated session may access sensitive or protected resources before requiring a fresh TOTP or hardware FIDO2 verification challenge."
+                      spec="Mitigates session-cookie hijacking by enforcing step-up verification on privileged endpoints (e.g. /admin.*)."
+                      align="left"
+                    />
+                    <ColumnHeaderTooltip
+                      title="Enforced Access Scope"
+                      tooltipTitle="Enforced Authorization Scope"
+                      definition="The designated internal applications, development repositories, and departmental systems accessible to members of this group according to Authelia gateway forward-auth rules."
+                      spec="Evaluated dynamically at Traefik reverse proxy based on AD group claims."
+                      align="left"
+                    />
+                    <ColumnHeaderTooltip
+                      title="Explicit Restrictions"
+                      tooltipTitle="Explicit Security Denials"
+                      definition="Administrative consoles, container orchestrators, and raw SOC telemetry backends strictly denied to this group to maintain least-privilege isolation and prevent lateral movement."
+                      spec="Enforced via default-deny gateway access control rules."
+                      align="left"
+                    />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#334155] text-[#F1F5F9]/90">
+                  {filteredRoles.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-[#94A3B8] font-mono">
+                        No Active Directory group mappings match current filter "{searchFilter}".
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRoles.map((r, index) => (
+                      <motion.tr
+                        key={r.group}
+                        initial={{ opacity: 0, y: 14 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{
+                          duration: 0.35,
+                          delay: index * 0.06,
+                          ease: [0.25, 0.1, 0.25, 1],
+                        }}
+                        className="hover:bg-[#0F172A]/70 transition-colors"
+                      >
+                        <td className="p-3.5 font-mono font-bold text-white whitespace-nowrap min-w-[190px]">
+                          <div className="flex items-center gap-2">
+                            <span className={`w-2.5 h-2.5 rounded-full shrink-0 shadow-sm ${
+                              r.color === 'emerald' ? 'bg-emerald-400' :
+                              r.color === 'amber' ? 'bg-amber-400' :
+                              r.color === 'sky' ? 'bg-sky-400' :
+                              r.color === 'blue' ? 'bg-blue-400' :
+                              r.color === 'rose' ? 'bg-rose-400' : 'bg-purple-400'
+                            }`}></span>
+                            <span>{r.group}</span>
+                          </div>
+                        </td>
+                        <td className="p-3.5 text-[#94A3B8] font-medium min-w-[130px] whitespace-nowrap">{r.role}</td>
+                        <td className="p-3.5 font-mono font-semibold text-[#38BDF8] min-w-[120px] whitespace-nowrap">{r.sessionLength}</td>
+                        <td className="p-3.5 font-mono min-w-[160px] whitespace-nowrap">
+                          <span className={`px-2.5 py-1 rounded text-[11px] inline-block font-mono ${
+                            r.mfaInterval.includes('1h') || r.mfaInterval.includes('hardware') ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold' :
+                            r.mfaInterval.includes('2h') ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold' :
+                            'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                          }`}>
+                            {r.mfaInterval}
+                          </span>
+                        </td>
+                        <td className="p-3.5 min-w-[280px]">
+                          <div className="font-medium text-white">{r.scope}</div>
+                          <div className="text-[11px] text-[#94A3B8] mt-0.5 leading-relaxed">{r.description}</div>
+                        </td>
+                        <td className="p-3.5 text-[11px] min-w-[220px]">
+                          <div className="flex flex-wrap gap-1.5">
+                            {r.deniedDomains.map((d) => (
+                              <span key={d} className="bg-rose-500/10 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded font-mono whitespace-nowrap">
+                                ✕ {d}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                      </motion.tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Table Footer Summary Bar */}
+            <div className="px-4 py-2.5 bg-[#0B1120] border-t border-[#334155] flex flex-wrap items-center justify-between gap-3 text-[11px] text-[#94A3B8] font-mono">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span>All policies strictly enforced at Traefik Forward-Auth & Keycloak OIDC layer</span>
+              </div>
+              <div className="text-xs">
+                Filter: <strong className="text-white">{selectedGroup === 'all' ? 'All AD Groups' : selectedGroup}</strong>
+              </div>
             </div>
           </div>
         </div>

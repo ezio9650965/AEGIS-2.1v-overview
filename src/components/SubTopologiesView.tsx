@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { InteractiveTopologyDiagram } from './InteractiveTopologyDiagram';
 import {
   Layers,
   Server,
@@ -124,39 +125,43 @@ export const SubTopologiesView: React.FC = () => {
             </p>
           </div>
 
-          {/* Sub-tabs */}
+          {/* Sub-tabs in Sequential Traffic Path Order (1 to 4) */}
           <div className="flex flex-wrap items-center gap-1 bg-[#0F172A] p-1 border border-[#334155] rounded font-mono">
             <button
               onClick={() => setActiveSubTab('z1')}
-              className={`px-3 py-1.5 rounded text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                 activeSubTab === 'z1' ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'text-[#94A3B8] hover:text-[#F1F5F9]'
               }`}
             >
-              Zone 1: Threatscape
-            </button>
-            <button
-              onClick={() => setActiveSubTab('z2')}
-              className={`px-3 py-1.5 rounded text-xs font-semibold transition-all cursor-pointer ${
-                activeSubTab === 'z2' ? 'bg-[#FBBF24]/20 text-[#FBBF24] border border-[#FBBF24]/40' : 'text-[#94A3B8] hover:text-[#F1F5F9]'
-              }`}
-            >
-              Zone 2: Enterprise Grid
+              <span className="w-4 h-4 rounded-full bg-red-500/20 text-red-400 text-[10px] font-bold flex items-center justify-center">1</span>
+              <span>Zone 1: Threatscape (Origin)</span>
             </button>
             <button
               onClick={() => setActiveSubTab('z3')}
-              className={`px-3 py-1.5 rounded text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                 activeSubTab === 'z3' ? 'bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/40' : 'text-[#94A3B8] hover:text-[#F1F5F9]'
               }`}
             >
-              Zone 3: ZTA Gateway
+              <span className="w-4 h-4 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-bold flex items-center justify-center">2</span>
+              <span>Zone 3: ZTA Gateway (Gate)</span>
             </button>
             <button
               onClick={() => setActiveSubTab('z4')}
-              className={`px-3 py-1.5 rounded text-xs font-semibold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                 activeSubTab === 'z4' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40' : 'text-[#94A3B8] hover:text-[#F1F5F9]'
               }`}
             >
-              Zone 4: MSSP SOC
+              <span className="w-4 h-4 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-bold flex items-center justify-center">3</span>
+              <span>Zone 4: MSSP SOC (Detection)</span>
+            </button>
+            <button
+              onClick={() => setActiveSubTab('z2')}
+              className={`px-3 py-1.5 rounded text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
+                activeSubTab === 'z2' ? 'bg-[#FBBF24]/20 text-[#FBBF24] border border-[#FBBF24]/40' : 'text-[#94A3B8] hover:text-[#F1F5F9]'
+              }`}
+            >
+              <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold flex items-center justify-center">4</span>
+              <span>Zone 2: Enterprise Grid (Target)</span>
             </button>
             <button
               onClick={() => setActiveSubTab('governance')}
@@ -173,6 +178,11 @@ export const SubTopologiesView: React.FC = () => {
         {/* Sub-tab 1: Zone 1 */}
         {activeSubTab === 'z1' && (
           <div className="space-y-4 font-mono">
+            {/* Visual Topology for Zone 1 (Constraints A-E) */}
+            <div className="mb-2">
+              <InteractiveTopologyDiagram filterZone="z1" initialExpandedZone="z1" showTraceControls={false} />
+            </div>
+
             <div className="bg-[#0F172A] border border-red-500/30 rounded-lg p-5">
               <h3 className="text-sm font-bold text-red-400 uppercase tracking-wider mb-3">Zone 1: Threatscape & Red Team Emulation Engine</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
@@ -208,6 +218,11 @@ export const SubTopologiesView: React.FC = () => {
         {/* Sub-tab 2: Zone 2 */}
         {activeSubTab === 'z2' && (
           <div className="space-y-4 font-mono">
+            {/* Visual Topology for Zone 2 (Constraints A-E) */}
+            <div className="mb-2">
+              <InteractiveTopologyDiagram filterZone="z2" initialExpandedZone="z2" showTraceControls={false} />
+            </div>
+
             <div className="bg-[#0F172A] border border-[#FBBF24]/30 rounded-lg p-5">
               <h3 className="text-sm font-bold text-[#FBBF24] uppercase tracking-wider mb-3">Zone 2: Small Enterprise Domain Grid (`aegis.corp` - 192.168.20.0/24)</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
@@ -350,6 +365,11 @@ export const SubTopologiesView: React.FC = () => {
         {/* Sub-tab 3: Zone 3 */}
         {activeSubTab === 'z3' && (
           <div className="space-y-4 font-mono">
+            {/* Visual Topology for Zone 3 (Constraints A-E) */}
+            <div className="mb-2">
+              <InteractiveTopologyDiagram filterZone="z3" initialExpandedZone="z3" showTraceControls={false} />
+            </div>
+
             <div className="bg-[#0F172A] border border-[#38BDF8]/30 rounded-lg p-5">
               <h3 className="text-sm font-bold text-[#38BDF8] uppercase tracking-wider mb-3">Zone 3: ZTA Gateway Network Isolation & Port Matrix</h3>
 
@@ -557,6 +577,11 @@ export const SubTopologiesView: React.FC = () => {
         {/* Sub-tab 4: Zone 4 */}
         {activeSubTab === 'z4' && (
           <div className="space-y-6 font-mono">
+            {/* Visual Topology for Zone 4 (Constraints A-E) */}
+            <div className="mb-2">
+              <InteractiveTopologyDiagram filterZone="z4" initialExpandedZone="z4" showTraceControls={false} />
+            </div>
+
             {/* Zone 4 Cluster Overview Cards */}
             <div className="bg-[#0F172A] border border-purple-500/30 rounded-lg p-5">
               <h3 className="text-sm font-bold text-purple-400 uppercase tracking-wider mb-3 flex items-center justify-between">

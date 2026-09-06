@@ -178,6 +178,13 @@ body {
   width: 100%;
 }
 
+.governance-dashboard {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  width: 100%;
+}
+
 .governance-grid {
   display: grid;
   grid-template-columns: 1fr;

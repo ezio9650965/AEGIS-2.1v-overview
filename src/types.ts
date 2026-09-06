@@ -23,13 +23,6 @@ export interface SecurityDebtItem {
   evidence: string;
 }
 
-export interface TryHackMeTopic {
-  topic: string;
-  implementation: string;
-  zone: string;
-  artifact: string;
-}
-
 export interface DemoAct {
   act: string;
   title: string;
