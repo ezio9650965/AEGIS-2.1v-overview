@@ -112,64 +112,77 @@ export const SubTopologiesView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 font-sans">
-      <div className="bg-[#1E293B] border border-[#334155] rounded-lg p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+    <div className="space-y-6 font-mono text-[13px]">
+      <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-6 aegis-grid-bg shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-[#30363d]">
           <div>
-            <h2 className="pro-title flex items-center gap-2">
-              <Layers className="w-5 h-5 text-[#38BDF8]" />
-              <span>Section 3: Detailed Zone Sub-Topologies</span>
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[rgba(0,212,255,0.13)] border border-[#00d4ff]/30 text-[#00d4ff] text-[10px] uppercase font-bold tracking-wider mb-2">
+              <Layers className="w-3.5 h-3.5 text-[#00d4ff]" />
+              <span>Section 3 Sub-Architectures</span>
+            </div>
+            <h2 className="text-lg font-bold text-[#c9d1d9] tracking-tight flex items-center gap-2">
+              <span>Detailed Zone Sub-Topologies</span>
             </h2>
-            <p className="text-xs text-[#94A3B8] mt-1">
+            <p className="text-xs text-[#8b949e] mt-1">
               Select a zone below to inspect internal components, IP addresses, network segments, port bindings, telemetry sources, and threat intelligence orchestration.
             </p>
           </div>
 
           {/* Sub-tabs in Sequential Traffic Path Order (1 to 4) */}
-          <div className="flex flex-wrap items-center gap-1 bg-[#0F172A] p-1 border border-[#334155] rounded font-mono">
+          <div className="flex flex-wrap items-center gap-1 bg-[#0d1117] p-1 border border-[#30363d] rounded font-mono">
             <button
               onClick={() => setActiveSubTab('z1')}
               className={`px-3 py-1.5 rounded text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-                activeSubTab === 'z1' ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'text-[#94A3B8] hover:text-[#F1F5F9]'
+                activeSubTab === 'z1'
+                  ? 'bg-[rgba(255,51,102,0.13)] text-[#ff3366] border border-[#ff3366]/50 shadow-sm'
+                  : 'text-[#8b949e] hover:text-[#c9d1d9] hover:bg-[#21262d]'
               }`}
             >
-              <span className="w-4 h-4 rounded-full bg-red-500/20 text-red-400 text-[10px] font-bold flex items-center justify-center">1</span>
+              <span className="w-4 h-4 rounded-full bg-[rgba(255,51,102,0.13)] border border-[#ff3366] text-[#ff3366] text-[10px] font-bold flex items-center justify-center">1</span>
               <span>Zone 1: Threatscape (Origin)</span>
             </button>
             <button
               onClick={() => setActiveSubTab('z3')}
               className={`px-3 py-1.5 rounded text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-                activeSubTab === 'z3' ? 'bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/40' : 'text-[#94A3B8] hover:text-[#F1F5F9]'
+                activeSubTab === 'z3'
+                  ? 'bg-[rgba(0,212,255,0.13)] text-[#00d4ff] border border-[#00d4ff]/50 shadow-sm'
+                  : 'text-[#8b949e] hover:text-[#c9d1d9] hover:bg-[#21262d]'
               }`}
             >
-              <span className="w-4 h-4 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-bold flex items-center justify-center">2</span>
+              <span className="w-4 h-4 rounded-full bg-[rgba(0,212,255,0.13)] border border-[#00d4ff] text-[#00d4ff] text-[10px] font-bold flex items-center justify-center">2</span>
               <span>Zone 3: ZTA Gateway (Gate)</span>
             </button>
             <button
               onClick={() => setActiveSubTab('z4')}
               className={`px-3 py-1.5 rounded text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-                activeSubTab === 'z4' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/40' : 'text-[#94A3B8] hover:text-[#F1F5F9]'
+                activeSubTab === 'z4'
+                  ? 'bg-[rgba(189,147,249,0.13)] text-[#bd93f9] border border-[#bd93f9]/50 shadow-sm'
+                  : 'text-[#8b949e] hover:text-[#c9d1d9] hover:bg-[#21262d]'
               }`}
             >
-              <span className="w-4 h-4 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-bold flex items-center justify-center">3</span>
+              <span className="w-4 h-4 rounded-full bg-[rgba(189,147,249,0.13)] border border-[#bd93f9] text-[#bd93f9] text-[10px] font-bold flex items-center justify-center">3</span>
               <span>Zone 4: MSSP SOC (Detection)</span>
             </button>
             <button
               onClick={() => setActiveSubTab('z2')}
               className={`px-3 py-1.5 rounded text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-                activeSubTab === 'z2' ? 'bg-[#FBBF24]/20 text-[#FBBF24] border border-[#FBBF24]/40' : 'text-[#94A3B8] hover:text-[#F1F5F9]'
+                activeSubTab === 'z2'
+                  ? 'bg-[rgba(255,183,0,0.13)] text-[#ffb700] border border-[#ffb700]/50 shadow-sm'
+                  : 'text-[#8b949e] hover:text-[#c9d1d9] hover:bg-[#21262d]'
               }`}
             >
-              <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-bold flex items-center justify-center">4</span>
+              <span className="w-4 h-4 rounded-full bg-[rgba(255,183,0,0.13)] border border-[#ffb700] text-[#ffb700] text-[10px] font-bold flex items-center justify-center">4</span>
               <span>Zone 2: Enterprise Grid (Target)</span>
             </button>
             <button
               onClick={() => setActiveSubTab('governance')}
               className={`px-3 py-1.5 rounded text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeSubTab === 'governance' ? 'bg-emerald-500/20 text-[#4ADE80] border border-emerald-500/40' : 'text-[#94A3B8] hover:text-[#F1F5F9]'
+                activeSubTab === 'governance'
+                  ? 'bg-[rgba(0,255,65,0.13)] text-[#00ff41] border border-[#00ff41]/50 shadow-sm'
+                  : 'text-[#8b949e] hover:text-[#c9d1d9] hover:bg-[#21262d]'
               }`}
             >
-              <ShieldCheck className="w-3.5 h-3.5" />
+              <ShieldCheck className="w-3.5 h-3.5 text-[#00ff41]" />
               <span>Identity & Governance</span>
             </button>
           </div>
