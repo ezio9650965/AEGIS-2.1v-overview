@@ -255,7 +255,29 @@ export async function exportAegisPdf(options: PdfExportOptions = {}): Promise<vo
     doc.text(kpi.sub, kx + 2.5, cursorY + 14.5);
   });
 
-  cursorY += 22;
+  cursorY += 21;
+
+  // Regression Risk Callout
+  checkPageBreak(15);
+  const regBg: [number, number, number] = isPrint ? [254, 243, 199] : [45, 30, 15];
+  doc.setFillColor(...regBg);
+  doc.setDrawColor(...colors.warning);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(marginX, cursorY, contentWidth, 12, 1, 1, 'FD');
+
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...colors.warning);
+  doc.text('REGRESSION RISK NOTICE [AUDIT-VERIFIED: SEP 6, 2026]:', marginX + 3, cursorY + 4);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...colors.textPrimary);
+  const regText =
+    'Gateway hardening (Argon2id parameters, session policy, Keycloak mode, orphaned secret files) previously regressed silently between sessions due to snapshot restores. Status reflects recent live terminal re-verification, not a permanent guarantee.';
+  const splitReg = doc.splitTextToSize(regText, contentWidth - 6);
+  doc.text(splitReg, marginX + 3, cursorY + 7.5);
+  cursorY += 15;
 
   // ==========================================
   // 3. ARCHITECTURAL TRANSITIONS (v2.0 -> v2.1)
@@ -533,7 +555,7 @@ export async function exportAegisPdf(options: PdfExportOptions = {}): Promise<vo
     doc.text('REMEDIATION IMPLEMENTED (v2.1)', marginX + 85, cursorY + 4.2);
     cursorY += 6;
 
-    SECURITY_DEBT.slice(0, 8).forEach((sd) => {
+    SECURITY_DEBT.forEach((sd) => {
       checkPageBreak(8);
       doc.setFillColor(...colors.panelBg);
       doc.setDrawColor(...colors.panelBorder);
@@ -545,7 +567,14 @@ export async function exportAegisPdf(options: PdfExportOptions = {}): Promise<vo
       doc.setTextColor(...colors.textPrimary);
       doc.text(sd.flaw.substring(0, 42), marginX + 3, cursorY + 4.8);
 
-      const sevColor = sd.severity === 'Critical' ? colors.danger : sd.severity === 'High' ? colors.warning : colors.primary;
+      const sevColor =
+        sd.severity === 'Critical'
+          ? colors.danger
+          : sd.severity === 'High'
+          ? colors.warning
+          : sd.severity === 'Medium'
+          ? colors.primary
+          : colors.textSecondary;
       doc.setFont('courier', 'bold');
       doc.setFontSize(6.5);
       doc.setTextColor(...sevColor);

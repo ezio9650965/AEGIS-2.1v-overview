@@ -44,6 +44,11 @@ export const SecurityDebtView: React.FC = () => {
                         Medium
                       </span>
                     )}
+                    {item.severity === 'Low' && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-500/20 text-slate-300 border border-slate-500/40">
+                        Low
+                      </span>
+                    )}
                   </td>
                   <td className="p-3 text-[#4ADE80] font-medium">{item.fix}</td>
                   <td className="p-3 text-[#94A3B8] text-[11px]">{item.evidence}</td>

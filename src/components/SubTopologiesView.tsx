@@ -373,7 +373,7 @@ export const SubTopologiesView: React.FC = () => {
                   </div>
                   <ul className="text-[11px] text-[#F1F5F9]/80 space-y-1">
                     <li>• <strong className="text-white">Authelia v4.39.20:</strong> Forward Auth, Argon2id, OIDC Provider.</li>
-                    <li>• <strong className="text-white">Keycloak v26.6.2:</strong> Federated Identity Vault (`start --optimized`).</li>
+                    <li>• <strong className="text-white">Keycloak v26.6.2:</strong> Federated Identity Vault (`start` plain production mode).</li>
                     <li>• <strong className="text-white">PostgreSQL 16 & Redis 7:</strong> Zero host exposure database & session cache.</li>
                   </ul>
                 </div>

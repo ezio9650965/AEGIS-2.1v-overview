@@ -47,7 +47,12 @@ export const Header: React.FC<HeaderProps> = ({ onExportMarkdown }) => {
             </div>
             <div className="w-px h-3 bg-[#334155]"></div>
             <div className="flex items-center gap-1.5">
-              <span className="px-1.5 py-0.5 rounded bg-[#4ADE80]/15 text-[#4ADE80] border border-[#4ADE80]/30 text-[10px] font-bold">[Z3: DONE]</span>
+              <span
+                title="Verified via live audit as of September 6, 2026 — this project has previously had gateway hardening regress silently between sessions; status reflects the most recent live check, not a one-time claim."
+                className="px-1.5 py-0.5 rounded bg-[#4ADE80]/15 text-[#4ADE80] border border-[#4ADE80]/30 text-[10px] font-bold cursor-help flex items-center gap-1"
+              >
+                <span>[Z3: DONE*]</span>
+              </span>
               <span className="px-1.5 py-0.5 rounded bg-[#64748B]/20 text-[#94A3B8] border border-[#334155] text-[10px]">[Z2: PENDING]</span>
               <span className="px-1.5 py-0.5 rounded bg-[#64748B]/20 text-[#94A3B8] border border-[#334155] text-[10px]">[Z4: PENDING]</span>
             </div>

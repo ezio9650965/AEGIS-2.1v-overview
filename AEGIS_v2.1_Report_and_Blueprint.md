@@ -24,12 +24,14 @@ AEGIS v2.1 represents a tactical restructuring of the project to eliminate fragi
    - Upgraded Argon2id password hashing parameters (`memory: 65536 KB`, `iterations: 3`, `parallelism: 4`).
    - Reduced session persistence from 1 year to 72 hours to uphold continuous verification principles.
    - Applied safe SQL script password rotations across PostgreSQL accounts and purged orphaned `.env` files.
-   - Switched Keycloak from `start-dev` to `start --optimized`.
+    - Switched Keycloak from `start-dev` to `start` (plain production mode — `--optimized` was attempted but requires a pre-built image via `kc.sh build`, which this deployment does not use).
 4. **Active Edge Defenses Added**: Integrated **Coraza WAF** (Caddy plugin with OWASP Core Rule Set) inline to protect target web applications, **Suricata IDS** container on `proxy_net` with Emerging Threats Open rules, and host-level **Zeek NTA** (5-node cluster on `br_proxy`, `ens34`, and `ens33`).
 5. **Zone 2 Enterprise Grid Expanded**: Introduced a complete 3-node corporate domain (`aegis.corp`) featuring a Windows Server 2022 Active Directory Domain Controller (`CORP-DC01`), a Windows 10 domain workstation (`CORP-PC01` "Patient Zero") instrumented with Sysmon v15 and Wazuh Agent, and an Ubuntu PostgreSQL customer database server (`CORP-DB01`).
 
-### 1.3 Honest Per-Zone Implementation Status
-- **Zone 3 Gateway Sensors & Hardening**: **Done (Operational)** — All 9 core containers healthy, dual bridge isolation (`proxy_net` DMZ + `auth_net` `internal: true`) active, Forward-Auth MFA enforced, Coraza WAF and Suricata IDS operational.
+### 1.3 Honest Per-Zone Implementation Status & Regression Notice
+> **⚠️ Regression Risk Notice**: Gateway hardening (Argon2id parameters, session policy, Keycloak mode, orphaned secret files) has previously regressed silently between work sessions on this project — likely due to config files being reverted from an older snapshot. Status in this report reflects the most recent live verification (September 6, 2026), not a permanent guarantee. Recommend periodic live re-audits rather than trusting checklist state alone.
+
+- **Zone 3 Gateway Sensors & Hardening**: **Done (Operational\*)** — Verified via live audit as of September 6, 2026. All 9 core containers healthy, dual bridge isolation (`proxy_net` DMZ + `auth_net` `internal: true`) active, Forward-Auth MFA enforced, Coraza WAF and Suricata IDS operational. *Status reflects the most recent live check, not a one-time claim.*
 - **Zone 2 AD Enterprise Grid**: **Not Started (Pending deployment)** — Domain controller promotion (`CORP-DC01`), workstation enrollment (`CORP-PC01`), database server setup (`CORP-DB01`), and Wazuh agent deployments pending.
 - **Zone 4 SOAR & SOC Cluster**: **Not Started (Pending deployment)** — `minisoc1` (Elasticsearch) & `minisoc2` (Wazuh Manager/Kibana) native package installations, and `minisoc3` Docker stack (Shuffle SOAR, Logstash, MISP) pending.
 - **Zone 1 Threatscape & Red Team Engine**: **Configured & Ready** — Kali Linux APT station with Sliver C2, sqlmap, mimikatz, and REMnux sandbox environment prepared.
@@ -348,14 +350,15 @@ access_control:
   4. Legacy Authelia Forward-Auth URL path updated.
   5. Traefik dynamic YAML section corruption repaired.
 
-### 4.2 v2.1 Hardening Script Execution (8-Command Suite)
+### 4.2 v2.1 Hardening Script Execution & Re-Verified Remediations
 - [x] **TLS Certs Regenerated**: Multi-SAN certificate generated for `*.zerotrust.lan`.
 - [x] **Embedded RSA Key Purged**: Private key removed from `authelia/configuration.yml`; mounted `oidc.key` referenced.
-- [x] **Argon2id Parameters Hardened**: Updated to `memory: 65536 KB`, `iterations: 3`, `parallelism: 4`.
-- [x] **Session Expiration Aligned**: Reduced `remember_me` persistence to 72 hours.
+- [x] **Argon2id Parameters Hardened**: Re-confirmed and re-applied after live audit found the gateway had regressed to iterations:1, memory:64 (64KB). Verified via configuration.yml direct read.
+- [x] **Session Expiration Aligned**: Re-confirmed and re-applied after live audit found remember_me had regressed to 1y. Verified via grep on the live config file.
 - [x] **Database Passwords Rotated**: Safe SQL file execution used to update PostgreSQL credentials without bash shell parameter expansion corruption.
-- [x] **Orphaned `.env` Files Purged**: Stale `.env` files in subdirectories removed to enforce single-source-of-truth in root `.env`.
-- [x] **Keycloak Production Mode**: Executable command updated to `start --optimized`.
+- [x] **Orphaned `.env` Files Purged**: Re-confirmed and re-applied — postgres/.env and redis/.env had reappeared on the live host with stale 2024-dated passwords inconsistent with root .env. Deleted again.
+- [x] **Keycloak Production Mode**: Re-confirmed and re-applied — command had regressed to start-dev on the live host. Switched command from start-dev to start (plain production mode — --optimized was attempted but requires a pre-built image via kc.sh build, which this deployment does not use).
+- [x] **Set Unique Password Hash for Eagle User**: Generated via `authelia crypto hash generate argon2`, applied to users_database.yml. Verified admin, eagle, and ezio now have three distinct hashes (previously admin and eagle shared an identical hash).
 
 ---
 
@@ -370,7 +373,6 @@ access_control:
 - [ ] **Configure Zeek NTA 5-Node Cluster**: Configure `node.cfg` for 5-node cluster (manager/proxy/3 workers) monitoring `br_proxy`, `ens34`, and `ens33`.
 - [ ] **Update Keycloak Admin Password**: Update `keycloak/.env` with `KC_Admin_AEGIS_2026!`.
 - [ ] **Generate Strong Session Secret**: Run `openssl rand -hex 32` and populate `AUTHELIA_SESSION_SECRET`.
-- [ ] **Set Unique Password Hash for Eagle**: Generate distinct Argon2id hash for `eagle` account in `users_database.yml`.
 
 ### 5.2 High Priority (SOC Telemetry & Automation)
 - [ ] **Deploy Zone 4 Distributed SOC**: Verify inter-node communication across `minisoc1` (ES), `minisoc2` (Wazuh/Kibana), and `minisoc3` (Shuffle/Logstash/MISP).
@@ -413,13 +415,16 @@ access_control:
 | **1-Year Session Persistence** | High | Reduced `remember_me` to `72h` (lab) / `8h` (production intent). | Authelia session cookie header check. |
 | **Weak Argon2id Memory (64 KB)** | High | Updated config parameters to `memory: 65536` (64 MB), `iterations: 3`. | Hash generation test via Authelia CLI. |
 | **TLS Cert Mismatch (`.local` vs `.lan`)** | High | Regenerated 4096-bit RSA certificate for `*.zerotrust.lan`. | OpenSSL `s_client` SubjectAltName validation. |
-| **Orphan `.env` Files with Stale Passwords**| Medium | Deleted `redis/.env` and `postgres/.env`; centralized in root `.env`. | File system audit (`ls -la`). |
-| **Keycloak in Development Mode** | Medium | Changed container command to `start --optimized`. | Keycloak startup log inspection. |
-| **Identical Password Hashes (`admin` / `eagle`)**| Medium | Generated unique Argon2id password hash for `eagle` user account. | `users_database.yml` diff audit. |
+| **Orphan `.env` Files with Stale Passwords**| Medium | Deleted `redis/.env` and `postgres/.env`; centralized in root `.env` (re-confirmed and purged after live audit regression). | File system audit (`ls -la`). |
+| **Keycloak in Development Mode** | Medium | Switched command from `start-dev` to `start` (plain production mode — `--optimized` was attempted but requires a pre-built image via `kc.sh build`, which this deployment does not use). | Keycloak startup log inspection. |
+| **Identical Password Hashes (`admin` / `eagle`)**| Medium | Generated unique Argon2id hash for `eagle` via `authelia crypto hash generate argon2`, applied to `users_database.yml` (3 distinct hashes verified). | `users_database.yml` diff audit. |
 | **Custom ML Black Box Failure** | High | Replaced with deterministic Shuffle SOAR + Logstash + MISP pipeline. | Shuffle UI workflow execution logs. |
 | **Single Flat Docker Network** | Critical | Implemented dual-network isolation (`proxy_net` + `auth_net` `internal: true`). | `docker network inspect` confirmation. |
 | **Unrestricted Host Port Exposures** | Critical | Unbound internal service ports; exposed only 80, 443, 1514, and 1515. | Host `nmap` port scan proof. |
 | **Mailpit Used as System's Only Mail Path** | High | Mailpit is DEV/TEST-ONLY; must be replaced by a real authenticated SMTP relay (Postfix/Sendgrid) with SPF/DKIM/DMARC in production. Account activation links in Mailpit are readable by anyone with access to port 8025. | Architectural debt acknowledgment & onboarding flow isolation audit. |
+| **OIDC RSA Private Key Exposure via File Sharing** | Critical | Regenerated entire 4096-bit RSA keypair from scratch; old key fully retired, not rotated-in-place. | New key generation timestamp vs. old key's original creation date. |
+| **Traefik TLS Private Key & Stray Unused Cert Files** | High | Regenerated fresh self-signed keypair via openssl; deleted the two stray leftover key files (`privkey.pem`, `zerotrust.pem`). | `ls -la traefik/certs/` shows only `zerotrust.crt` and `zerotrust.key`, both freshly dated. |
+| **Healthcheck Commands Failing on Containers Lacking curl** | Low | Mailpit switched to `wget` (present in image); Portainer switched to its own `--version` CLI check; Keycloak switched to a bash `/dev/tcp` port-open check (no external binary dependency). | All 8 containers now report healthy accurately in `docker compose ps`. |
 
 ---
 

@@ -242,16 +242,21 @@ export const ExecutiveSummaryView: React.FC = () => {
           <p className="text-[11px] text-[#94A3B8] mt-1">Local Gateway + Remote SOC</p>
         </div>
 
-        <div className="bg-[#1E293B] border border-[#334155] p-4 rounded-lg glow-green-hover">
+        <div className="bg-[#1E293B] border border-[#334155] p-4 rounded-lg glow-green-hover relative group">
           <div className="text-[#94A3B8] text-xs uppercase tracking-wider mb-1 flex items-center justify-between">
             <span>Zone 3 Gateway</span>
-            <span className="text-[10px] text-[#4ADE80]">[VERIFIED]</span>
+            <span className="text-[10px] text-[#4ADE80] font-bold">[AUDIT-VERIFIED]</span>
           </div>
           <div className="text-xl font-bold text-[#4ADE80] flex items-center">
             Sensors: Done
             <span className="terminal-cursor text-sm">▊</span>
           </div>
-          <p className="text-[11px] text-[#94A3B8] mt-1">9 Containers · Dual-Bridge ZTA</p>
+          <p className="text-[11px] text-[#94A3B8] mt-1">
+            9 Containers · Dual-Bridge ZTA
+          </p>
+          <div className="mt-2 text-[10px] text-[#4ADE80]/90 bg-[#4ADE80]/10 px-2 py-1 rounded border border-[#4ADE80]/30 leading-snug">
+            Verified via live audit as of September 6, 2026 — reflects recent live re-check.
+          </div>
         </div>
 
         <div className="bg-[#1E293B] border border-[#334155] p-4 rounded-lg glow-amber-hover">
@@ -260,20 +265,44 @@ export const ExecutiveSummaryView: React.FC = () => {
             <span className="text-[10px] text-[#F59E0B]">[STANDBY]</span>
           </div>
           <div className="text-xl font-bold text-[#F59E0B]">
-            Z3 Done · Z2/4 Open
+            Z3 Done* · Z2/4 Open
           </div>
           <p className="text-[11px] text-[#94A3B8] mt-1">Zone 2 grid + Zone 4 SOAR not started</p>
+          <div className="mt-2 text-[10px] text-[#F59E0B]/90 bg-[#F59E0B]/10 px-2 py-1 rounded border border-[#F59E0B]/30 leading-snug">
+            *Z3 live verified; Z2 & Z4 remain open.
+          </div>
         </div>
 
         <div className="bg-[#1E293B] border border-[#334155] p-4 rounded-lg">
           <div className="text-[#94A3B8] text-xs uppercase tracking-wider mb-1 flex items-center justify-between">
             <span>Hardening Suite</span>
-            <span className="text-[10px] text-purple-400">[8/8]</span>
+            <span className="text-[10px] text-purple-400">[8/8 RE-FIXED]</span>
           </div>
           <div className="text-xl font-bold text-purple-400">
             8/8 Remediated
           </div>
-          <p className="text-[11px] text-[#94A3B8] mt-1">Certs, Argon2id, Sessions, SQL</p>
+          <p className="text-[11px] text-[#94A3B8] mt-1">Argon2id, sessions, secrets, Keycloak</p>
+          <div className="mt-2 text-[10px] text-purple-300 bg-purple-500/10 px-2 py-1 rounded border border-purple-500/30 leading-snug">
+            Regressions audited & terminal-fixed tonight.
+          </div>
+        </div>
+      </div>
+
+      {/* Regression Risk & Hardening Assurance Notice */}
+      <div className="bg-amber-950/20 border-l-4 border-amber-500 border-y border-r border-amber-500/30 p-4 rounded-r-lg font-mono">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div>
+            <div className="flex items-center gap-2 text-xs font-bold text-amber-300 uppercase tracking-wider mb-1">
+              <span>Regression Risk & Hardening Assurance Notice</span>
+              <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded border border-amber-500/40">
+                LIVE AUDIT CAVEAT
+              </span>
+            </div>
+            <p className="text-xs text-amber-100/90 leading-relaxed font-sans">
+              Gateway hardening (Argon2id parameters, session policy, Keycloak mode, orphaned secret files) has previously regressed silently between work sessions on this project — likely due to config files being reverted from an older snapshot. Status in this report reflects the most recent live verification (September 6, 2026), not a permanent guarantee. Recommend periodic live re-audits rather than trusting checklist state alone.
+            </p>
+          </div>
         </div>
       </div>
 
