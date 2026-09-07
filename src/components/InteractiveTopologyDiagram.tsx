@@ -317,6 +317,9 @@ export const InteractiveTopologyDiagram: React.FC<TopologyProps> = ({
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Key Legend collapsible state (defaults to open)
+  const [keyLegendOpen, setKeyLegendOpen] = useState<boolean>(true);
+
   const activeScenario =
     TRACE_SCENARIOS.find((s) => s.id === activeScenarioId) || TRACE_SCENARIOS[0];
   const activeStep = activeScenario.steps[currentStepIndex] || activeScenario.steps[0];
@@ -685,124 +688,158 @@ export const InteractiveTopologyDiagram: React.FC<TopologyProps> = ({
         {/* ========================================================================= */}
         {/* ALWAYS-VISIBLE PINNED LEGEND */}
         {/* ========================================================================= */}
-        <aside className="xl:col-span-3 bg-[#161b22] border border-[#30363d] rounded-lg p-4 font-mono space-y-4 shadow-md h-fit xl:sticky xl:top-4">
-          <div className="flex items-center justify-between pb-2 border-b border-[#30363d]">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-[#c9d1d9] uppercase tracking-wider">
+        <aside
+          className={`xl:col-span-3 bg-[#161b22] border border-[#30363d] rounded-lg font-mono shadow-md h-fit xl:sticky xl:top-4 transition-all duration-300 ${
+            keyLegendOpen ? 'p-4 space-y-4' : 'p-3'
+          }`}
+        >
+          <div
+            className={`flex items-center justify-between select-none ${
+              keyLegendOpen ? 'pb-2 border-b border-[#30363d]' : ''
+            }`}
+          >
+            <div
+              onClick={() => setKeyLegendOpen(!keyLegendOpen)}
+              className="flex items-center gap-1.5 text-xs font-bold text-[#c9d1d9] uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
+            >
               <Layers className="w-3.5 h-3.5 text-[#00d4ff]" />
               <span>Topology Key & Legend</span>
             </div>
-            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[rgba(0,212,255,0.13)] text-[#00d4ff] border border-[#00d4ff]/30 font-bold uppercase tracking-wider">
-              Key
-            </span>
-          </div>
-
-          {/* Section 1: Two Distinct Traffic Flows */}
-          <div className="space-y-2">
-            <div className="text-[10px] font-bold text-[#8b949e] uppercase tracking-wider">
-              Distinct Traffic Flows (Primary vs Out-of-Band)
-            </div>
-            <div className="space-y-1.5 text-[11px]">
-              {/* Primary Path 1 */}
-              <div className="p-2 rounded bg-[#0d1117] border border-[#ff3366]/40">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="w-4 h-4 rounded-full bg-[rgba(255,51,102,0.13)] border border-[#ff3366] text-[#ff3366] font-bold text-[9px] flex items-center justify-center shrink-0">1</span>
-                  <strong className="text-[#ff3366] text-[10px]">Primary Step 1: Zone 1 (Origin)</strong>
-                </div>
-                <span className="text-[10px] text-[#8b949e] block pl-6">Adversary station, external client, C2 listeners</span>
-              </div>
-
-              {/* Primary Path 2 */}
-              <div className="p-2 rounded bg-[#0d1117] border border-[#00d4ff]/40">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="w-4 h-4 rounded-full bg-[rgba(0,212,255,0.13)] border border-[#00d4ff] text-[#00d4ff] font-bold text-[9px] flex items-center justify-center shrink-0">2</span>
-                  <strong className="text-[#00d4ff] text-[10px]">Primary Step 2: Zone 3 (Gateway)</strong>
-                </div>
-                <span className="text-[10px] text-[#8b949e] block pl-6">Inspects (WAF), Authenticates (Authelia/MFA), Authorizes</span>
-              </div>
-
-              {/* Primary Path 3 */}
-              <div className="p-2 rounded bg-[#0d1117] border border-[#ffb700]/40">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="w-4 h-4 rounded-full bg-[rgba(255,183,0,0.13)] border border-[#ffb700] text-[#ffb700] font-bold text-[9px] flex items-center justify-center shrink-0">3</span>
-                  <strong className="text-[#ffb700] text-[10px]">Primary Step 3: Zone 2 (Target)</strong>
-                </div>
-                <span className="text-[10px] text-[#8b949e] block pl-6">Direct destination once access is granted (Zero SOC transit)</span>
-              </div>
-
-              {/* Out-of-Band Telemetry Branch */}
-              <div className="p-2 rounded bg-[rgba(189,147,249,0.08)] border border-[#bd93f9]/50">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="w-4 h-4 rounded-full bg-[rgba(189,147,249,0.13)] border border-[#bd93f9] text-[#bd93f9] font-bold text-[9px] flex items-center justify-center shrink-0">⇶</span>
-                  <strong className="text-[#bd93f9] text-[10px]">Parallel Telemetry Stream</strong>
-                </div>
-                <span className="text-[10px] text-[#8b949e] block pl-6">Zone 3 Sensors & Zone 2 EDR ship logs out-of-band to Zone 4 SOC</span>
-              </div>
-
-              {/* Response Loop */}
-              <div className="p-2 rounded bg-[rgba(0,255,65,0.08)] border border-[#00ff41]/50">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="w-4 h-4 rounded-full bg-[rgba(0,255,65,0.13)] border border-[#00ff41] text-[#00ff41] font-bold text-[9px] flex items-center justify-center shrink-0">↺</span>
-                  <strong className="text-[#00ff41] text-[10px]">SOAR Active Response Loop</strong>
-                </div>
-                <span className="text-[10px] text-[#8b949e] block pl-6">Zone 4 SOAR dispatches firewall-drop / host-drop back to Zone 3 / Zone 2</span>
-              </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-[rgba(0,212,255,0.13)] text-[#00d4ff] border border-[#00d4ff]/30 font-bold uppercase tracking-wider">
+                Key
+              </span>
+              <button
+                type="button"
+                onClick={() => setKeyLegendOpen(!keyLegendOpen)}
+                className="p-1 rounded bg-[#21262d] border border-[#30363d] text-[#8b949e] hover:text-[#c9d1d9] hover:border-[#00d4ff]/50 transition-colors cursor-pointer flex items-center justify-center"
+                title={keyLegendOpen ? 'Collapse Legend' : 'Expand Legend'}
+                aria-expanded={keyLegendOpen}
+                aria-label="Toggle Topology Key & Legend"
+              >
+                {keyLegendOpen ? (
+                  <ChevronDown className="w-3.5 h-3.5 text-[#00d4ff]" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5 text-[#8b949e]" />
+                )}
+              </button>
             </div>
           </div>
 
-          {/* Section 2: Kernel Isolation Boundary Style */}
-          <div className="space-y-1.5">
-            <div className="text-[10px] font-bold text-[#8b949e] uppercase tracking-wider">Isolation Boundary Style</div>
-            <div className="p-2 rounded bg-[rgba(189,147,249,0.08)] border-2 border-dashed border-[#bd93f9]/60 flex items-start gap-2">
-              <Lock className="w-3.5 h-3.5 text-[#bd93f9] shrink-0 mt-0.5" />
-              <div className="text-[10px] leading-relaxed">
-                <strong className="text-[#bd93f9] block font-bold">internal: true (Kernel Isolated)</strong>
-                <span className="text-[#8b949e]">
-                  Zero host port bindings, isolated Docker bridge, no default internet gateway or outbound route.
-                </span>
+          {/* Collapsible Key Content */}
+          <div
+            className={`overflow-hidden transition-all duration-300 space-y-4 ${
+              keyLegendOpen ? 'max-h-[2600px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
+            }`}
+          >
+            {/* Section 1: Two Distinct Traffic Flows */}
+            <div className="space-y-2">
+              <div className="text-[10px] font-bold text-[#8b949e] uppercase tracking-wider">
+                Distinct Traffic Flows (Primary vs Out-of-Band)
               </div>
-            </div>
-          </div>
+              <div className="space-y-1.5 text-[11px]">
+                {/* Primary Path 1 */}
+                <div className="p-2 rounded bg-[#0d1117] border border-[#ff3366]/40">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="w-4 h-4 rounded-full bg-[rgba(255,51,102,0.13)] border border-[#ff3366] text-[#ff3366] font-bold text-[9px] flex items-center justify-center shrink-0">1</span>
+                    <strong className="text-[#ff3366] text-[10px]">Primary Step 1: Zone 1 (Origin)</strong>
+                  </div>
+                  <span className="text-[10px] text-[#8b949e] block pl-6">Adversary station, external client, C2 listeners</span>
+                </div>
 
-          {/* Section 3: Arrow & Line Styles */}
-          <div className="space-y-1.5">
-            <div className="text-[10px] font-bold text-[#8b949e] uppercase tracking-wider">Traffic & Edge Line Types</div>
-            <div className="space-y-1 text-[10px]">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-0.5 bg-[#00d4ff] shrink-0 shadow-sm"></div>
-                <span className="text-[#c9d1d9]">Solid Cyan: mTLS / Primary Ingress</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-7 border-t border-dashed border-[#ffb700] shrink-0"></div>
-                <span className="text-[#ffb700]">Dashed Amber: Direct Verified Enclave Transit</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-7 border-t border-dotted border-[#bd93f9] shrink-0"></div>
-                <span className="text-[#bd93f9]">Dotted Purple: Out-of-Band Telemetry Stream</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-7 border-t border-dashed border-[#00ff41] shrink-0"></div>
-                <span className="text-[#00ff41]">Dashed Green: SOAR Active Response Loop</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-1 bg-[#ff3366] rounded-full shrink-0 flex items-center justify-center text-[7px] text-white">✕</div>
-                <span className="text-[#ff3366]">Solid Red / ✕: Denied / Blocked Path</span>
-              </div>
-            </div>
-          </div>
+                {/* Primary Path 2 */}
+                <div className="p-2 rounded bg-[#0d1117] border border-[#00d4ff]/40">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="w-4 h-4 rounded-full bg-[rgba(0,212,255,0.13)] border border-[#00d4ff] text-[#00d4ff] font-bold text-[9px] flex items-center justify-center shrink-0">2</span>
+                    <strong className="text-[#00d4ff] text-[10px]">Primary Step 2: Zone 3 (Gateway)</strong>
+                  </div>
+                  <span className="text-[10px] text-[#8b949e] block pl-6">Inspects (WAF), Authenticates (Authelia/MFA), Authorizes</span>
+                </div>
 
-          {/* Architectural Distinction Cue */}
-          <div className="bg-[#0d1117] p-3 rounded-lg border border-[#30363d] text-[10px] space-y-2 text-[#8b949e]">
-            <div className="text-[#00d4ff] font-bold uppercase tracking-wider flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#00d4ff]"></span>
-              <span>Architectural Ground Truth:</span>
+                {/* Primary Path 3 */}
+                <div className="p-2 rounded bg-[#0d1117] border border-[#ffb700]/40">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="w-4 h-4 rounded-full bg-[rgba(255,183,0,0.13)] border border-[#ffb700] text-[#ffb700] font-bold text-[9px] flex items-center justify-center shrink-0">3</span>
+                    <strong className="text-[#ffb700] text-[10px]">Primary Step 3: Zone 2 (Target)</strong>
+                  </div>
+                  <span className="text-[10px] text-[#8b949e] block pl-6">Direct destination once access is granted (Zero SOC transit)</span>
+                </div>
+
+                {/* Out-of-Band Telemetry Branch */}
+                <div className="p-2 rounded bg-[rgba(189,147,249,0.08)] border border-[#bd93f9]/50">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="w-4 h-4 rounded-full bg-[rgba(189,147,249,0.13)] border border-[#bd93f9] text-[#bd93f9] font-bold text-[9px] flex items-center justify-center shrink-0">⇶</span>
+                    <strong className="text-[#bd93f9] text-[10px]">Parallel Telemetry Stream</strong>
+                  </div>
+                  <span className="text-[10px] text-[#8b949e] block pl-6">Zone 3 Sensors & Zone 2 EDR ship logs out-of-band to Zone 4 SOC</span>
+                </div>
+
+                {/* Response Loop */}
+                <div className="p-2 rounded bg-[rgba(0,255,65,0.08)] border border-[#00ff41]/50">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="w-4 h-4 rounded-full bg-[rgba(0,255,65,0.13)] border border-[#00ff41] text-[#00ff41] font-bold text-[9px] flex items-center justify-center shrink-0">↺</span>
+                    <strong className="text-[#00ff41] text-[10px]">SOAR Active Response Loop</strong>
+                  </div>
+                  <span className="text-[10px] text-[#8b949e] block pl-6">Zone 4 SOAR dispatches firewall-drop / host-drop back to Zone 3 / Zone 2</span>
+                </div>
+              </div>
             </div>
-            <div className="space-y-1.5 font-mono text-[10px] leading-relaxed">
-              <p className="text-[#c9d1d9]">
-                <strong className="text-[#00d4ff]">Primary Request Flow (3 Steps):</strong> Zone 1 &rarr; Zone 3 &rarr; Zone 2. Gateway terminates TLS, authenticates identity, and routes directly to target enclave.
-              </p>
-              <p className="text-[#bd93f9]">
-                <strong className="text-[#bd93f9]">SOC (Zone 4) is NOT in-line:</strong> Sensors and agents ship telemetry out-of-band; SOAR countermeasure is a feedback loop ↺, not access verification.
-              </p>
+
+            {/* Section 2: Kernel Isolation Boundary Style */}
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-bold text-[#8b949e] uppercase tracking-wider">Isolation Boundary Style</div>
+              <div className="p-2 rounded bg-[rgba(189,147,249,0.08)] border-2 border-dashed border-[#bd93f9]/60 flex items-start gap-2">
+                <Lock className="w-3.5 h-3.5 text-[#bd93f9] shrink-0 mt-0.5" />
+                <div className="text-[10px] leading-relaxed">
+                  <strong className="text-[#bd93f9] block font-bold">internal: true (Kernel Isolated)</strong>
+                  <span className="text-[#8b949e]">
+                    Zero host port bindings, isolated Docker bridge, no default internet gateway or outbound route.
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Section 3: Arrow & Line Styles */}
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-bold text-[#8b949e] uppercase tracking-wider">Traffic & Edge Line Types</div>
+              <div className="space-y-1 text-[10px]">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-0.5 bg-[#00d4ff] shrink-0 shadow-sm"></div>
+                  <span className="text-[#c9d1d9]">Solid Cyan: mTLS / Primary Ingress</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-7 border-t border-dashed border-[#ffb700] shrink-0"></div>
+                  <span className="text-[#ffb700]">Dashed Amber: Direct Verified Enclave Transit</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-7 border-t border-dotted border-[#bd93f9] shrink-0"></div>
+                  <span className="text-[#bd93f9]">Dotted Purple: Out-of-Band Telemetry Stream</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-7 border-t border-dashed border-[#00ff41] shrink-0"></div>
+                  <span className="text-[#00ff41]">Dashed Green: SOAR Active Response Loop</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-1 bg-[#ff3366] rounded-full shrink-0 flex items-center justify-center text-[7px] text-white">✕</div>
+                  <span className="text-[#ff3366]">Solid Red / ✕: Denied / Blocked Path</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Architectural Distinction Cue */}
+            <div className="bg-[#0d1117] p-3 rounded-lg border border-[#30363d] text-[10px] space-y-2 text-[#8b949e]">
+              <div className="text-[#00d4ff] font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#00d4ff]"></span>
+                <span>Architectural Ground Truth:</span>
+              </div>
+              <div className="space-y-1.5 font-mono text-[10px] leading-relaxed">
+                <p className="text-[#c9d1d9]">
+                  <strong className="text-[#00d4ff]">Primary Request Flow (3 Steps):</strong> Zone 1 &rarr; Zone 3 &rarr; Zone 2. Gateway terminates TLS, authenticates identity, and routes directly to target enclave.
+                </p>
+                <p className="text-[#bd93f9]">
+                  <strong className="text-[#bd93f9]">SOC (Zone 4) is NOT in-line:</strong> Sensors and agents ship telemetry out-of-band; SOAR countermeasure is a feedback loop ↺, not access verification.
+                </p>
+              </div>
             </div>
           </div>
         </aside>

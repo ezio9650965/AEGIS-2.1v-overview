@@ -6,6 +6,7 @@ import {
   RotateCcw,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
 } from 'lucide-react';
 
 export interface SvgTopologyVisualizerProps {
@@ -18,6 +19,8 @@ export interface SvgTopologyVisualizerProps {
   onResetTrace: () => void;
   onZoneClick?: (zoneKey: 'z1' | 'z2' | 'z3' | 'z4') => void;
   expandedZones?: Record<string, boolean>;
+  activeScenarioId?: string;
+  onScenarioChange?: (newId: string) => void;
 }
 
 export const SvgTopologyVisualizer: React.FC<SvgTopologyVisualizerProps> = ({
@@ -29,7 +32,12 @@ export const SvgTopologyVisualizer: React.FC<SvgTopologyVisualizerProps> = ({
   onTogglePlay,
   onResetTrace,
   onZoneClick,
+  activeScenarioId,
+  onScenarioChange,
 }) => {
+  // Collapsible legend state (defaults to open)
+  const [legendOpen, setLegendOpen] = useState<boolean>(true);
+
   // SQLi Attack Step definitions for the AEGIS defense flow
   const sqliSteps = [
     {
@@ -923,82 +931,102 @@ export const SvgTopologyVisualizer: React.FC<SvgTopologyVisualizerProps> = ({
         {/* ===================================================================== */}
         <div
           id="svg-persistent-corner-legend"
-          className="absolute bottom-2.5 right-2.5 z-20 bg-[#161b22]/95 backdrop-blur-md border border-[#30363d] rounded-lg p-3 font-mono shadow-2xl text-[10px] space-y-2.5 max-w-[270px] select-none"
+          className={`absolute bottom-2.5 right-2.5 z-20 bg-[#161b22]/95 backdrop-blur-md border border-[#30363d] rounded-lg p-3 font-mono shadow-2xl text-[10px] max-w-[270px] select-none transition-all duration-300 ${
+            legendOpen ? 'space-y-2.5' : ''
+          }`}
         >
           {/* Header */}
-          <div className="flex items-center justify-between pb-1.5 border-b border-[#30363d]">
+          <div className={`flex items-center justify-between ${legendOpen ? 'pb-1.5 border-b border-[#30363d]' : ''}`}>
             <div className="flex items-center gap-1.5 font-bold text-[#c9d1d9] text-[11px]">
               <span className="w-2 h-2 rounded-full bg-[#00d4ff] pulse-indicator-cy"></span>
               <span>Visualizer Legend</span>
             </div>
-            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[rgba(0,212,255,0.13)] text-[#00d4ff] border border-[#00d4ff]/30 font-bold uppercase tracking-wider">
-              AEGIS KEY
-            </span>
+            <button
+              type="button"
+              onClick={() => setLegendOpen(!legendOpen)}
+              className="text-[9px] px-1.5 py-0.5 rounded bg-[rgba(0,212,255,0.13)] text-[#00d4ff] border border-[#00d4ff]/30 font-bold uppercase tracking-wider hover:bg-[rgba(0,212,255,0.25)] transition-colors cursor-pointer flex items-center gap-1"
+              title={legendOpen ? 'Collapse Legend' : 'Expand Legend'}
+              aria-expanded={legendOpen}
+            >
+              <span>AEGIS KEY</span>
+              {legendOpen ? (
+                <ChevronDown className="w-3 h-3 text-[#00d4ff]" />
+              ) : (
+                <ChevronRight className="w-3 h-3 text-[#00d4ff]" />
+              )}
+            </button>
           </div>
 
-          {/* 1. Color Coding for Zones */}
-          <div className="space-y-1">
-            <div className="text-[9px] font-bold text-[#8b949e] uppercase tracking-wider">Per-Zone Color Coding</div>
-            <div className="grid grid-cols-2 gap-1.5 text-[10px]">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#ff3366] shrink-0"></span>
-                <span className="text-[#ff3366] font-medium truncate">Zone 1: Threat</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#00d4ff] shrink-0"></span>
-                <span className="text-[#00d4ff] font-medium truncate">Zone 3: Gateway</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#bd93f9] shrink-0"></span>
-                <span className="text-[#bd93f9] font-medium truncate">Zone 4: SOC</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#ffb700] shrink-0"></span>
-                <span className="text-[#ffb700] font-medium truncate">Zone 2: Target</span>
+          {/* Collapsible Content */}
+          <div
+            className={`overflow-hidden transition-all duration-300 space-y-2.5 ${
+              legendOpen ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'
+            }`}
+          >
+            {/* 1. Color Coding for Zones */}
+            <div className="space-y-1">
+              <div className="text-[9px] font-bold text-[#8b949e] uppercase tracking-wider">Per-Zone Color Coding</div>
+              <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#ff3366] shrink-0"></span>
+                  <span className="text-[#ff3366] font-medium truncate">Zone 1: Threat</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#00d4ff] shrink-0"></span>
+                  <span className="text-[#00d4ff] font-medium truncate">Zone 3: Gateway</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#bd93f9] shrink-0"></span>
+                  <span className="text-[#bd93f9] font-medium truncate">Zone 4: SOC</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#ffb700] shrink-0"></span>
+                  <span className="text-[#ffb700] font-medium truncate">Zone 2: Target</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* 2. Border Styles for Isolation Boundaries */}
-          <div className="space-y-1 pt-1 border-t border-[#30363d]/60">
-            <div className="text-[9px] font-bold text-[#8b949e] uppercase tracking-wider">Isolation Boundary Style</div>
-            <div className="space-y-1 text-[10px]">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-3 rounded-sm border border-[#00d4ff]/70 bg-[rgba(0,212,255,0.13)] shrink-0"></div>
-                <span className="text-[#c9d1d9]">Solid: Host Bridge</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-3 rounded-sm border border-dashed border-[#bd93f9] bg-[rgba(189,147,249,0.13)] shrink-0"></div>
-                <span className="text-[#bd93f9]">
-                  Dashed: <code className="text-[#bd93f9] font-bold">internal: true</code> Isolation
-                </span>
+            {/* 2. Border Styles for Isolation Boundaries */}
+            <div className="space-y-1 pt-1 border-t border-[#30363d]/60">
+              <div className="text-[9px] font-bold text-[#8b949e] uppercase tracking-wider">Isolation Boundary Style</div>
+              <div className="space-y-1 text-[10px]">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-3 rounded-sm border border-[#00d4ff]/70 bg-[rgba(0,212,255,0.13)] shrink-0"></div>
+                  <span className="text-[#c9d1d9]">Solid: Host Bridge</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-3 rounded-sm border border-dashed border-[#bd93f9] bg-[rgba(189,147,249,0.13)] shrink-0"></div>
+                  <span className="text-[#bd93f9]">
+                    Dashed: <code className="text-[#bd93f9] font-bold">internal: true</code> Isolation
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* 3. Line Styles for Traffic Types */}
-          <div className="space-y-1 pt-1 border-t border-[#30363d]/60">
-            <div className="text-[9px] font-bold text-[#8b949e] uppercase tracking-wider">Traffic & Edge Line Types</div>
-            <div className="space-y-1 text-[10px]">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-0.5 bg-[#00d4ff] shrink-0"></div>
-                <span className="text-[#c9d1d9]">Cyan: mTLS / Inspected Flow</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-6 border-t border-dashed border-[#ffb700] shrink-0"></div>
-                <span className="text-[#c9d1d9]">Amber: DNAT / Blind-Routed</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-1 bg-[#ff3366] rounded shrink-0 flex items-center justify-center text-[7px] text-white font-bold">✕</div>
-                <span className="text-[#ff3366] font-bold">Red / ✕: Denied / Blocked Path</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-6 border-t border-dotted border-[#bd93f9] shrink-0"></div>
-                <span className="text-[#bd93f9]">Purple: Telemetry Stream</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-6 border-t border-dashed border-[#00ff41] shrink-0"></div>
-                <span className="text-[#00ff41]">Green: SOAR Countermeasure</span>
+            {/* 3. Line Styles for Traffic Types */}
+            <div className="space-y-1 pt-1 border-t border-[#30363d]/60">
+              <div className="text-[9px] font-bold text-[#8b949e] uppercase tracking-wider">Traffic & Edge Line Types</div>
+              <div className="space-y-1 text-[10px]">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-0.5 bg-[#00d4ff] shrink-0"></div>
+                  <span className="text-[#c9d1d9]">Cyan: mTLS / Inspected Flow</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 border-t border-dashed border-[#ffb700] shrink-0"></div>
+                  <span className="text-[#ffb700]">Dashed Amber: Direct Verified Enclave Transit</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-1 bg-[#ff3366] rounded shrink-0 flex items-center justify-center text-[7px] text-white font-bold">✕</div>
+                  <span className="text-[#ff3366] font-bold">Red / ✕: Denied / Blocked Path</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 border-t border-dotted border-[#bd93f9] shrink-0"></div>
+                  <span className="text-[#bd93f9]">Purple: Telemetry Stream</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-6 border-t border-dashed border-[#00ff41] shrink-0"></div>
+                  <span className="text-[#00ff41]">Green: SOAR Countermeasure</span>
+                </div>
               </div>
             </div>
           </div>
