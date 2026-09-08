@@ -255,31 +255,31 @@ export const ExecutiveSummaryView: React.FC = () => {
             9 Containers · Dual-Bridge ZTA
           </p>
           <div className="mt-2 text-[10px] text-[#4ADE80]/90 bg-[#4ADE80]/10 px-2 py-1 rounded border border-[#4ADE80]/30 leading-snug">
-            Verified via live audit as of September 6, 2026 — reflects recent live re-check.
+            Verified via live audit as of September 8, 2026 — reflects recent live re-check.
           </div>
         </div>
 
-        <div className="bg-[#1E293B] border border-[#334155] p-4 rounded-lg glow-amber-hover">
+        <div className="bg-[#1E293B] border border-[#334155] p-4 rounded-lg glow-cyan-hover">
           <div className="text-[#94A3B8] text-xs uppercase tracking-wider mb-1 flex items-center justify-between">
             <span>Zone Status</span>
-            <span className="text-[10px] text-[#F59E0B]">[STANDBY]</span>
+            <span className="text-[10px] text-[#38BDF8] font-bold">[PIPELINE VERIFIED]</span>
           </div>
-          <div className="text-xl font-bold text-[#F59E0B]">
-            Z3 Done* · Z2/4 Open
+          <div className="text-xl font-bold text-[#38BDF8]">
+            Z3/Z4 Ingest Live*
           </div>
-          <p className="text-[11px] text-[#94A3B8] mt-1">Zone 2 grid + Zone 4 SOAR not started</p>
-          <div className="mt-2 text-[10px] text-[#F59E0B]/90 bg-[#F59E0B]/10 px-2 py-1 rounded border border-[#F59E0B]/30 leading-snug">
-            *Z3 live verified; Z2 & Z4 remain open.
+          <p className="text-[11px] text-[#94A3B8] mt-1">Zone 4 Detection Pipeline Verified</p>
+          <div className="mt-2 text-[10px] text-[#38BDF8]/90 bg-[#38BDF8]/10 px-2 py-1.5 rounded border border-[#38BDF8]/30 leading-snug">
+            Zone 4 detection pipeline (Zeek/Suricata/Authelia → Wazuh agent → MITRE-tagged rules on minisoc2) verified end-to-end via wazuh-logtest as of September 8, 2026. Still outstanding: Shuffle SOAR workflow graph (containers healthy, workflow logic not yet built) and OpenLDAP pipeline (not started).
           </div>
         </div>
 
         <div className="bg-[#1E293B] border border-[#334155] p-4 rounded-lg">
           <div className="text-[#94A3B8] text-xs uppercase tracking-wider mb-1 flex items-center justify-between">
             <span>Hardening Suite</span>
-            <span className="text-[10px] text-purple-400">[8/8 RE-FIXED]</span>
+            <span className="text-[10px] text-purple-400">[LIVE-VERIFIED]</span>
           </div>
           <div className="text-xl font-bold text-purple-400">
-            8/8 Remediated
+            Remediated
           </div>
           <p className="text-[11px] text-[#94A3B8] mt-1">Argon2id, sessions, secrets, Keycloak</p>
           <div className="mt-2 text-[10px] text-purple-300 bg-purple-500/10 px-2 py-1 rounded border border-purple-500/30 leading-snug">
@@ -300,7 +300,7 @@ export const ExecutiveSummaryView: React.FC = () => {
               </span>
             </div>
             <p className="text-xs text-amber-100/90 leading-relaxed font-sans">
-              Gateway hardening (Argon2id parameters, session policy, Keycloak mode, orphaned secret files) has previously regressed silently between work sessions on this project — likely due to config files being reverted from an older snapshot. Status in this report reflects the most recent live verification (September 6, 2026), not a permanent guarantee. Recommend periodic live re-audits rather than trusting checklist state alone.
+              Gateway hardening (Argon2id parameters, session policy, Keycloak mode, orphaned secret files) has previously regressed silently between work sessions on this project — likely due to config files being reverted from an older snapshot. Status in this report reflects the most recent live verification (September 8, 2026), not a permanent guarantee. Recommend periodic live re-audits rather than trusting checklist state alone.
             </p>
           </div>
         </div>

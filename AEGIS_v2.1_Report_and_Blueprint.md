@@ -29,11 +29,11 @@ AEGIS v2.1 represents a tactical restructuring of the project to eliminate fragi
 5. **Zone 2 Enterprise Grid Expanded**: Introduced a complete 3-node corporate domain (`aegis.corp`) featuring a Windows Server 2022 Active Directory Domain Controller (`CORP-DC01`), a Windows 10 domain workstation (`CORP-PC01` "Patient Zero") instrumented with Sysmon v15 and Wazuh Agent, and an Ubuntu PostgreSQL customer database server (`CORP-DB01`).
 
 ### 1.3 Honest Per-Zone Implementation Status & Regression Notice
-> **⚠️ Regression Risk Notice**: Gateway hardening (Argon2id parameters, session policy, Keycloak mode, orphaned secret files) has previously regressed silently between work sessions on this project — likely due to config files being reverted from an older snapshot. Status in this report reflects the most recent live verification (September 6, 2026), not a permanent guarantee. Recommend periodic live re-audits rather than trusting checklist state alone.
+> **⚠️ Regression Risk Notice**: Gateway hardening (Argon2id parameters, session policy, Keycloak mode, orphaned secret files) has previously regressed silently between work sessions on this project — likely due to config files being reverted from an older snapshot. Status in this report reflects the most recent live verification (September 8, 2026), not a permanent guarantee. Recommend periodic live re-audits rather than trusting checklist state alone.
 
-- **Zone 3 Gateway Sensors & Hardening**: **Done (Operational\*)** — Verified via live audit as of September 6, 2026. All 9 core containers healthy, dual bridge isolation (`proxy_net` DMZ + `auth_net` `internal: true`) active, Forward-Auth MFA enforced, Coraza WAF and Suricata IDS operational. *Status reflects the most recent live check, not a one-time claim.*
+- **Zone 3 Gateway Sensors & Hardening**: **Done (Operational\*)** — Verified via live audit as of September 8, 2026. All 9 core containers healthy, dual bridge isolation (`proxy_net` DMZ + `auth_net` `internal: true`) active, Forward-Auth MFA enforced, Coraza WAF and Suricata IDS operational. *Status reflects the most recent live check, not a one-time claim.*
 - **Zone 2 AD Enterprise Grid**: **Not Started (Pending deployment)** — Domain controller promotion (`CORP-DC01`), workstation enrollment (`CORP-PC01`), database server setup (`CORP-DB01`), and Wazuh agent deployments pending.
-- **Zone 4 SOAR & SOC Cluster**: **Not Started (Pending deployment)** — `minisoc1` (Elasticsearch) & `minisoc2` (Wazuh Manager/Kibana) native package installations, and `minisoc3` Docker stack (Shuffle SOAR, Logstash, MISP) pending.
+- **Zone 4 Detection Pipeline & SOC Automation**: **Telemetry Pipeline Verified (Operational\*)** — Zone 4 detection pipeline (Zeek/Suricata/Authelia → Wazuh agent → MITRE-tagged rules on minisoc2) verified end-to-end via wazuh-logtest as of September 8, 2026. `minisoc3` automation stack (Shuffle + Logstash + MISP) healthy. Still outstanding: Shuffle SOAR workflow graph (workflow logic not yet built) and OpenLDAP pipeline (not started).
 - **Zone 1 Threatscape & Red Team Engine**: **Configured & Ready** — Kali Linux APT station with Sliver C2, sqlmap, mimikatz, and REMnux sandbox environment prepared.
 
 ### 1.4 What AEGIS Does and How It Enforces Zero Trust
@@ -359,6 +359,9 @@ access_control:
 - [x] **Orphaned `.env` Files Purged**: Re-confirmed and re-applied — postgres/.env and redis/.env had reappeared on the live host with stale 2024-dated passwords inconsistent with root .env. Deleted again.
 - [x] **Keycloak Production Mode**: Re-confirmed and re-applied — command had regressed to start-dev on the live host. Switched command from start-dev to start (plain production mode — --optimized was attempted but requires a pre-built image via kc.sh build, which this deployment does not use).
 - [x] **Set Unique Password Hash for Eagle User**: Generated via `authelia crypto hash generate argon2`, applied to users_database.yml. Verified admin, eagle, and ezio now have three distinct hashes (previously admin and eagle shared an identical hash).
+- [x] **Keycloak Admin Password Rotated**: Rotated via `kcadm.sh set-password` against the live Keycloak instance (NOT by editing `keycloak/.env` alone — that only affects a fresh database bootstrap, not an already-provisioned instance). Old password was base64-encoded in `.env`, which provided no real protection — trivially decoded with `base64 -d`.
+- [x] **Strong AUTHELIA_SESSION_SECRET Generated**: Generated via `openssl rand -hex 32`, applied to root `.env`, Authelia restarted and confirmed healthy.
+- [x] **Gateway Log Ingestion via Wazuh Agent**: Implemented via the Wazuh agent's own localfile log collector on the Gateway (not a separate Filebeat instance) — 5 sources now monitored and confirmed reaching `minisoc2`: Zeek's `conn.log`, `dns.log`, `ssl.log`; Suricata's `eve.json`; and Authelia's own JSON log file (added via `configuration.yml`'s `log.file_path` option, replacing reliance on Docker's stdout log wrapper). Verified via `ossec.log` showing all 5 "Analyzing file" entries with no errors.
 
 ---
 
@@ -370,21 +373,15 @@ access_control:
   - Join `CORP-PC01` (Win10) to `aegis.corp`.
   - Deploy `CORP-DB01` (Ubuntu 22.04) PostgreSQL server with customer PII table.
   - Install and register Wazuh Agents on all 3 Zone 2 nodes.
-- [ ] **Configure Zeek NTA 5-Node Cluster**: Configure `node.cfg` for 5-node cluster (manager/proxy/3 workers) monitoring `br_proxy`, `ens34`, and `ens33`.
-- [ ] **Update Keycloak Admin Password**: Update `keycloak/.env` with `KC_Admin_AEGIS_2026!`.
-- [ ] **Generate Strong Session Secret**: Run `openssl rand -hex 32` and populate `AUTHELIA_SESSION_SECRET`.
 
 ### 5.2 High Priority (SOC Telemetry & Automation)
-- [ ] **Deploy Zone 4 Distributed SOC**: Verify inter-node communication across `minisoc1` (ES), `minisoc2` (Wazuh/Kibana), and `minisoc3` (Shuffle/Logstash/MISP).
-- [ ] **Configure Gateway Filebeat**: Ship Traefik, Authelia, Zeek, and Suricata logs to `minisoc1:9200`.
-- [ ] **Build Shuffle SOAR Workflow ("Mahoraga v2.1")**: Implement webhook listener → MISP lookup → Wazuh Active Response / Keycloak REST API session revocation logic.
+- [ ] **Build Shuffle SOAR Workflow ("Mahoraga v2.1")**: Implement webhook listener → MISP lookup → Wazuh Active Response / Keycloak REST API session revocation logic (containers running healthy on `minisoc3`, workflow logic not yet built).
+- [ ] **OpenLDAP Pipeline Integration**: Centralized directory service integration for enterprise IAM (not started).
+- [ ] **End-to-End Live Attack Validation**: Trigger real attack, confirm telemetry flow across full pipeline to Shuffle SOAR webhook.
 - [ ] **Write L1 SOC Playbooks**: Complete Markdown documentation for `brute-force.md`, `malware.md`, and `exfiltration.md`.
-- [ ] **Map Custom Wazuh Rules to MITRE**: Tag all detection rules with explicit MITRE ATT&CK technique IDs.
 - [ ] **Construct Kibana Dashboards**: Finalize SOC Morning, Network Traffic, Phishing Analysis, and MITRE Matrix dashboards.
 
 ### 5.3 Medium Priority & Jury Preparation
-- [ ] **Configure Zeek Log Ingestion**: Map `conn.log`, `dns.log`, and `http.log` via Filebeat to Elasticsearch.
-- [ ] **Configure Suricata Alert Forwarding**: Pipe Suricata `eve.json` alerts to Wazuh Manager.
 - [ ] **Deploy REMnux VM in Zone 1**: Setup malware static analysis toolkit.
 - [ ] **Build Kibana Investigation Cases**: Configure case templates and timelines for incident triage.
 - [ ] **Script 3 Reproducible Attack Scenarios**: Finalize automated scripts for SQLi, LSASS credential dumping, and Sliver C2 beaconing.
@@ -399,7 +396,7 @@ access_control:
 | **Week 1** | Build Zone 2 | Zone 2 | 3-Node AD Domain (`aegis.corp`) | `CORP-DC01` promoted; `PC01` joined; `DB01` serving data; all Wazuh agents green. |
 | **Week 2** | Harden Zone 3 | Zone 3 | Hardened ZTA Gateway + Active Edge Defenses | All security debt fixed; Coraza WAF + Suricata + Zeek active; 100% container health. |
 | **Week 3** | Deploy Zone 4 | Zone 4 | 3-Node MSSP SOC Cluster | `minisoc1/2/3` communicating; ES 8.19, Wazuh 4.7, Kibana, and Shuffle UI accessible. |
-| **Week 4** | Telemetry Pipeline | Zone 3 → 4 | Unified Log Ingestion | Filebeat shipping Traefik/Zeek logs to ES; Wazuh agent events indexed in Kibana. |
+| **Week 4** | Telemetry Pipeline | Zone 3 → 4 | Unified Log Ingestion | Wazuh agent shipping Zeek/Suricata/Authelia logs to minisoc2; events indexed in Kibana. |
 | **Week 5** | Detection Engineering | Zone 4 | Custom Wazuh & Suricata Rule Suite | Custom rules fire on test attacks; all alerts tagged with MITRE ATT&CK IDs. |
 | **Week 6** | SOAR & Playbooks | Zone 4 | "Mahoraga v2.1" Automated Response | Shuffle workflow isolates compromised host on demand; 3 L1 playbooks written. |
 | **Week 7** | Red Team Validation | Zone 1 | Scripted Attack Execution | Sliver C2 beacon, sqlmap SQLi, and mimikatz dump generate alerts reliably. |
@@ -425,6 +422,8 @@ access_control:
 | **OIDC RSA Private Key Exposure via File Sharing** | Critical | Regenerated entire 4096-bit RSA keypair from scratch; old key fully retired, not rotated-in-place. | New key generation timestamp vs. old key's original creation date. |
 | **Traefik TLS Private Key & Stray Unused Cert Files** | High | Regenerated fresh self-signed keypair via openssl; deleted the two stray leftover key files (`privkey.pem`, `zerotrust.pem`). | `ls -la traefik/certs/` shows only `zerotrust.crt` and `zerotrust.key`, both freshly dated. |
 | **Healthcheck Commands Failing on Containers Lacking curl** | Low | Mailpit switched to `wget` (present in image); Portainer switched to its own `--version` CLI check; Keycloak switched to a bash `/dev/tcp` port-open check (no external binary dependency). | All 8 containers now report healthy accurately in `docker compose ps`. |
+| **Custom MITRE-Tagged Wazuh Rules Not Deployed** | High | Rules added to `/var/ossec/etc/rules/local_rules.xml`, validated field-by-field with `wazuh-logtest` (confirmed correct firing on matching input and correct silence on non-matching input), manager restarted. | `wazuh-logtest` output showing rule 100100 firing with `mitre.id T1190` on a synthetic Web Application Attack test line. |
+| **Silent Zeek 5-Node Cluster Crash (Corrupted node.cfg)** | High | Corrected `node.cfg` (restored worker-grid to `ens34`), ran `zeekctl deploy`. | `zeekctl status` showing all 5 nodes running; `conn.log`/`dns.log`/`ssl.log` confirmed actively writing fresh data afterward. |
 
 ---
 

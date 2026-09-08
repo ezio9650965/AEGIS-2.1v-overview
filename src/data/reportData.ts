@@ -36,15 +36,16 @@ export const INITIAL_CHECKLIST_DONE: ChecklistItem[] = [
   { id: 'd20', title: 'Zeek NTA 5-Node Cluster', description: '5-node manager/proxy/worker cluster monitoring br_proxy, ens34 & ens33.', category: 'critical', completed: true, who: 'eagle' },
   { id: 'd21', title: 'Deploy Zone 4 minisoc3 automation stack (Shuffle + Logstash + MISP)', description: '9-container stack verified healthy, Elasticsearch connectivity confirmed via direct query against minisoc1, MISP/Shuffle web UIs reachable.', category: 'critical', completed: true, who: 'ezio' },
   { id: 'd22', title: 'Set Unique Password Hash for Eagle User', description: 'Generated via `authelia crypto hash generate argon2`, applied to users_database.yml. Verified admin, eagle, and ezio now have three distinct hashes (previously admin and eagle shared an identical hash).', category: 'critical', completed: true, who: 'eagle' },
+  { id: 'l5', title: 'Update Keycloak Admin Password', description: 'Rotated via kcadm.sh set-password against the live Keycloak instance (NOT by editing keycloak/.env alone — that only affects a fresh database bootstrap, not an already-provisioned instance). Old password was base64-encoded in .env, which provided no real protection — trivially decoded with `base64 -d`.', category: 'critical', completed: true, who: 'eagle' },
+  { id: 'l6', title: 'Generate Strong AUTHELIA_SESSION_SECRET', description: 'Generated via openssl rand -hex 32, applied to root .env, Authelia restarted and confirmed healthy.', category: 'critical', completed: true, who: 'eagle' },
+  { id: 'l9', title: 'Configure Gateway Log Ingestion via Wazuh Agent', description: "Implemented via the Wazuh agent's own localfile log collector on the Gateway (not a separate Filebeat instance) — 5 sources now monitored and confirmed reaching minisoc2: Zeek's conn.log, dns.log, ssl.log; Suricata's eve.json; and Authelia's own JSON log file (added via configuration.yml's log.file_path option, replacing reliance on Docker's stdout log wrapper). Verified via ossec.log showing all 5 'Analyzing file' entries with no errors.", category: 'high', completed: true, who: 'ezio' },
 ];
 
 export const INITIAL_CHECKLIST_LEFT: ChecklistItem[] = [
   { id: 'l1', title: 'Deploy Zone 2 Enterprise Grid (CORP-DC01, CORP-PC01, CORP-DB01)', description: 'Promote DC01 (Win Server 2022 AD DS aegis.corp), join PC01, deploy DB01 PostgreSQL customer PII, install 3 Wazuh agents.', category: 'critical', completed: false, who: 'both' },
-  { id: 'l5', title: 'Update Keycloak Admin Password', description: 'Update keycloak/.env with KC_Admin_AEGIS_2026! and sync in UI.', category: 'critical', completed: false, who: 'eagle' },
-  { id: 'l6', title: 'Generate Strong AUTHELIA_SESSION_SECRET', description: 'Execute openssl rand -hex 32 and update root .env file.', category: 'critical', completed: false, who: 'eagle' },
-  { id: 'l9', title: 'Configure Gateway Filebeat Ingestion', description: 'Ship Traefik JSON logs, Authelia audit, Zeek conn.log, Suricata alerts to minisoc1:9200.', category: 'high', completed: false, who: 'ezio' },
   { id: 'l10', title: 'Build the Shuffle SOAR workflow itself (webhook receiver -> MISP lookup -> Keycloak session revocation / Wazuh Active Response)', description: 'Containers are running on minisoc3 but the workflow graph is not yet built in Shuffle UI.', category: 'high', completed: false, who: 'ezio' },
   { id: 'l10b', title: 'End-to-end live-alert test (trigger a real attack, confirm it flows Wazuh -> Elasticsearch -> Logstash -> Shuffle webhook)', description: 'Trigger real attack and verify full pipeline flow from endpoint detection to SOAR webhook execution.', category: 'high', completed: false, who: 'ezio' },
+  { id: 'l10c', title: 'OpenLDAP Pipeline Integration', description: 'Centralized directory service integration for enterprise IAM (not started).', category: 'high', completed: false, who: 'both' },
   { id: 'l11', title: 'Write 3 L1 SOC Playbooks in Markdown', description: 'Create brute-force.md, malware.md, and exfiltration.md in /opt/soc/playbooks/.', category: 'high', completed: false, who: 'both' },
   { id: 'l12', title: 'Map Custom Wazuh Rules to MITRE ATT&CK', description: 'Tag all local Wazuh rules with explicit mitre.id fields in local_rules.xml.', category: 'high', completed: false, who: 'ezio' },
   { id: 'l13', title: 'Build Kibana Dashboards', description: 'Import and build SOC Morning, Network Traffic, Phishing Analysis, and MITRE Matrix views.', category: 'high', completed: false, who: 'ezio' },
@@ -54,6 +55,12 @@ export const INITIAL_CHECKLIST_LEFT: ChecklistItem[] = [
   { id: 'l17', title: 'Script 3 Reproducible Attack Scenarios', description: 'Prepare automated scripts for SQLi, LSASS mimikatz dump, and Sliver C2 beaconing.', category: 'jury', completed: false, who: 'both' },
   { id: 'l18', title: 'Rehearse 15-Minute Jury Demo Script', description: 'Execute 5 dry-run rehearsals covering all 5 demo acts under 15 minutes.', category: 'jury', completed: false, who: 'both' },
 ];
+
+export const ZONE_STATUS = {
+  status: 'Z3 Done · Z4 Ingest Verified',
+  summary: 'Zone 4 detection pipeline (Zeek/Suricata/Authelia → Wazuh agent → MITRE-tagged rules on minisoc2) verified end-to-end via wazuh-logtest as of September 8, 2026. Still outstanding: Shuffle SOAR workflow graph (containers healthy, workflow logic not yet built) and OpenLDAP pipeline (not started).',
+  lastAuditDate: 'September 8, 2026',
+};
 
 export const SECURITY_DEBT: SecurityDebtItem[] = [
   { flaw: 'Hardcoded RSA key in Authelia config', severity: 'Critical', fix: 'Removed key block, use key_file: /config/oidc.key', evidence: 'Config audit & startup log' },
@@ -71,6 +78,18 @@ export const SECURITY_DEBT: SecurityDebtItem[] = [
   { flaw: 'OIDC RSA private key embedded in configuration.yml, plus an identical standalone oidc.key file — both exposed via file sharing', severity: 'Critical', fix: 'Regenerated entire 4096-bit RSA keypair from scratch; old key fully retired, not rotated-in-place', evidence: "New key generation timestamp vs. old key's original creation date" },
   { flaw: 'Traefik TLS private key (zerotrust.key) similarly exposed via file sharing, plus stray unused key files (privkey.pem, zerotrust.pem) sitting in the same directory', severity: 'High', fix: 'Regenerated fresh self-signed keypair via openssl; deleted the two stray leftover key files', evidence: "ls -la traefik/certs/ shows only zerotrust.crt and zerotrust.key, both freshly dated" },
   { flaw: 'Healthcheck commands (curl-based) silently failing on Mailpit, Portainer, and Keycloak containers because those images don\'t ship curl — containers were fully healthy in reality but reported "unhealthy" in docker compose ps', severity: 'Low', fix: 'Mailpit switched to wget (present in image); Portainer switched to its own --version CLI check; Keycloak switched to a bash /dev/tcp port-open check (no external binary dependency)', evidence: 'All 8 containers now report healthy accurately in docker compose ps' },
+  {
+    flaw: "Custom MITRE-tagged Wazuh rules (100100-100103) had been drafted but never actually deployed to minisoc2 — confirmed via direct file read showing only Wazuh's default template present",
+    severity: 'High',
+    fix: 'Rules added to /var/ossec/etc/rules/local_rules.xml, validated field-by-field with wazuh-logtest (confirmed correct firing on matching input and correct silence on non-matching input), manager restarted',
+    evidence: 'wazuh-logtest output showing rule 100100 firing with mitre.id T1190 on a synthetic Web Application Attack test line',
+  },
+  {
+    flaw: "Zeek cluster (all 5 nodes) had silently crashed, likely triggered by a routine system package upgrade invalidating the running deployment. Root cause: node.cfg's worker-grid interface had been corrupted to duplicate worker-lan's ens33 assignment instead of its correct ens34, leaving zero coverage on that interface",
+    severity: 'High',
+    fix: 'Corrected node.cfg, ran zeekctl deploy',
+    evidence: 'zeekctl status showing all 5 nodes running; conn.log/dns.log/ssl.log confirmed actively writing fresh data afterward',
+  },
 ];
 
 export const DEMO_ACTS: DemoAct[] = [
