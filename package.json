@@ -1,7 +1,39 @@
 {
-  "name": "react-example",
+  "name": "aegis-v2.1",
   "private": true,
-  "version": "0.0.0",
+  "version": "2.1.0",
+  "description": "Sovereign Zero-Trust Access Gateway & Hybrid MSSP SOC Architecture",
+  "author": "Taibi Mohamed Anis (Ezio) <taibianis965@gmail.com>",
+  "license": "MIT",
+  "homepage": "/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/taibianis/aegis-v2.1.git"
+  },
+  "bugs": {
+    "url": "https://github.com/taibianis/aegis-v2.1/issues"
+  },
+  "keywords": [
+    "zero-trust",
+    "zta",
+    "cybersecurity",
+    "soc",
+    "mssp",
+    "siem",
+    "soar",
+    "wazuh",
+    "zeek",
+    "suricata",
+    "authelia",
+    "keycloak",
+    "traefik",
+    "misp",
+    "shuffle-soar",
+    "elasticsearch",
+    "kibana",
+    "mitre-attack",
+    "blue-team"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",

@@ -5,11 +5,221 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AEGIS v2.1 Project Report & Blueprint</title>
     <meta name="description" content="Unified AEGIS v2.1 Zero-Trust Gateway & SOC Architecture Blueprint, Report, and Interactive Dashboard" />
+    <meta name="author" content="Taibi Mohamed Anis (Ezio)" />
+    <meta name="keywords" content="AEGIS v2.1, Zero-Trust Architecture, ZTA, SOC, MSSP, SIEM, SOAR, Wazuh, Zeek, Suricata, Authelia, Keycloak, Traefik, Shuffle SOAR, MISP, Elasticsearch, Kibana, MITRE ATT&CK, Cybersecurity, Blue Team, BeyondCorp" />
+    <meta name="theme-color" content="#0F172A" />
+
+    <!-- Search Engine Directives & Crawler Optimization -->
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1, all" />
+    <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+    <meta name="slurp" content="index, follow" />
+    <meta name="duckduckbot" content="index, follow" />
+    <meta name="baiduspider" content="index, follow" />
+    <meta name="yandex" content="index, follow" />
+    <meta name="revisit-after" content="1 days" />
+    <meta name="rating" content="General" />
+
+    <!-- Open Graph / Facebook / LinkedIn / Discord -->
+    <meta property="og:type" content="website" />
     <meta property="og:title" content="AEGIS v2.1 Project Report & Blueprint" />
     <meta property="og:description" content="Unified AEGIS v2.1 Zero-Trust Gateway & SOC Architecture Blueprint, Report, and Interactive Dashboard" />
+    <meta property="og:url" content="/" />
+    <meta property="og:site_name" content="AEGIS v2.1 Cybersecurity Architecture" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:image" content="https://raw.githubusercontent.com/taibianis/aegis-v2.1/main/docs/assets/aegis-v2.1-architecture-diagram.png" />
+    <meta property="og:image:alt" content="AEGIS v2.1 4-Zone Zero-Trust Gateway and Hybrid MSSP SOC Architecture Diagram" />
+
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AEGIS v2.1 Project Report & Blueprint" />
+    <meta name="twitter:description" content="Unified AEGIS v2.1 Zero-Trust Gateway & SOC Architecture Blueprint, Report, and Interactive Dashboard" />
+    <meta name="twitter:creator" content="@taibianis" />
+    <meta name="twitter:image" content="https://raw.githubusercontent.com/taibianis/aegis-v2.1/main/docs/assets/aegis-v2.1-architecture-diagram.png" />
+
+    <!-- Repository Reference & Source Signals for Scrapers -->
+    <link rel="github-repo" href="https://github.com/taibianis/aegis-v2.1" />
+
+    <!-- Sitemaps & Manifest Links -->
+    <link rel="sitemap" type="application/xml" title="Sitemap" href="/sitemap.xml" />
+    <link rel="manifest" href="/manifest.json" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
+
+    <!-- Schema.org JSON-LD Structured Data for Crawlers & Scrapers -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "/#website",
+          "url": "/",
+          "name": "AEGIS v2.1 Project Report & Blueprint",
+          "alternateName": "AEGIS v2.1 Sovereign Zero-Trust Access Gateway & Hybrid MSSP SOC Architecture",
+          "description": "Unified AEGIS v2.1 Zero-Trust Gateway & SOC Architecture Blueprint, Report, and Interactive Dashboard",
+          "inLanguage": "en-US",
+          "publisher": {
+            "@type": "Person",
+            "name": "Taibi Mohamed Anis (Ezio)",
+            "jobTitle": "Network Security Architect"
+          }
+        },
+        {
+          "@type": "TechArticle",
+          "@id": "/#article",
+          "isPartOf": {
+            "@id": "/#website"
+          },
+          "headline": "AEGIS v2.1: Sovereign Zero-Trust Access Gateway & Hybrid MSSP SOC Architecture",
+          "name": "AEGIS v2.1 Master Architecture Blueprint & Verification Report",
+          "description": "Technical specification and live-audited operational report for a four-zone Zero-Trust Access Gateway with Coraza WAF, Suricata IDS, Zeek NTA, and a 3-node distributed MSSP SOC featuring Wazuh Manager, Elasticsearch 8.19, Kibana, Shuffle SOAR, and MISP Threat Intelligence.",
+          "author": {
+            "@type": "Person",
+            "name": "Taibi Mohamed Anis (Ezio)",
+            "email": "taibianis965@gmail.com",
+            "jobTitle": "Network Security Architect"
+          },
+          "datePublished": "2026-09-08",
+          "dateModified": "2026-09-08",
+          "about": [
+            {
+              "@type": "Thing",
+              "name": "Zero Trust Network Access"
+            },
+            {
+              "@type": "Thing",
+              "name": "Security Operations Center"
+            },
+            {
+              "@type": "Thing",
+              "name": "Intrusion Detection System"
+            },
+            {
+              "@type": "Thing",
+              "name": "Network Traffic Analysis"
+            },
+            {
+              "@type": "Thing",
+              "name": "Security Orchestration, Automation, and Response"
+            },
+            {
+              "@type": "Thing",
+              "name": "MITRE ATT&CK Framework"
+            }
+          ],
+          "keywords": [
+            "Zero-Trust",
+            "ZTA",
+            "Traefik",
+            "Authelia",
+            "Keycloak",
+            "Wazuh",
+            "Zeek",
+            "Suricata",
+            "Shuffle SOAR",
+            "MISP",
+            "Elasticsearch",
+            "Kibana",
+            "MITRE ATT&CK",
+            "Coraza WAF"
+          ]
+        },
+        {
+          "@type": "SoftwareSourceCode",
+          "@id": "/#sourcecode",
+          "name": "AEGIS v2.1 Architecture Codebase",
+          "programmingLanguage": ["TypeScript", "Docker Compose", "Bash", "YAML"],
+          "codeRepository": "https://github.com/taibianis/aegis-v2.1",
+          "license": "https://opensource.org/licenses/MIT",
+          "author": {
+            "@type": "Person",
+            "name": "Taibi Mohamed Anis (Ezio)"
+          }
+        },
+        {
+          "@type": "ItemList",
+          "@id": "/#table-of-contents",
+          "name": "AEGIS v2.1 Architectural Sections",
+          "description": "Index of all core architectural views and operational modules in AEGIS v2.1",
+          "itemListElement": [
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "Executive Summary",
+              "description": "Project identity, core changes in v2.1, and honest per-zone operational status",
+              "url": "/#sec-1"
+            },
+            {
+              "@type": "ListItem",
+              "position": 2,
+              "name": "Full Architecture Topology",
+              "description": "Comprehensive 4-zone master topology schematic across Threatscape, Enterprise Grid, ZTA Gateway, and MSSP SOC",
+              "url": "/#sec-2"
+            },
+            {
+              "@type": "ListItem",
+              "position": 3,
+              "name": "Sub-Topologies Deep Dive",
+              "description": "Detailed breakdowns of Gateway Dual-Bridge DMZ, Auth Enclave, and 3-Node SOC Stack",
+              "url": "/#sec-3"
+            },
+            {
+              "@type": "ListItem",
+              "position": 4,
+              "name": "Identity & Governance Policy",
+              "description": "Zero-trust governance policies, RBAC access control matrix, and credential isolation standards",
+              "url": "/#sec-11"
+            },
+            {
+              "@type": "ListItem",
+              "position": 5,
+              "name": "Current State Checklist (What Is Done)",
+              "description": "25 live-audited hardening milestones, kernel-level bridge isolation, and operational sensors",
+              "url": "/#sec-4"
+            },
+            {
+              "@type": "ListItem",
+              "position": 6,
+              "name": "Remaining Work Checklist (What Is Left)",
+              "description": "Action items for Zone 2 AD domain deployment, SOAR workflow graph logic, and live attack tests",
+              "url": "/#sec-5"
+            },
+            {
+              "@type": "ListItem",
+              "position": 7,
+              "name": "Roadmap & Execution Plan",
+              "description": "8-week phased tactical delivery plan for comprehensive implementation",
+              "url": "/#sec-6"
+            },
+            {
+              "@type": "ListItem",
+              "position": 8,
+              "name": "Security Debt Register",
+              "description": "Catalog of 17 identified flaws, severity ratings, technical fixes, and live verification evidence",
+              "url": "/#sec-7"
+            },
+            {
+              "@type": "ListItem",
+              "position": 9,
+              "name": "Jury Demo Script",
+              "description": "15-minute 5-act defense demonstration script with exact terminal commands",
+              "url": "/#sec-9"
+            },
+            {
+              "@type": "ListItem",
+              "position": 10,
+              "name": "File Structure Blueprint",
+              "description": "Unified directory structure and configuration blueprint for all four zones",
+              "url": "/#sec-10"
+            }
+          ]
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

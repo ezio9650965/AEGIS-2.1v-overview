@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChecklistItem } from './types';
 import { Header } from './components/Header';
 import { Navigation } from './components/Navigation';
@@ -25,6 +25,32 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [doneItems, setDoneItems] = useState(INITIAL_CHECKLIST_DONE);
   const [leftItems, setLeftItems] = useState(INITIAL_CHECKLIST_LEFT);
+
+  // Synchronize active view with URL hash or ?section= query param for crawlers, scrapers & direct linking
+  useEffect(() => {
+    const handleUrlSync = () => {
+      const hash = window.location.hash.replace('#', '');
+      const params = new URLSearchParams(window.location.search);
+      const sectionParam = params.get('section') || hash;
+      if (sectionParam && SECTIONS.some((s) => s.id === sectionParam)) {
+        setActiveSectionId(sectionParam);
+      }
+    };
+    handleUrlSync();
+    window.addEventListener('hashchange', handleUrlSync);
+    window.addEventListener('popstate', handleUrlSync);
+    return () => {
+      window.removeEventListener('hashchange', handleUrlSync);
+      window.removeEventListener('popstate', handleUrlSync);
+    };
+  }, []);
+
+  const handleSelectSection = (id: string) => {
+    setActiveSectionId(id);
+    if (window.location.hash !== `#${id}`) {
+      window.history.pushState(null, '', `#${id}`);
+    }
+  };
 
   const handleToggleChecklist = (id: string, isDoneList: boolean) => {
     if (isDoneList) {
@@ -166,7 +192,7 @@ export default function App() {
 
       <Header
         activeTab={activeSectionId}
-        onTabChange={setActiveSectionId}
+        onTabChange={handleSelectSection}
         onExportMarkdown={handleExportMarkdown}
       />
 
@@ -174,7 +200,7 @@ export default function App() {
         <Navigation
           sections={filteredSections}
           activeSection={activeSectionId}
-          onSelectSection={setActiveSectionId}
+          onSelectSection={handleSelectSection}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           completedDoneCount={completedDoneCount}

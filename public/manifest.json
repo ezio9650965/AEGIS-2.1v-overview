@@ -1,0 +1,46 @@
+{
+  "short_name": "AEGIS v2.1",
+  "name": "AEGIS v2.1 Project Report & Blueprint",
+  "description": "Unified AEGIS v2.1 Zero-Trust Gateway & SOC Architecture Blueprint, Report, and Interactive Dashboard",
+  "start_url": "/",
+  "id": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0F172A",
+  "theme_color": "#0F172A",
+  "lang": "en-US",
+  "dir": "ltr",
+  "categories": [
+    "security",
+    "developer",
+    "education",
+    "utilities"
+  ],
+  "shortcuts": [
+    {
+      "name": "Executive Summary",
+      "short_name": "Summary",
+      "description": "AEGIS v2.1 executive summary and operational status",
+      "url": "/#sec-1"
+    },
+    {
+      "name": "Master Topology",
+      "short_name": "Topology",
+      "description": "4-Zone Zero-Trust & MSSP SOC architecture map",
+      "url": "/#sec-2"
+    },
+    {
+      "name": "Work Checklist",
+      "short_name": "Checklist",
+      "description": "Completed and remaining implementation tasks",
+      "url": "/#sec-4"
+    },
+    {
+      "name": "Security Debt Register",
+      "short_name": "Security Debt",
+      "description": "Catalog of technical flaws, fixes, and audit evidence",
+      "url": "/#sec-7"
+    }
+  ]
+}
