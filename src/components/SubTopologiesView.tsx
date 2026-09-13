@@ -635,12 +635,12 @@ export const SubTopologiesView: React.FC = () => {
                     <span>minisoc3 (10.16.64.157)</span>
                     <span className="text-[9px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded border border-purple-500/40 font-bold">Docker Compose (9 Containers)</span>
                   </div>
-                  <div className="text-[10px] text-[#94A3B8] mb-2">"The Executor" — SOAR & Threat Intel</div>
+                  <div className="text-[10px] text-[#94A3B8] mb-2">"The Executor" — SOAR & Threat Intel (.dz Nginx Proxy)</div>
                   <ul className="text-[11px] text-[#F1F5F9]/80 space-y-1">
-                    <li>• <strong className="text-white">Shuffle SOAR (4):</strong> frontend (:3001), backend, orborus, mongo:6</li>
-                    <li>• <strong className="text-white">MISP Official (4):</strong> core (:8080), modules, db, redis</li>
+                    <li>• <strong className="text-white">Shuffle SOAR (5):</strong> frontend (:3001), backend, orborus, db, opensearch</li>
+                    <li>• <strong className="text-white">MISP Official (4):</strong> core (:8443 direct), modules, db, redis</li>
                     <li>• <strong className="text-white">Logstash 8.19.13 (:5044):</strong> rule.level &gt;= 12 query to Shuffle hook</li>
-                    <li>• <strong className="text-white">Mailpit (:8025):</strong> SMTP sinkhole moved to minisoc3</li>
+                    <li>• <strong className="text-white">Nginx Reverse Proxy:</strong> misp.dz, shuffle.dz, kibana.dz (cross-node)</li>
                   </ul>
                 </div>
               </div>
@@ -715,7 +715,7 @@ export const SubTopologiesView: React.FC = () => {
                     {/* Shuffle Group */}
                     <div className="bg-[#1E293B] p-3 rounded border border-purple-500/30">
                       <div className="font-bold text-purple-300 mb-1 flex items-center justify-between">
-                        <span>Shuffle SOAR (4)</span>
+                        <span>Shuffle SOAR (5)</span>
                         <span className="text-[9px] text-[#4ADE80] font-mono">[HEALTHY]</span>
                       </div>
                       <p className="text-[10px] text-[#94A3B8] mb-2">Visual Automation & Webhook Orchestrator</p>
@@ -724,6 +724,7 @@ export const SubTopologiesView: React.FC = () => {
                         <li>• <code className="text-purple-300">shuffle-backend</code>: ghcr.io/shuffle/shuffle-backend</li>
                         <li>• <code className="text-purple-300">shuffle-orborus</code>: ghcr.io/shuffle/shuffle-orborus</li>
                         <li>• <code className="text-purple-300">shuffle-database</code>: mongo:6</li>
+                        <li>• <code className="text-purple-300">shuffle-opensearch</code>: opensearch (migrated backend store)</li>
                       </ul>
                     </div>
 

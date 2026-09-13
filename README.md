@@ -70,24 +70,32 @@ pre-existing nodes:
 |---|---|---|
 | minisoc1 "The Vault" | Elasticsearch 8.19.13, 8GB JVM heap | Operational (pre-existing) |
 | minisoc2 "The Brain" | Wazuh Manager 4.7 + Kibana | Operational (pre-existing) |
-| minisoc3 "The Executor" | Shuffle SOAR + MISP + Logstash | Infrastructure deployed and verified this cycle |
+| minisoc3 "The Executor" | Shuffle SOAR (5 containers) + MISP + Logstash | Infrastructure deployed and verified this cycle; Nginx .dz reverse proxy |
 
 minisoc3 replaced an earlier disconnected Scikit-Learn anomaly-detection
 script — that pipeline had no live Elasticsearch ingestion and no working
 hook into Wazuh's response system, and was removed rather than debugged
-further. It now runs 9 containers: a 4-container Shuffle SOAR stack
-(frontend/backend/orborus/database), a 4-container official MISP stack
-(core/modules/mariadb/valkey — the previously used third-party
-`coolacid/misp-docker` image is deprecated and unavailable), Logstash, and
-Mailpit.
+further. The stack runs a 5-container Shuffle SOAR stack (frontend, backend,
+orborus, database, plus added shuffle-opensearch — Shuffle's backend
+migrated MongoDB → OpenSearch, not in original compose plan), a 4-container
+official MISP stack (core/modules/mariadb/valkey — the previously used
+third-party `coolacid/misp-docker` image is deprecated and unavailable),
+Logstash, and Mailpit.
 
-**Verified:** all 9 containers healthy; direct query against minisoc1
-confirms Logstash's Elasticsearch connectivity and query logic are correct.
+**Verified:** 9-container stack verified healthy. MISP/Shuffle/Kibana dashboards
+reachable via Nginx reverse proxy (misp.dz, shuffle.dz, kibana.dz) on minisoc3,
+resolved via hosts-file DNS. MISP_BASEURL bug (baked config not auto-updating
+from .env) fixed and documented. Shuffle SOAR stack is 5 containers, not 4
+(added shuffle-opensearch — Shuffle's backend migrated MongoDB → OpenSearch,
+not in original compose plan). Direct query against minisoc1 confirms
+Logstash's Elasticsearch connectivity and query logic are correct.
 **Not yet built:** the actual Shuffle workflow graph (webhook receiver →
-MISP reputation lookup → Keycloak session revocation / Wazuh Active
-Response) exists as infrastructure only — the automation logic itself is
-still to be built. No live attack has been run end-to-end through the
-pipeline yet.
+MISP reputation lookup → Wazuh Active Response) exists as infrastructure only
+— the automation logic itself is still to be built (l10, l10b, l10c not started).
+Keycloak session revocation: cross-zone route to Gateway (192.168.19.173) confirmed
+unreachable from minisoc3; dropped from automated Shuffle workflow, moved to
+manual step in demo playbook. No live attack has been run end-to-end through
+the pipeline yet.
 
 ### Zone 2 — Enterprise Grid *(not built)*
 
@@ -166,8 +174,8 @@ Highlights:
 |---|---|
 | Zone 3 (Gateway) | Built, hardened, sensors verified |
 | Zone 4 minisoc1/2 | Pre-existing, operational |
-| Zone 4 minisoc3 | Infrastructure deployed and verified; SOAR workflow not yet built |
-| Zone 4 detection rules on minisoc2 | Drafted; deployment not yet confirmed |
+| Zone 4 minisoc3 | Infrastructure deployed and verified (5-container Shuffle stack including shuffle-opensearch, 4-container MISP, Logstash, Nginx .dz reverse proxy); SOAR workflow not yet built |
+| Zone 4 detection rules on minisoc2 | Verified operational: Rule 100100 confirmed firing with T1190 via wazuh-logtest; mitre.id fields validated in local_rules.xml |
 | Zone 4 OpenLDAP ingestion | Not started |
 | Zone 2 (Enterprise Grid) | Not built |
 | Zone 1 (Threatscape) | Not built |
