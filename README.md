@@ -177,7 +177,7 @@ clients are paying for expert triage, not just a dashboard.
 A running list of real issues found and fixed during development — kept
 here deliberately rather than hidden, because a defensible security debt
 register is stronger evidence of engineering rigor than a claim of
-zero-issue development. Full register in `docs/architecture.md`.
+zero-issue development. Full register: see the Security Debt view on the live site (src/components/SecurityDebtView.tsx).
 
 Highlights:
 - **Mailpit is dev/test-only.** It sinks all outbound mail including
@@ -256,6 +256,8 @@ in your own `.env` files (never committed — see `.env.example` for the
 required variable names).
 
 Full setup notes: `docs/SETUP.md`
+
+Deploying this in a real organization (not just a lab)? See `docs/DEPLOYMENT.md` for the enterprise rollout walkthrough — placement, identity migration strategy, connecting to a remote SOC, and a known gap around host-level monitoring of the gateway itself.
 
 ---
 
