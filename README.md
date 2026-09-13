@@ -61,6 +61,26 @@ management interface — has no route to the internet or the host, enforced
 at the kernel network-namespace level, not by application-layer
 configuration that could be misconfigured away.
 
+### Zone 3 — Known Gap: Network Segmentation Is Not Yet Implemented
+
+The gateway is dual-homed by design (`ens33` on the DHCP-assigned
+Ministry-facing subnet, `ens34` statically configured on a separate
+`192.168.50.0/24` segment intended to isolate target/endpoint traffic
+behind the gateway's kernel routing).
+
+**As currently deployed, `ens34` is provisioned but unused.** Verified via
+live `ip route` and `iptables`/`nft` inspection: the Windows 10 endpoint
+and the Juice Shop target both sit on the same flat `192.168.19.0/24`
+subnet as the gateway's external-facing interface — not behind the
+intended isolation boundary. The Docker-level segmentation (`auth_net`
+marked `internal: true`, verified via nftables `DOCKER-INTERNAL` chain) is
+real and enforced; the VM/network-level segmentation between the gateway
+and its targets is not, yet.
+
+This is stated here directly, not only in the interactive diagram on the
+live site, because it is the single most consequential gap between this
+project's stated threat model and its current verified state.
+
 ### Zone 4 — MSSP SOC *(partially verified)*
 
 Three AlmaLinux 9.3 nodes, native package installs (not Docker) on the two
@@ -119,24 +139,26 @@ rest of the environment. Not started.
 
 ## The Access Control Model
 
-Two distinct policies exist behind the same gateway — this distinction
-matters and is a deliberate design choice, not an oversight:
+**One policy applies behind this gateway: `default_policy: deny`, with
+`two_factor` required everywhere.** There is no public-facing bypass domain
+— an earlier design draft described a customer-storefront bypass path, but
+that was never implemented and has been removed from this documentation to
+match the real deployed configuration.
 
-- **Customer-facing paths** (e.g. the Juice Shop storefront): `policy:
-  bypass` in Authelia. No employee MFA. Customers use the application's own
-  account system, if any. Forcing enterprise MFA onto a public storefront
-  would be a UX failure dressed up as security.
-- **Employee/admin paths** (internal tools, admin panels, the SOC itself):
-  `policy: two_factor`, scoped by Active Directory group membership through
-  Keycloak. Sensitive paths (e.g. an application's `/admin` route) re-check
-  MFA even within an already-valid general session — the specific
-  mitigation against a hijacked session cookie silently inheriting admin
-  access.
+The only bypass rules that exist are narrow and structural, not
+access-level exceptions:
+- Authelia's own login portal (`authelia.zerotrust.lan`) — it IS the auth
+  layer, so it can't gate itself.
+- Keycloak's OIDC protocol/callback endpoints
+  (`/realms/*/protocol/openid-connect/*`, `/realms/*/login-actions/*`, and
+  a few static asset paths) — these must stay reachable for the OAuth2
+  authorization-code flow to complete before a session exists at all.
 
-Access maps to job function via group membership, never to title —
-onboarding, role changes, and offboarding are single directory edits, not
-gateway reconfigurations. See `docs/architecture.md` for the full
-role-mapping table and the onboarding/offboarding sequence.
+Everything else — Keycloak's admin console, the Traefik dashboard,
+Portainer, Mailpit, and any application placed behind this gateway —
+requires a full MFA-backed session. See `src/components/zones/` in this
+repo for the live, interactive version of this policy with the actual
+redacted config file.
 
 ---
 
@@ -196,18 +218,32 @@ question.
 
 ## Repository Structure
 
-See `docs/architecture.md` for the full file structure and per-file
-purpose. Top-level layout:
+This repository is the project's interactive documentation site (React +
+Vite), not a raw deployment tree. The actual gateway/SOC deployment configs
+live on their respective hosts and are reproduced here, redacted, inside
+the app itself — see `src/components/zones/Zone3ConfigFilesViewer.tsx`.
 
 ```
-~/aegis/
-├── gateway/    Zone 3 — Docker Compose stack, Traefik/Authelia/Keycloak
-│               configs, Coraza WAF, Zeek node config
-├── soc/        Zone 4 — minisoc3 Docker Compose stack, Wazuh rules,
-│               L1 playbooks, Kibana dashboard exports
-├── grid/       Zone 2 — endpoint configs (planned)
-└── docs/       Architecture docs, MITRE mapping, demo script
+src/
+├── components/
+│   ├── zones/          Per-zone deep-dive views (topology, file
+│   │                   structure, redacted configs) — Zone 3 is
+│   │                   the reference implementation
+│   ├── MasterTopologyView.tsx
+│   ├── SubTopologiesView.tsx
+│   ├── FileStructureView.tsx
+│   └── ...             Other report sections (roadmap, security
+│                       debt register, jury demo script, etc.)
+├── data/
+│   └── reportData.ts   Task/status tracking data consumed by the
+│                       dashboard views above
+└── App.tsx
 ```
+
+Live deployment configs referenced throughout the app (Docker Compose,
+Traefik, Authelia, Keycloak, etc.) are not stored as separate files in this
+repo — they're embedded, redacted, and downloadable directly from the
+relevant zone's page on the live site.
 
 ---
 
