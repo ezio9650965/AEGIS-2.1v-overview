@@ -33,7 +33,7 @@ AEGIS v2.1 represents a tactical restructuring of the project to eliminate fragi
 
 - **Zone 3 Gateway Sensors & Hardening**: **Done (Operational\*)** — Verified via live audit as of September 8, 2026. All 9 core containers healthy, dual bridge isolation (`proxy_net` DMZ + `auth_net` `internal: true`) active, Forward-Auth MFA enforced, Coraza WAF and Suricata IDS operational. *Status reflects the most recent live check, not a one-time claim.*
 - **Zone 2 AD Enterprise Grid**: **Not Started (Pending deployment)** — Domain controller promotion (`CORP-DC01`), workstation enrollment (`CORP-PC01`), database server setup (`CORP-DB01`), and Wazuh agent deployments pending.
-- **Zone 4 Detection Pipeline & SOC Automation**: **Telemetry Pipeline & Rules Verified (Operational\*)** — Zone 4 detection pipeline (Zeek/Suricata/Authelia → Wazuh agent → MITRE-tagged rules on minisoc2) verified end-to-end via wazuh-logtest as of September 13, 2026. `minisoc3` automation stack (5-container Shuffle + Logstash + MISP + Nginx .dz reverse proxy) healthy. Still outstanding: Shuffle SOAR workflow graph (workflow logic not yet built) and OpenLDAP pipeline (not started).
+- **Zone 4 Detection Pipeline & SOC Automation**: **Telemetry Pipeline Verified & SOAR In Progress (Operational\*)** — Zone 4 detection pipeline (Zeek/Suricata/Authelia → Wazuh agent → MITRE-tagged rules on minisoc2) verified end-to-end via wazuh-logtest as of September 13, 2026. `minisoc3` automation stack (5-container Shuffle with shuffle-opensearch + Logstash webhook wired + MISP TLS port 443 + Nginx .dz reverse proxy) healthy. Shuffle SOAR workflow `misp_enrichment` in progress (webhook trigger and MISP restSearch auth confirmed; disambiguation test active). Still outstanding: OpenLDAP pipeline (not started) and full end-to-end attack flow.
 - **Zone 1 Threatscape & Red Team Engine**: **Configured & Ready** — Kali Linux APT station with Sliver C2, sqlmap, mimikatz, and REMnux sandbox environment prepared.
 
 ### 1.4 What AEGIS Does and How It Enforces Zero Trust
@@ -363,7 +363,9 @@ access_control:
 - [x] **Strong AUTHELIA_SESSION_SECRET Generated**: Generated via `openssl rand -hex 32`, applied to root `.env`, Authelia restarted and confirmed healthy.
 - [x] **Gateway Log Ingestion via Wazuh Agent**: Implemented via the Wazuh agent's own localfile log collector on the Gateway (not a separate Filebeat instance) — 5 sources now monitored and confirmed reaching `minisoc2`: Zeek's `conn.log`, `dns.log`, `ssl.log`; Suricata's `eve.json`; and Authelia's own JSON log file (added via `configuration.yml`'s `log.file_path` option, replacing reliance on Docker's stdout log wrapper). Verified via `ossec.log` showing all 5 "Analyzing file" entries with no errors.
 - [x] **Deploy Zone 4 minisoc3 automation stack (Shuffle + Logstash + MISP)**: 9-container stack verified healthy. MISP/Shuffle/Kibana dashboards reachable via Nginx reverse proxy (misp.dz, shuffle.dz, kibana.dz) on minisoc3, resolved via hosts-file DNS. MISP_BASEURL bug (baked config not auto-updating from .env) fixed and documented.
-- [x] **Nginx Reverse Proxy for Zone 4 Dashboards**: Configured .dz domain reverse proxy on minisoc3 (misp.dz → https://127.0.0.1:8443 with proxy_ssl_verify off, shuffle.dz → 127.0.0.1:3001, kibana.dz → 10.16.64.156:5601 cross-node). Fixed two real bugs: (1) MISP internal nginx 30x-redirects 8080→443, proxy must target 8443 directly; (2) MISP_BASEURL baked into config.php at first container boot, does not auto-update from .env on restart — required direct sed into the live config plus .env update.
+- [x] **Nginx Reverse Proxy for Zone 4 Dashboards**: Configured .dz domain reverse proxy on minisoc3 (misp.dz → https://127.0.0.1:8443 with proxy_ssl_verify off, shuffle.dz → 127.0.0.1:3001, kibana.dz → 10.16.64.156:5601 cross-node). Fixed two real bugs: (1) MISP internal nginx 30x-redirects 8080→443, proxy must target 8443 directly; (2) MISP_BASEURL baked into config.php at first container boot, does not auto-update from .env on restart — required direct sed into the live config plus .env update. Login remained broken after initial config: MISP sets a secure-flagged session cookie, but nginx served misp.dz over plain HTTP only, so browsers silently dropped the cookie. Fixed by adding a TLS (self-signed) server block on port 443 for misp.dz. Also cleared a stale CSRF token left over from the HTTP→HTTPS switch.
+- [x] **Fix Shuffle Backend / OpenSearch Dependency**: `shuffle-backend` was crash-looping — requires OpenSearch, none was deployed. Added `shuffle-opensearch` service + backend env vars (`SHUFFLE_OPENSEARCH_URL`, `SHUFFLE_ELASTIC=true`, `SHUFFLE_OPENSEARCH_SKIPSSL_VERIFY=true`) via `docker-compose.override.yml`, base compose file untouched. Backend confirmed stable.
+- [x] **Wire Wazuh Alerts to Shuffle Webhook (Logstash)**: `logstash.conf` `${SHUFFLE_WEBHOOK}` was hardcoded wrong directly in `docker-compose.yml` (stale path/port), not read from `.env` despite appearing to be. Corrected via override file to the live webhook URL; confirmed container reads it correctly.
 - [x] **Map Custom Wazuh Rules to MITRE ATT&CK**: Rule 100100 confirmed firing with T1190 via wazuh-logtest; mitre.id fields validated in local_rules.xml.
 
 ---
@@ -378,9 +380,9 @@ access_control:
   - Install and register Wazuh Agents on all 3 Zone 2 nodes.
 
 ### 5.2 High Priority (SOC Telemetry & Automation)
-- [ ] **Build Shuffle SOAR Workflow ("Mahoraga v2.1")**: Implement webhook listener → MISP lookup → Wazuh Active Response / Keycloak REST API session revocation logic (containers running healthy on `minisoc3`, workflow logic not yet built).
+- [ ] **Build Shuffle SOAR Workflow (`misp_enrichment`)**: Workflow `misp_enrichment` created with live webhook trigger, reachable via reverse proxy and Docker network. MISP node added (`Search events / restSearch`), auth confirmed (200, success:true). Disambiguation test in progress: seeding a real MISP event/attribute to confirm `$exec.data.srcip` resolves before building the decision/branch node. Keycloak revocation dropped from automated workflow (cross-zone network path unreachable), designated as manual step in demo playbook.
 - [ ] **OpenLDAP Pipeline Integration**: Centralized directory service integration for enterprise IAM (not started).
-- [ ] **End-to-End Live Attack Validation**: Trigger real attack, confirm telemetry flow across full pipeline to Shuffle SOAR webhook.
+- [ ] **End-to-End Live Attack Validation**: Trigger real attack, confirm telemetry flow across full pipeline to Shuffle SOAR webhook (not started).
 - [ ] **Write L1 SOC Playbooks**: Complete Markdown documentation for `brute-force.md`, `malware.md`, and `exfiltration.md`.
 - [ ] **Construct Kibana Dashboards**: Finalize SOC Morning, Network Traffic, Phishing Analysis, and MITRE Matrix dashboards.
 
@@ -427,6 +429,14 @@ access_control:
 | **Healthcheck Commands Failing on Containers Lacking curl** | Low | Mailpit switched to `wget` (present in image); Portainer switched to its own `--version` CLI check; Keycloak switched to a bash `/dev/tcp` port-open check (no external binary dependency). | All 8 containers now report healthy accurately in `docker compose ps`. |
 | **Custom MITRE-Tagged Wazuh Rules Not Deployed** | High | Rules added to `/var/ossec/etc/rules/local_rules.xml`, validated field-by-field with `wazuh-logtest` (confirmed correct firing on matching input and correct silence on non-matching input), manager restarted. | `wazuh-logtest` output showing rule 100100 firing with `mitre.id T1190` on a synthetic Web Application Attack test line. |
 | **Silent Zeek 5-Node Cluster Crash (Corrupted node.cfg)** | High | Corrected `node.cfg` (restored worker-grid to `ens34`), ran `zeekctl deploy`. | `zeekctl status` showing all 5 nodes running; `conn.log`/`dns.log`/`ssl.log` confirmed actively writing fresh data afterward. |
+
+### 7.1 Active Known Issues & Unresolved Technical Debt (Terminal Ground Truth — Not Completed Tasks)
+
+| Issue / Debt Item | Severity | Current Status | Description & Impact |
+| :--- | :--- | :--- | :--- |
+| **"Too many fields for JSON decoder" flood on minisoc2** | High | Unresolved | Log flood on minisoc2 `wazuh-analysisd`: "Too many fields for JSON decoder" occurring during alert ingestion. Root cause unresolved; may be silently dropping Wazuh alerts when event payload fields exceed decoder limits. |
+| **logstash.conf TLS still disabled** | Medium | Open | Elasticsearch CA certificate was never copied from `minisoc1` to `minisoc3`. Logstash transport pipeline currently runs with `ssl_certificate_verification => false`. |
+| **Full .env exposed in chat session — secrets burned** | Critical | Pending Rotation | Full `.env` was exposed in a chat session. All secrets in it (`ES_PASSWORD`, `MISP_MYSQL_ROOT_PASSWORD`, `MISP_MYSQL_PASSWORD`, `MISP_ADMIN_PASSWORD`, `MISP_GPG_PASSPHRASE`, `REDIS_PASSWORD`, `SHUFFLE_OPENSEARCH_PASSWORD`) must be treated as burned and rotated across all hosts. |
 
 ---
 

@@ -23,6 +23,15 @@ export interface SecurityDebtItem {
   evidence: string;
 }
 
+export interface KnownIssue {
+  id: string;
+  title: string;
+  severity: 'Critical' | 'High' | 'Medium' | 'Low';
+  description: string;
+  impact: string;
+  status: 'Open' | 'Unresolved' | 'Pending Rotation';
+}
+
 export interface DemoAct {
   act: string;
   title: string;

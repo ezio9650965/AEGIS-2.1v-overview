@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { SECURITY_DEBT } from '../data/reportData';
-import { Bug, CheckCircle2, ShieldAlert, AlertTriangle, Search, Filter, RefreshCw } from 'lucide-react';
+import { SECURITY_DEBT, KNOWN_ISSUES } from '../data/reportData';
+import { Bug, CheckCircle2, ShieldAlert, AlertTriangle, Search, Filter, RefreshCw, KeyRound, Radio, Flame } from 'lucide-react';
 
 export const SecurityDebtView: React.FC = () => {
   const [severityFilter, setSeverityFilter] = useState<'All' | 'Critical' | 'High' | 'Medium' | 'Low'>('All');
@@ -109,6 +109,67 @@ export const SecurityDebtView: React.FC = () => {
             <div className="text-[10px] uppercase tracking-wider text-slate-400">Low</div>
             <div className="text-base font-bold text-slate-300 mt-0.5">{stats.low}</div>
           </button>
+        </div>
+
+        {/* Active Known Issues & Unresolved Security Debt Block */}
+        <div className="mb-6 p-4 rounded-lg bg-[#0F172A] border border-amber-500/40">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-3 border-b border-[#334155]">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-400" />
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>Active Known Issues &amp; Unresolved Technical Debt</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    Not Completed Tasks
+                  </span>
+                </h3>
+                <p className="text-[11px] text-[#94A3B8]">
+                  Terminal-confirmed ground truth defects currently tracked, under active investigation, or awaiting secret rotation.
+                </p>
+              </div>
+            </div>
+            <div className="text-[10px] font-mono text-amber-400/90 bg-amber-950/40 px-2.5 py-1 rounded border border-amber-500/30 shrink-0">
+              {KNOWN_ISSUES.length} Open Debt Items
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {KNOWN_ISSUES.map((issue) => (
+              <div
+                key={issue.id}
+                className="p-3 rounded bg-[#1E293B] border border-[#334155] flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span
+                      className={`text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded border ${
+                        issue.severity === 'Critical'
+                          ? 'bg-red-500/20 text-red-400 border-red-500/40'
+                          : issue.severity === 'High'
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                      }`}
+                    >
+                      {issue.severity}
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                      {issue.status}
+                    </span>
+                  </div>
+                  <h4 className="text-xs font-bold text-white mb-1.5 leading-snug">
+                    {issue.title}
+                  </h4>
+                  <p className="text-[11px] text-[#94A3B8] leading-relaxed mb-2">
+                    {issue.description}
+                  </p>
+                </div>
+                <div className="text-[10px] font-mono text-amber-300/90 bg-amber-500/10 p-2 rounded border border-amber-500/20 leading-relaxed">
+                  <span className="text-amber-400 font-bold">Impact: </span>
+                  {issue.impact}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Filter and Search Bar */}

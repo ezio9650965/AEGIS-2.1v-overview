@@ -1,4 +1,4 @@
-import { Section, ChecklistItem, SecurityDebtItem, DemoAct } from '../types';
+import { Section, ChecklistItem, SecurityDebtItem, KnownIssue, DemoAct } from '../types';
 
 export const SECTIONS: Section[] = [
   { id: 'sec-1', number: 1, title: 'Executive Summary', shortTitle: 'Exec Summary', icon: 'Shield', badge: 'v2.1 Identity' },
@@ -36,7 +36,9 @@ export const INITIAL_CHECKLIST_DONE: ChecklistItem[] = [
   { id: 'd20', title: 'Zeek NTA 5-Node Cluster', description: '5-node manager/proxy/worker cluster monitoring br_proxy, ens34 & ens33.', category: 'critical', completed: true, who: 'eagle' },
   { id: 'd21', title: 'Deploy Zone 4 minisoc3 automation stack (Shuffle + Logstash + MISP)', description: '9-container stack verified healthy. MISP/Shuffle/Kibana dashboards reachable via Nginx reverse proxy (misp.dz, shuffle.dz, kibana.dz) on minisoc3, resolved via hosts-file DNS. MISP_BASEURL bug (baked config not auto-updating from .env) fixed and documented.', category: 'critical', completed: true, who: 'ezio' },
   { id: 'd22', title: 'Set Unique Password Hash for Eagle User', description: 'Generated via `authelia crypto hash generate argon2`, applied to users_database.yml. Verified admin, eagle, and ezio now have three distinct hashes (previously admin and eagle shared an identical hash).', category: 'critical', completed: true, who: 'eagle' },
-  { id: 'd23', title: 'Nginx Reverse Proxy for Zone 4 Dashboards', description: 'Configured .dz domain reverse proxy on minisoc3 (misp.dz → https://127.0.0.1:8443 with proxy_ssl_verify off, shuffle.dz → 127.0.0.1:3001, kibana.dz → 10.16.64.156:5601 cross-node). Fixed two real bugs: (1) MISP internal nginx 30x-redirects 8080→443, proxy must target 8443 directly; (2) MISP_BASEURL baked into config.php at first container boot, does not auto-update from .env on restart — required direct sed into the live config plus .env update.', category: 'high', completed: true, who: 'ezio' },
+  { id: 'd23', title: 'Nginx Reverse Proxy for Zone 4 Dashboards', description: 'Configured .dz domain reverse proxy on minisoc3 (misp.dz → https://127.0.0.1:8443 with proxy_ssl_verify off, shuffle.dz → 127.0.0.1:3001, kibana.dz → 10.16.64.156:5601 cross-node). Fixed two real bugs: (1) MISP internal nginx 30x-redirects 8080→443, proxy must target 8443 directly; (2) MISP_BASEURL baked into config.php at first container boot, does not auto-update from .env on restart — required direct sed into the live config plus .env update. Login remained broken after initial config: MISP sets a secure-flagged session cookie, but nginx served misp.dz over plain HTTP only, so browsers silently dropped the cookie. Fixed by adding a TLS (self-signed) server block on port 443 for misp.dz. Also cleared a stale CSRF token left over from the HTTP→HTTPS switch.', category: 'high', completed: true, who: 'ezio' },
+  { id: 'd24', title: 'Fix Shuffle Backend / OpenSearch Dependency', description: 'shuffle-backend was crash-looping — requires OpenSearch, none was deployed. Added shuffle-opensearch service + backend env vars (SHUFFLE_OPENSEARCH_URL, SHUFFLE_ELASTIC=true, SHUFFLE_OPENSEARCH_SKIPSSL_VERIFY=true) via docker-compose.override.yml, base compose file untouched. Backend confirmed stable.', category: 'high', completed: true, who: 'ezio' },
+  { id: 'd25', title: 'Wire Wazuh Alerts to Shuffle Webhook (Logstash)', description: 'logstash.conf ${SHUFFLE_WEBHOOK} was hardcoded wrong directly in docker-compose.yml (stale path/port), not read from .env despite appearing to be. Corrected via override file to the live webhook URL; confirmed container reads it correctly.', category: 'high', completed: true, who: 'ezio' },
   { id: 'l5', title: 'Update Keycloak Admin Password', description: 'Rotated via kcadm.sh set-password against the live Keycloak instance (NOT by editing keycloak/.env alone — that only affects a fresh database bootstrap, not an already-provisioned instance). Old password was base64-encoded in .env, which provided no real protection — trivially decoded with `base64 -d`.', category: 'critical', completed: true, who: 'eagle' },
   { id: 'l6', title: 'Generate Strong AUTHELIA_SESSION_SECRET', description: 'Generated via openssl rand -hex 32, applied to root .env, Authelia restarted and confirmed healthy.', category: 'critical', completed: true, who: 'eagle' },
   { id: 'l9', title: 'Configure Gateway Log Ingestion via Wazuh Agent', description: "Implemented via the Wazuh agent's own localfile log collector on the Gateway (not a separate Filebeat instance) — 5 sources now monitored and confirmed reaching minisoc2: Zeek's conn.log, dns.log, ssl.log; Suricata's eve.json; and Authelia's own JSON log file (added via configuration.yml's log.file_path option, replacing reliance on Docker's stdout log wrapper). Verified via ossec.log showing all 5 'Analyzing file' entries with no errors.", category: 'high', completed: true, who: 'ezio' },
@@ -44,7 +46,7 @@ export const INITIAL_CHECKLIST_DONE: ChecklistItem[] = [
 
 export const INITIAL_CHECKLIST_LEFT: ChecklistItem[] = [
   { id: 'l1', title: 'Deploy Zone 2 Enterprise Grid (CORP-DC01, CORP-PC01, CORP-DB01)', description: 'Promote DC01 (Win Server 2022 AD DS aegis.corp), join PC01, deploy DB01 PostgreSQL customer PII, install 3 Wazuh agents.', category: 'critical', completed: false, who: 'both' },
-  { id: 'l10', title: 'Build the Shuffle SOAR workflow itself (webhook receiver -> MISP lookup -> Keycloak session revocation / Wazuh Active Response)', description: 'Containers are running on minisoc3 but the workflow graph is not yet built in Shuffle UI.', category: 'high', completed: false, who: 'ezio' },
+  { id: 'l10', title: 'Build the Shuffle SOAR workflow itself (webhook receiver -> MISP lookup -> Wazuh Active Response)', description: 'Workflow misp_enrichment created with live webhook trigger, reachable via reverse proxy and Docker network. MISP node added (Search events / restSearch), auth confirmed (200, success:true). Disambiguation test in progress: seeding a real MISP event/attribute to confirm $exec.data.srcip resolves before building the decision/branch node.', category: 'high', completed: false, who: 'ezio' },
   { id: 'l10b', title: 'End-to-end live-alert test (trigger a real attack, confirm it flows Wazuh -> Elasticsearch -> Logstash -> Shuffle webhook)', description: 'Trigger real attack and verify full pipeline flow from endpoint detection to SOAR webhook execution.', category: 'high', completed: false, who: 'ezio' },
   { id: 'l10c', title: 'OpenLDAP Pipeline Integration', description: 'Centralized directory service integration for enterprise IAM (not started).', category: 'high', completed: false, who: 'both' },
   { id: 'l11', title: 'Write 3 L1 SOC Playbooks in Markdown', description: 'Create brute-force.md, malware.md, and exfiltration.md in /opt/soc/playbooks/.', category: 'high', completed: false, who: 'both' },
@@ -58,8 +60,8 @@ export const INITIAL_CHECKLIST_LEFT: ChecklistItem[] = [
 ];
 
 export const ZONE_STATUS = {
-  status: 'Z3 Done · Z4 Ingest Verified',
-  summary: 'Zone 4 detection pipeline (Zeek/Suricata/Authelia → Wazuh agent → MITRE-tagged rules on minisoc2) verified end-to-end via wazuh-logtest as of September 13, 2026. Still outstanding: Shuffle SOAR workflow graph (containers healthy, workflow logic not yet built) and OpenLDAP pipeline (not started).',
+  status: 'Z3 Done · Z4 Workflow In Progress',
+  summary: 'Zone 4 detection pipeline (Zeek/Suricata/Authelia → Wazuh agent → MITRE-tagged rules on minisoc2) verified end-to-end via wazuh-logtest as of September 13, 2026. Shuffle SOAR workflow in progress (misp_enrichment webhook & MISP node verified; disambiguation test active). Outstanding: OpenLDAP pipeline (not started) and full end-to-end attack test.',
   lastAuditDate: 'September 13, 2026',
 };
 
@@ -90,6 +92,33 @@ export const SECURITY_DEBT: SecurityDebtItem[] = [
     severity: 'High',
     fix: 'Corrected node.cfg, ran zeekctl deploy',
     evidence: 'zeekctl status showing all 5 nodes running; conn.log/dns.log/ssl.log confirmed actively writing fresh data afterward',
+  },
+];
+
+export const KNOWN_ISSUES: KnownIssue[] = [
+  {
+    id: 'ki-1',
+    title: '"Too many fields for JSON decoder" flood on minisoc2',
+    severity: 'High',
+    description: 'Log flood on minisoc2 wazuh-analysisd: "Too many fields for JSON decoder" occurring during alert ingestion. Root cause unresolved.',
+    impact: 'May be silently dropping Wazuh alerts when event payloads exceed decoder field count limits.',
+    status: 'Unresolved',
+  },
+  {
+    id: 'ki-2',
+    title: 'logstash.conf TLS still disabled',
+    severity: 'Medium',
+    description: 'Elasticsearch CA cert was never copied from minisoc1 to minisoc3.',
+    impact: 'Logstash transport pipeline currently runs with ssl_certificate_verification => false.',
+    status: 'Open',
+  },
+  {
+    id: 'ki-3',
+    title: 'Full .env exposed in chat session — secrets burned',
+    severity: 'Critical',
+    description: 'Full .env was exposed in a chat session. All secrets in it must be treated as burned and rotated.',
+    impact: 'ES_PASSWORD, MISP_MYSQL_ROOT_PASSWORD, MISP_MYSQL_PASSWORD, MISP_ADMIN_PASSWORD, MISP_GPG_PASSPHRASE, REDIS_PASSWORD, SHUFFLE_OPENSEARCH_PASSWORD require immediate credential rotation.',
+    status: 'Pending Rotation',
   },
 ];
 

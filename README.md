@@ -84,18 +84,21 @@ Logstash, and Mailpit.
 
 **Verified:** 9-container stack verified healthy. MISP/Shuffle/Kibana dashboards
 reachable via Nginx reverse proxy (misp.dz, shuffle.dz, kibana.dz) on minisoc3,
-resolved via hosts-file DNS. MISP_BASEURL bug (baked config not auto-updating
-from .env) fixed and documented. Shuffle SOAR stack is 5 containers, not 4
-(added shuffle-opensearch — Shuffle's backend migrated MongoDB → OpenSearch,
-not in original compose plan). Direct query against minisoc1 confirms
-Logstash's Elasticsearch connectivity and query logic are correct.
-**Not yet built:** the actual Shuffle workflow graph (webhook receiver →
-MISP reputation lookup → Wazuh Active Response) exists as infrastructure only
-— the automation logic itself is still to be built (l10, l10b, l10c not started).
-Keycloak session revocation: cross-zone route to Gateway (192.168.19.173) confirmed
-unreachable from minisoc3; dropped from automated Shuffle workflow, moved to
-manual step in demo playbook. No live attack has been run end-to-end through
-the pipeline yet.
+resolved via hosts-file DNS. MISP_BASEURL bug fixed and login cookie issue resolved
+by adding TLS (self-signed) port 443 server block for misp.dz (secure-flagged cookie
+no longer dropped) and clearing stale CSRF token. Shuffle backend crash-loop
+resolved by adding shuffle-opensearch service and backend env vars via
+docker-compose.override.yml. Logstash ${SHUFFLE_WEBHOOK} corrected via override file
+to live webhook URL. Direct query against minisoc1 confirms Logstash's Elasticsearch
+connectivity and query logic are correct.
+**In progress / Not yet complete:** Shuffle SOAR workflow `misp_enrichment` created
+with live webhook trigger and MISP node (Search events / restSearch, 200 success:true);
+disambiguation test currently in progress to confirm $exec.data.srcip resolves before
+building the decision/branch node. End-to-end alert test (l10b) and OpenLDAP pipeline
+(l10c) not started. Keycloak session revocation: cross-zone route to Gateway
+(192.168.19.173) confirmed unreachable from minisoc3; dropped from automated Shuffle
+workflow, designated as a manual step in demo playbook. No live attack has been run
+end-to-end through the pipeline yet.
 
 ### Zone 2 — Enterprise Grid *(not built)*
 
@@ -166,6 +169,11 @@ Highlights:
   initial build and have been fixed — see the Security Debt Register for
   the full before/after with verification evidence for each.
 
+### Known Issues & Active Security Debt (Unresolved / Under Active Investigation)
+- **"Too many fields for JSON decoder" flood on minisoc2**: Root cause unresolved; observed during alert ingestion. May be silently dropping Wazuh alerts.
+- **logstash.conf TLS still disabled**: Elasticsearch CA certificate was never copied from minisoc1 to minisoc3; transport currently runs with `ssl_certificate_verification => false`.
+- **Full .env exposed in chat session**: All secrets in it (`ES_PASSWORD`, `MISP_MYSQL_ROOT_PASSWORD`, `MISP_MYSQL_PASSWORD`, `MISP_ADMIN_PASSWORD`, `MISP_GPG_PASSPHRASE`, `REDIS_PASSWORD`, `SHUFFLE_OPENSEARCH_PASSWORD`) must be treated as burned and rotated.
+
 ---
 
 ## Status Summary
@@ -174,7 +182,7 @@ Highlights:
 |---|---|
 | Zone 3 (Gateway) | Built, hardened, sensors verified |
 | Zone 4 minisoc1/2 | Pre-existing, operational |
-| Zone 4 minisoc3 | Infrastructure deployed and verified (5-container Shuffle stack including shuffle-opensearch, 4-container MISP, Logstash, Nginx .dz reverse proxy); SOAR workflow not yet built |
+| Zone 4 minisoc3 | Infrastructure deployed and verified (5-container Shuffle with shuffle-opensearch, 4-container MISP, Logstash webhook wired, Nginx .dz HTTPS proxy); SOAR workflow in progress (misp_enrichment trigger & MISP node verified) |
 | Zone 4 detection rules on minisoc2 | Verified operational: Rule 100100 confirmed firing with T1190 via wazuh-logtest; mitre.id fields validated in local_rules.xml |
 | Zone 4 OpenLDAP ingestion | Not started |
 | Zone 2 (Enterprise Grid) | Not built |
