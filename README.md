@@ -255,7 +255,7 @@ Reproducing it requires: a Docker host for Zone 3, three AlmaLinux nodes
 in your own `.env` files (never committed — see `.env.example` for the
 required variable names).
 
-Full setup notes: `docs/architecture.md`
+Full setup notes: `docs/SETUP.md`
 
 ---
 
