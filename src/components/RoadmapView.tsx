@@ -81,6 +81,7 @@ export const RoadmapView: React.FC = () => {
         { id: 'w4-2', label: 'Verify end-to-end detection and response timing (MTTD < 15s, MTTR < 45s)', completed: false },
         { id: 'w4-3', label: 'Execute 5 full dry-run rehearsals of the 15-minute 5-Act Jury Demo Script', completed: false },
         { id: 'w4-4', label: 'Finalize technical documentation, jury presentation slides, and formal architecture sign-off', completed: false },
+        { id: 'w4-5', label: 'Atomic Red Team coverage testing — not started', completed: false },
       ],
     },
   ]);

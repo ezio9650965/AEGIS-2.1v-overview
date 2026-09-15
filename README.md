@@ -135,6 +135,13 @@ Planned red-team emulation environment (Kali Linux, C2 framework, malware
 analysis sandbox) for generating reproducible attack scenarios against the
 rest of the environment. Not started.
 
+#### Attack Testing Methodology: Kali vs. Atomic Red Team
+
+Two complementary attack-testing methodologies validate AEGIS detection and response:
+
+- **Kali Linux (Manual Kill-Chain):** Demonstrates one full, realistic, narrative attack chain end-to-end for the live jury demo (SQLi initial access via Juice Shop → LSASS memory dump via Mimikatz on Patient Zero → Sliver C2 beaconing and exfiltration).
+- **Atomic Red Team (ATT&CK Coverage Matrix):** Provides breadth across MITRE ATT&CK techniques by executing discrete, highly focused test cases individually via `invoke-atomicredteam` (Windows) and the Linux/bash runner. Grouped by tactic (Execution, Persistence, Privilege Escalation, Defense Evasion, Exfiltration), each test produces a per-technique pass/fail coverage matrix (technique ID → detected by Wazuh/Sysmon/Zeek/Suricata), directly extending the MITRE ATT&CK tagging already proven in `local_rules.xml` `mitre.id` fields (e.g. rule 100100 / T1190).
+
 ---
 
 ## The Access Control Model
@@ -209,6 +216,7 @@ Highlights:
 | Zone 4 OpenLDAP ingestion | Not started |
 | Zone 2 (Enterprise Grid) | Not built |
 | Zone 1 (Threatscape) | Not built |
+| Atomic Red Team coverage testing | Not started |
 
 This project intentionally documents what is *not* done alongside what is —
 an inflated completion claim would not survive a jury's first technical

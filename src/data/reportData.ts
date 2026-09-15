@@ -59,6 +59,7 @@ export const INITIAL_CHECKLIST_LEFT: ChecklistItem[] = [
   { id: 'l16', title: 'Deploy REMnux VM in Zone 1', description: 'Set up static malware inspection sandbox on Kali / REMnux host.', category: 'medium', completed: false, who: 'both' },
   { id: 'l17', title: 'Script 3 Reproducible Attack Scenarios', description: 'Prepare automated scripts for SQLi, LSASS mimikatz dump, and Sliver C2 beaconing.', category: 'jury', completed: false, who: 'both' },
   { id: 'l18', title: 'Rehearse 15-Minute Jury Demo Script', description: 'Execute 5 dry-run rehearsals covering all 5 demo acts under 15 minutes.', category: 'jury', completed: false, who: 'both' },
+  { id: 'l19', title: 'Atomic Red Team coverage testing', description: 'Run Atomic Red Team test battery against Zone 2 endpoints (Windows/Sysmon + Linux), grouped by tactic (Execution, Persistence, Privilege Escalation, Defense Evasion, Exfiltration), and build a technique -> detected/not-detected coverage matrix.', category: 'jury', completed: false, who: 'both' },
 ];
 
 export const ZONE_STATUS = {
