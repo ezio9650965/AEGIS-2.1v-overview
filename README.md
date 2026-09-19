@@ -81,6 +81,9 @@ This is stated here directly, not only in the interactive diagram on the
 live site, because it is the single most consequential gap between this
 project's stated threat model and its current verified state.
 
+**Ingress Scope vs. Full Bidirectional Enforcement:**
+AEGIS's current ingress model (Traefik reverse-proxying inbound traffic to protected services) should not be confused with a full transparent gateway enforcing all traffic, including outbound/browsing traffic from internal endpoints. That is not yet implemented — it depends on completing the already-documented network segmentation gap (ens34 unused, endpoints not routed behind the gateway). Ingress Zero-Trust enforcement (Traefik + Authelia + Coraza) is proven and verified. Full bidirectional/egress traffic enforcement through the gateway is a documented future-work item, dependent on resolving the existing network segmentation gap.
+
 ### Zone 4 — MSSP SOC *(partially verified)*
 
 Three AlmaLinux 9.3 nodes, native package installs (not Docker) on the two
@@ -199,9 +202,19 @@ Highlights:
   the full before/after with verification evidence for each.
 
 ### Known Issues & Active Security Debt (Unresolved / Under Active Investigation)
+- **Coraza WAF routing bypass**: Traefik's dynamic config (`traefik-dynamic.yml`) routes Juice Shop traffic directly, skipping WAF inspection entirely. Coraza container is healthy and running, but receives zero traffic (`coraza_logs/access.log` last write predates this finding by days). Fix identified (repoint the juiceshop service to `http://coraza:8080`) but not yet applied as of September 19, 2026.
+- **Scoping distinction — Ingress vs. Bidirectional Egress Enforcement**: Ingress Zero-Trust enforcement (Traefik edge reverse proxy + Authelia Forward-Auth MFA + Coraza WAF request inspection) is currently distinct from full bidirectional egress traffic enforcement. In the current implementation, ingress policy enforces authentication and filtering on inbound requests to protected internal workloads; however, outbound egress traffic originating from internal workloads, containers, or hosts is not yet routed through a mandatory egress proxy or transparent Zero-Trust egress gateway filter.
 - **"Too many fields for JSON decoder" flood on minisoc2**: Root cause unresolved; observed during alert ingestion. May be silently dropping Wazuh alerts.
 - **logstash.conf TLS still disabled**: Elasticsearch CA certificate was never copied from minisoc1 to minisoc3; transport currently runs with `ssl_certificate_verification => false`.
-- **Full .env exposed in chat session**: All secrets in it (`ES_PASSWORD`, `MISP_MYSQL_ROOT_PASSWORD`, `MISP_MYSQL_PASSWORD`, `MISP_ADMIN_PASSWORD`, `MISP_GPG_PASSPHRASE`, `REDIS_PASSWORD`, `SHUFFLE_OPENSEARCH_PASSWORD`) must be treated as burned and rotated.
+- **Full .env exposed in chat session / plaintext credentials**: All secrets in it (`ES_PASSWORD`, `MISP_MYSQL_ROOT_PASSWORD`, `MISP_MYSQL_PASSWORD`, `MISP_ADMIN_PASSWORD`, `MISP_GPG_PASSPHRASE`, `REDIS_PASSWORD`, `SHUFFLE_OPENSEARCH_PASSWORD`), plus elastic superuser and Keycloak admin passwords pasted in chat sessions, must be treated as burned and rotated.
+
+### Resolved Issues & Architectural Debt
+- **Zeek & Suricata Log Ingestion & Mapping Collisions — RESOLVED**:
+  - *Root Cause*: Forcing Zeek and Suricata raw events through the same Wazuh archives index/mapping (`wazuh-archives-4.x-*`) caused Elasticsearch mapping collisions (`data.id` keyword vs. object; `data.service` object vs. string), dropping real events with HTTP 400.
+  - *Real Fix*: Installed Filebeat directly on `ztagateway` (where raw log files reside: `/opt/zeek/spool/manager/{conn,dns}.log` and `/var/log/suricata/eve.json`), using native Filebeat Zeek and Suricata modules, shipping to their own ECS-normalized data stream (`.ds-filebeat-8.19.13-*`, `event.module: zeek` / `suricata`), completely separate from `wazuh-archives-*`.
+  - *Verification*: Verified with real data: 931+ Zeek connection events, 93,000+ Suricata events, zero mapping errors.
+  - *Pipeline Rollback*: The now-unnecessary `aegis-zeek-normalize` ingest pipeline call was rolled back from the Wazuh archives pipeline (restored from backup, re-verified empty via `_ingest/pipeline` inspection).
+  - *Dashboards*: Kibana dashboards built and confirmed rendering real data: `[Filebeat Zeek] Overview`, `[Filebeat Suricata] Events Overview`, `[Filebeat Suricata] Alert Overview`, plus a new combined `"AEGIS Network Overview (Zeek+Suricata)"` dashboard. Closes checklist items `l14` and `l15`.
 
 ---
 
@@ -213,6 +226,7 @@ Highlights:
 | Zone 4 minisoc1/2 | Pre-existing, operational |
 | Zone 4 minisoc3 | Infrastructure deployed and verified (5-container Shuffle with shuffle-opensearch, 4-container MISP, Logstash webhook wired, Nginx .dz HTTPS proxy); SOAR workflow in progress (misp_enrichment trigger & MISP node verified) |
 | Zone 4 detection rules on minisoc2 | Verified operational: Rule 100100 confirmed firing with T1190 via wazuh-logtest; mitre.id fields validated in local_rules.xml |
+| Zone 4 Zeek/Suricata Ingestion & Dashboards | Operational: Dedicated Filebeat ECS data streams (.ds-filebeat-8.19.13-*) and 4 verified Kibana dashboards |
 | Zone 4 OpenLDAP ingestion | Not started |
 | Zone 2 (Enterprise Grid) | Not built |
 | Zone 1 (Threatscape) | Not built |

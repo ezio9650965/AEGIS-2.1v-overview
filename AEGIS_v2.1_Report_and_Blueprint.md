@@ -31,7 +31,7 @@ AEGIS v2.1 represents a tactical restructuring of the project to eliminate fragi
 ### 1.3 Honest Per-Zone Implementation Status & Regression Notice
 > **⚠️ Regression Risk Notice**: Gateway hardening (Argon2id parameters, session policy, Keycloak mode, orphaned secret files) has previously regressed silently between work sessions on this project — likely due to config files being reverted from an older snapshot. Status in this report reflects the most recent live verification (September 8, 2026), not a permanent guarantee. Recommend periodic live re-audits rather than trusting checklist state alone.
 
-- **Zone 3 Gateway Sensors & Hardening**: **Done (Operational\*)** — Verified via live audit as of September 8, 2026. All 9 core containers healthy, dual bridge isolation (`proxy_net` DMZ + `auth_net` `internal: true`) active, Forward-Auth MFA enforced, Coraza WAF and Suricata IDS operational. *Status reflects the most recent live check, not a one-time claim.*
+- **Zone 3 Gateway Sensors & Hardening**: **Done (Operational\*, with documented WAF bypass gap)** — Verified via live audit as of September 19, 2026. All 9 core containers healthy, dual bridge isolation (`proxy_net` DMZ + `auth_net` `internal: true`) active, Forward-Auth MFA enforced, Suricata IDS operational. *Audit finding*: Coraza WAF is deployed and healthy but NOT currently in the traffic path — a routing configuration gap, not a WAF failure (`traefik-dynamic.yml` routes Juice Shop traffic directly, skipping WAF inspection; fix identified to repoint service to `http://coraza:8080`, not yet applied/verified as of September 19, 2026).
 - **Zone 2 AD Enterprise Grid**: **Not Started (Pending deployment)** — Domain controller promotion (`CORP-DC01`), workstation enrollment (`CORP-PC01`), database server setup (`CORP-DB01`), and Wazuh agent deployments pending.
 - **Zone 4 Detection Pipeline & SOC Automation**: **Telemetry Pipeline Verified & SOAR In Progress (Operational\*)** — Zone 4 detection pipeline (Zeek/Suricata/Authelia → Wazuh agent → MITRE-tagged rules on minisoc2) verified end-to-end via wazuh-logtest as of September 13, 2026. `minisoc3` automation stack (5-container Shuffle with shuffle-opensearch + Logstash webhook wired + MISP TLS port 443 + Nginx .dz reverse proxy) healthy. Shuffle SOAR workflow `misp_enrichment` in progress (webhook trigger and MISP restSearch auth confirmed; disambiguation test active). Still outstanding: OpenLDAP pipeline (not started) and full end-to-end attack flow.
 - **Zone 1 Threatscape & Red Team Engine**: **Configured & Ready** — Kali Linux APT station with Sliver C2, sqlmap, mimikatz, and REMnux sandbox environment prepared.
@@ -100,8 +100,9 @@ graph TB
     AUTHELIA -->|"3. Check Sessions / Auth"| REDIS
     AUTHELIA -->|"4. User Credential Query"| POSTGRES
     AUTHELIA -->|"5. OIDC Delegation"| KEYCLOAK
-    TRAEFIK -->|"6. Proxy Clean Request"| CORAZA
-    CORAZA -->|"7. Clean Web Traffic"| JUICESHOP
+    TRAEFIK -->|"6. Direct Routing (Coraza Bypassed)"| JUICESHOP
+    TRAEFIK -.->|"6b. Intended: Proxy Clean Request (Fix Pending)"| CORAZA
+    CORAZA -.->|"7. Intended Clean Web Traffic"| JUICESHOP
 
     PC01 -->|"8. Sysmon / Security Logs (TCP 1514 mTLS)"| TRAEFIK
     DC01 -->|"9. AD Event Logs (TCP 1514 mTLS)"| TRAEFIK
@@ -334,7 +335,7 @@ access_control:
 ### 4.1 ZTA Gateway & Infrastructure Verification
 - [x] **Dual-Network Docker ZTA**: Kernel-level isolation configured with `proxy_net` (DMZ) and `auth_net` (`internal: true`).
 - [x] **Core Gateway Containers Healthy**: All 9 core containers (`traefik`, `authelia`, `keycloak`, `postgres`, `redis`, `mailpit`, `portainer`, `coraza-waf`, `suricata`) passing healthchecks.
-- [x] **Coraza WAF & Suricata IDS Active**: Inline Web Application Firewall and network intrusion detection configured and filtering traffic on `proxy_net`.
+- [ ] **Coraza WAF & Suricata IDS Active**: Suricata IDS active and streaming via Filebeat. Coraza WAF container running healthy, but currently bypassed in Traefik dynamic routing (`traefik-dynamic.yml` points directly to Juice Shop; fix identified, not yet applied).
 - [x] **Authelia Forward-Auth & MFA**: Two-factor authentication policy enforced across all protected domains via Traefik.
 - [x] **Keycloak OIDC Integration**: Federated identity provider configured for SSO token delegation.
 - [x] **Edge TLS Termination**: Traefik configured for TLS termination with valid wildcard certificates.
@@ -434,6 +435,7 @@ access_control:
 
 | Issue / Debt Item | Severity | Current Status | Description & Impact |
 | :--- | :--- | :--- | :--- |
+| **Coraza WAF bypass** | Critical | Open (Fix identified) | Coraza WAF bypass: Traefik's dynamic config routes Juice Shop traffic directly, skipping WAF inspection entirely. The Coraza container is healthy and running but receives zero traffic (`coraza_logs/access.log` last write predates this finding by days, confirming no requests have passed through it). Fix identified (repoint the juiceshop service to `http://coraza:8080`) but not yet applied as of September 19, 2026. This is a routing configuration gap, not a WAF failure; do not mark fixed until verified live with inspected traffic. |
 | **"Too many fields for JSON decoder" flood on minisoc2** | High | Unresolved | Log flood on minisoc2 `wazuh-analysisd`: "Too many fields for JSON decoder" occurring during alert ingestion. Root cause unresolved; may be silently dropping Wazuh alerts when event payload fields exceed decoder limits. |
 | **logstash.conf TLS still disabled** | Medium | Open | Elasticsearch CA certificate was never copied from `minisoc1` to `minisoc3`. Logstash transport pipeline currently runs with `ssl_certificate_verification => false`. |
 | **Full .env exposed in chat session — secrets burned** | Critical | Pending Rotation | Full `.env` was exposed in a chat session. All secrets in it (`ES_PASSWORD`, `MISP_MYSQL_ROOT_PASSWORD`, `MISP_MYSQL_PASSWORD`, `MISP_ADMIN_PASSWORD`, `MISP_GPG_PASSPHRASE`, `REDIS_PASSWORD`, `SHUFFLE_OPENSEARCH_PASSWORD`) must be treated as burned and rotated across all hosts. |
