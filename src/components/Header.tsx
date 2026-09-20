@@ -55,7 +55,7 @@ export const Header: React.FC<HeaderProps> = ({ onExportMarkdown }) => {
               </span>
               <span className="px-1.5 py-0.5 rounded bg-[#64748B]/20 text-[#94A3B8] border border-[#334155] text-[10px]">[Z2: PENDING]</span>
               <span
-                title="Zone 4 detection pipeline (Zeek/Suricata/Authelia → Wazuh agent → MITRE-tagged rules on minisoc2) verified end-to-end via wazuh-logtest as of September 13, 2026. Still outstanding: Shuffle SOAR workflow graph (containers healthy, workflow logic not yet built) and OpenLDAP pipeline (not started)."
+                title="Zone 4 detection pipeline (Zeek/Suricata/Authelia → Wazuh agent → MITRE-tagged rules on minisoc2) verified end-to-end via wazuh-logtest. OpenLDAP centralized identity pipeline & Keycloak OIDC federation verified across Stages 1-3. Shuffle SOAR enrichment verified with live Wazuh alert (T1055)."
                 className="px-1.5 py-0.5 rounded bg-[#38BDF8]/15 text-[#38BDF8] border border-[#38BDF8]/30 text-[10px] font-bold cursor-help"
               >
                 [Z4: PIPELINE VERIFIED]

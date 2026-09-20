@@ -40,3 +40,22 @@ export interface DemoAct {
   commands: { cmd: string; output?: string; note?: string }[];
   narrative: string;
 }
+
+export interface BugChainItem {
+  id: string;
+  stage: 'Stage 1: OpenLDAP' | 'Stage 2: Authelia' | 'Stage 3: Keycloak OIDC Federation' | 'Post-Migration Cleanup';
+  title: string;
+  category: 'OIDC Protocol' | 'Quarkus / JVM' | 'Directory Schema' | 'Network Isolation' | 'Credential Hygiene';
+  symptom: string;
+  rootCause: string;
+  remediation: string;
+  inChainOrder?: number;
+}
+
+export interface LessonLearnedItem {
+  id: string;
+  domain: string;
+  takeaway: string;
+  architecturalContext: string;
+  juryDefenseTalkingPoint: string;
+}

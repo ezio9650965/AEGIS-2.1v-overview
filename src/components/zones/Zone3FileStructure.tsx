@@ -5,13 +5,17 @@ export const Zone3FileStructure: React.FC = () => {
   const [copied, setCopied] = useState(false);
 
   const fileTreeText = `~/zerotrust-network/
-├── docker-compose.yml              # Multi-container orchestration: Traefik, Authelia, Keycloak, Postgres, Redis, Mailpit, Coraza
+├── docker-compose.yml              # Multi-container orchestration: Traefik, Authelia, Keycloak, OpenLDAP, oidc-proxy, Postgres, Redis, Mailpit, Coraza
 ├── .env                            # Environment variables and gateway service credentials (central source of truth)
 ├── authelia/                       # Zero Trust Forward-Auth engine and session boundary
-│   ├── configuration.yml           # Access control policy, contains secrets (see redacted version below)
-│   ├── users_database.yml          # Local user repository with Argon2id-hashed credentials and group memberships
+│   ├── configuration.yml           # Access control policy, LDAP auth backend, OIDC provider config
+│   ├── users_database.yml          # Deprecated local user repository (migrated to OpenLDAP in Stage 2)
 │   ├── oidc.key                    # RSA private key used to sign OpenID Connect identity tokens
 │   └── authelia.log                # Authentication runtime event and audit log
+├── ldap/                           # OpenLDAP centralized directory service (dc=zerotrust,dc=lan)
+│   └── bootstrap/                  # LDIF schema bootstrap: ou=People, ou=Groups, ou=Security_Groups, service accounts
+├── oidc-proxy/                     # Permanent internal Caddy sidecar proxy handling server-to-server OIDC calls on auth_net
+│   └── Caddyfile                   # Internal reverse proxy routing :8080 to authelia:9091, mitigating Keycloak 26.x truststore limitation
 ├── coraza/                         # Coraza Web Application Firewall (WAF) proxy container
 │   ├── Dockerfile                  # Custom Caddy image build with Coraza WAF plugin compiled
 │   ├── Caddyfile                   # Reverse proxy routing rules and WAF directives for Coraza

@@ -6,7 +6,7 @@ export const FileStructureView: React.FC = () => {
 
   const fileTreeText = `~/aegis/
 ├── gateway/
-│   ├── docker-compose.yml              # Core Gateway: Traefik, Authelia, Keycloak, Postgres, Redis, Portainer, Coraza, Suricata
+│   ├── docker-compose.yml              # Core Gateway: Traefik, Authelia, Keycloak, OpenLDAP, oidc-proxy, Postgres, Redis, Portainer, Coraza, Suricata
 │   ├── .env                            # Centralized active secrets (single source of truth)
 │   ├── traefik/
 │   │   ├── traefik.yml                 # Static config (entrypoints, logging, providers)
@@ -14,10 +14,14 @@ export const FileStructureView: React.FC = () => {
 │   │   └── certs/
 │   │       ├── zerotrust.crt           # Wildcard SAN cert (*.zerotrust.lan)
 │   │       └── zerotrust.key           # Private key
+│   ├── ldap/                           # OpenLDAP centralized directory (dc=zerotrust,dc=lan)
+│   │   └── bootstrap/                  # LDIF initial schema and user/group definitions
+│   ├── oidc-proxy/                     # Caddy sidecar proxy bridging Keycloak-Authelia OIDC calls on auth_net
+│   │   └── Caddyfile                   # Internal reverse proxy routing :8080 to authelia:9091
 │   ├── authelia/
-│   │   ├── configuration.yml           # MFA policy, Argon2id settings, OIDC provider config
-│   │   ├── users_database.yml          # Local user store with unique Argon2id hashes
-│   │   └── oidc.key                    # RSA-2048 private key file
+│   │   ├── configuration.yml           # MFA policy, Argon2id settings, LDAP auth backend & OIDC provider config
+│   │   ├── users_database.yml          # Deprecated local user store (migrated to OpenLDAP in Stage 2)
+│   │   └── oidc.key                    # RSA-4096 private key file
 │   ├── keycloak/
 │   │   └── .env                        # KC environment config (KC_DB_PASSWORD, admin creds)
 │   ├── postgres/

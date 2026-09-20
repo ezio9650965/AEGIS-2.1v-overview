@@ -47,6 +47,8 @@ networks:
   (Emerging Threats Open ruleset)
 - **`auth_net`** (`internal: true`, kernel-isolated, no host port exposure):
   Authelia (forward-auth, MFA, OIDC), Keycloak (identity provider),
+  OpenLDAP (`osixia/openldap:1.5.0` directory service, base DN `dc=zerotrust,dc=lan`),
+  `oidc-proxy` (permanent internal Caddy sidecar proxy handling server-to-server OIDC calls between Keycloak and Authelia over plain HTTP on `auth_net`, mitigating Keycloak 26.x's confirmed truststore limitation),
   PostgreSQL (identity vault), Redis (session cache), Mailpit (dev/test
   SMTP sinkhole — **not** production-safe, see Security Notes), Portainer
 
@@ -116,12 +118,13 @@ to live webhook URL. Direct query against minisoc1 confirms Logstash's Elasticse
 connectivity and query logic are correct.
 **In progress / Not yet complete:** Shuffle SOAR workflow `misp_enrichment` created
 with live webhook trigger and MISP node (Search events / restSearch, 200 success:true);
-disambiguation test currently in progress to confirm $exec.data.srcip resolves before
-building the decision/branch node. End-to-end alert test (l10b) and OpenLDAP pipeline
-(l10c) not started. Keycloak session revocation: cross-zone route to Gateway
-(192.168.19.173) confirmed unreachable from minisoc3; dropped from automated Shuffle
-workflow, designated as a manual step in demo playbook. No live attack has been run
-end-to-end through the pipeline yet.
+enrichment returned a verified single-attribute match against a real published MISP event.
+Decision/branch node (match -> action) in progress. Real end-to-end live alert test (l10b)
+flowed Wazuh -> Elasticsearch -> Logstash -> Shuffle webhook unprompted. Centralized identity
+migration (l10c) completed across Stages 1-3 (OpenLDAP directory service deployed, Authelia
+migrated to LDAP backend with MFA verified, Keycloak federated as relying party via oidc-proxy).
+Keycloak session revocation: cross-zone route to Gateway (192.168.19.173) confirmed unreachable
+from minisoc3; dropped from automated Shuffle workflow, designated as a manual step in demo playbook.
 
 ### Zone 2 — Enterprise Grid *(not built)*
 
@@ -207,6 +210,21 @@ Highlights:
 - **"Too many fields for JSON decoder" flood on minisoc2**: Root cause unresolved; observed during alert ingestion. May be silently dropping Wazuh alerts.
 - **logstash.conf TLS still disabled**: Elasticsearch CA certificate was never copied from minisoc1 to minisoc3; transport currently runs with `ssl_certificate_verification => false`.
 - **Full .env exposed in chat session / plaintext credentials**: All secrets in it (`ES_PASSWORD`, `MISP_MYSQL_ROOT_PASSWORD`, `MISP_MYSQL_PASSWORD`, `MISP_ADMIN_PASSWORD`, `MISP_GPG_PASSPHRASE`, `REDIS_PASSWORD`, `SHUFFLE_OPENSEARCH_PASSWORD`), plus elastic superuser and Keycloak admin passwords pasted in chat sessions, must be treated as burned and rotated.
+- **Plaintext secrets remaining in `authelia/configuration.yml`**: Plaintext secrets remaining in `authelia/configuration.yml` (`storage.encryption_key`, `storage.postgres.password`, `session.redis.password`, `identity_validation.reset_password.jwt_secret`, OIDC `client_secret`) — need migration to `AUTHELIA_*`-prefixed environment variables.
+- **Session secrets burned during OIDC debugging — credential rotation required**: New secrets burned by exposure during this session's debugging, requiring rotation before defense: `LDAP_ADMIN_PASSWORD`, `LDAP_CONFIG_PASSWORD`, `LDAP_BIND_PASSWORD`, Authelia's OIDC RSA private key, Authelia `storage.encryption_key`, Authelia OIDC client secret for Keycloak, Authelia session secret, Redis password, Postgres Authelia password. (These are in addition to the already-flagged Elasticsearch and Keycloak admin passwords.)
+- **Stray "AEGIS.CORP" realm in Keycloak pending deletion**: A stray "AEGIS.CORP" realm was created in Keycloak during earlier UI experimentation and needs deletion before defense (do not confuse with the actual planned Zone 2 `aegis.corp` Active Directory domain, which remains unbuilt — `l1`).
+- **Temporary/bootstrap Keycloak admin account still in use**: Temporary/bootstrap Keycloak admin account is still in use; needs a permanent admin created and the bootstrap account removed.
+- **Missing `sn`/`givenName` attributes on LDAP users**: LDAP users (`testuser`, `ezio`) are missing `sn` and `givenName` attributes, which caused a Keycloak First-Broker-Login profile-completion prompt/failure; needs fixing at the LDAP source plus an update to Authelia's attribute map (`given_name`/`family_name`).
+- **Abandoned truststore debugging artifacts pending cleanup**: Abandoned truststore debugging artifacts (`traefik/certs/truststore.p12`, `keycloak-cacerts-with-aegis.p12`, stale JVM env vars from the failed truststore fix attempts) need cleanup.
+- **oidc-proxy inter-container HTTP communication (Acceptable Risk / Scoped)**: `oidc-proxy`'s use of plain HTTP between containers on internal Docker bridge (`auth_net`, `internal: true`, no external route) is flagged as architecturally acceptable (internal isolated Docker network namespace with no host port exposure), not a residual risk or vulnerability — stated here explicitly so it is not read as an overlooked security gap.
+
+### Lessons Learned & Engineering Reflections (Identity Migration & OIDC Federation)
+- **Authelia environment variable substitution allow-list**: Authelia's configuration file env-var substitution is strictly allow-listed — only variables with `AUTHELIA_*` or `X_AUTHELIA_*` prefixes are honored. Arbitrary `${VAR}` syntax fails silently, leaving variables unexpanded or falling back to default values.
+- **LDAP Result Code 32 ("No Such Object") semantics**: In OpenLDAP, Result Code 32 can indicate an Access Control List (ACL) denial rather than the literal absence of an object or subtree. This was conclusively diagnosed by re-executing the identical search query as `cn=admin,dc=zerotrust,dc=lan`, which successfully returned the entries that `authelia-bind` was denied.
+- **Keycloak 26.x HTTP client truststore limitations & sidecar mitigation**: Keycloak 26.x's internal HTTP client (`SimpleHttpRequest`) does not honor its own configured truststore for outbound OIDC discovery and token exchange requests. Multiple standard Java/Keycloak remediations (`KC_TRUSTSTORE_PATHS`, `JAVA_TOOL_OPTIONS`, direct JVM `cacerts` certificate injection) were attempted and failed. The working and robust mitigation was introducing an internal Caddy sidecar proxy (`oidc-proxy`) on `auth_net` that handles server-to-server OIDC calls over plain HTTP within the trusted internal Docker bridge, while Traefik continues to terminate TLS for all browser-facing traffic. This is framed as a deliberate architectural mitigation aligned with Zero-Trust's "enforce trust at the boundary" principle, not a temporary workaround.
+- **Authelia OIDC issuer header validation**: Authelia's OIDC issuer resolution strictly depends on the incoming `Host`, `X-Forwarded-Proto`, and `X-Forwarded-Host` request headers matching its configured issuer URL (`https://auth.zerotrust.lan`) exactly. Any intermediary reverse proxy or broker must rewrite or pass through these headers consistently; otherwise, token requests and discovery calls are rejected with HTTP 400.
+- **OIDC token_endpoint_auth_method alignment**: The token endpoint authentication method must match identically between the relying party and identity provider. Keycloak defaults to `client_secret_post` (passing client credentials in the HTTP POST body), whereas Authelia enforces `client_secret_basic` (HTTP Basic Authorization header). Both mechanisms are fully OAuth 2.0 / OIDC spec-compliant; the failure was a configuration divergence, not an implementation bug on either side.
+- **Cross-user authentication-bypass vector in Authelia TOTP storage**: A genuine security finding was identified in Authelia's data model: user MFA/TOTP device secrets are persisted in PostgreSQL keyed strictly by username, entirely decoupled from the LDAP directory backend. Deleting a user from LDAP does not purge their registered MFA tokens from PostgreSQL. If a username is subsequently reissued to a different individual, the new identity inherits the previous user's active TOTP secret, creating a cross-user authentication-bypass vector unless an explicit database storage cleanup step is integrated into user deprovisioning workflows.
 
 ### Resolved Issues & Architectural Debt
 - **Zeek & Suricata Log Ingestion & Mapping Collisions — RESOLVED**:
@@ -227,7 +245,7 @@ Highlights:
 | Zone 4 minisoc3 | Infrastructure deployed and verified (5-container Shuffle with shuffle-opensearch, 4-container MISP, Logstash webhook wired, Nginx .dz HTTPS proxy); SOAR workflow in progress (misp_enrichment trigger & MISP node verified) |
 | Zone 4 detection rules on minisoc2 | Verified operational: Rule 100100 confirmed firing with T1190 via wazuh-logtest; mitre.id fields validated in local_rules.xml |
 | Zone 4 Zeek/Suricata Ingestion & Dashboards | Operational: Dedicated Filebeat ECS data streams (.ds-filebeat-8.19.13-*) and 4 verified Kibana dashboards |
-| Zone 4 OpenLDAP ingestion | Not started |
+| Zone 4 OpenLDAP ingestion | Completed (Stages 1-3: OpenLDAP + Authelia LDAP backend + Keycloak OIDC federation via oidc-proxy) |
 | Zone 2 (Enterprise Grid) | Not built |
 | Zone 1 (Threatscape) | Not built |
 | Atomic Red Team coverage testing | Not started |

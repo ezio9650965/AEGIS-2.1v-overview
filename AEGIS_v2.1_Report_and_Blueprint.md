@@ -33,7 +33,7 @@ AEGIS v2.1 represents a tactical restructuring of the project to eliminate fragi
 
 - **Zone 3 Gateway Sensors & Hardening**: **Done (Operational\*, with documented WAF bypass gap)** — Verified via live audit as of September 19, 2026. All 9 core containers healthy, dual bridge isolation (`proxy_net` DMZ + `auth_net` `internal: true`) active, Forward-Auth MFA enforced, Suricata IDS operational. *Audit finding*: Coraza WAF is deployed and healthy but NOT currently in the traffic path — a routing configuration gap, not a WAF failure (`traefik-dynamic.yml` routes Juice Shop traffic directly, skipping WAF inspection; fix identified to repoint service to `http://coraza:8080`, not yet applied/verified as of September 19, 2026).
 - **Zone 2 AD Enterprise Grid**: **Not Started (Pending deployment)** — Domain controller promotion (`CORP-DC01`), workstation enrollment (`CORP-PC01`), database server setup (`CORP-DB01`), and Wazuh agent deployments pending.
-- **Zone 4 Detection Pipeline & SOC Automation**: **Telemetry Pipeline Verified & SOAR In Progress (Operational\*)** — Zone 4 detection pipeline (Zeek/Suricata/Authelia → Wazuh agent → MITRE-tagged rules on minisoc2) verified end-to-end via wazuh-logtest as of September 13, 2026. `minisoc3` automation stack (5-container Shuffle with shuffle-opensearch + Logstash webhook wired + MISP TLS port 443 + Nginx .dz reverse proxy) healthy. Shuffle SOAR workflow `misp_enrichment` in progress (webhook trigger and MISP restSearch auth confirmed; disambiguation test active). Still outstanding: OpenLDAP pipeline (not started) and full end-to-end attack flow.
+- **Zone 4 Detection Pipeline & SOC Automation**: **Telemetry Pipeline Verified & SOAR In Progress (Operational\*)** — Zone 4 detection pipeline (Zeek/Suricata/Authelia → Wazuh agent → MITRE-tagged rules on minisoc2) verified end-to-end via wazuh-logtest. Centralized identity migration (OpenLDAP + Authelia LDAP backend + Keycloak OIDC federation via oidc-proxy) completed across Stages 1-3. `minisoc3` automation stack (5-container Shuffle with shuffle-opensearch + Logstash webhook wired + MISP TLS port 443 + Nginx .dz reverse proxy) healthy. Shuffle SOAR workflow `misp_enrichment` verified with real live Wazuh alert (T1055) and matching MISP restSearch lookup. Outstanding: decision/branch node and full multi-stage attack flow.
 - **Zone 1 Threatscape & Red Team Engine**: **Configured & Ready** — Kali Linux APT station with Sliver C2, sqlmap, mimikatz, and REMnux sandbox environment prepared.
 
 ### 1.4 What AEGIS Does and How It Enforces Zero Trust
@@ -76,6 +76,8 @@ graph TB
         subgraph AuthNet["auth_net (internal: true Secure Enclave)"]
             AUTHELIA["Authelia v4.39.20<br/>Forward-Auth / MFA / OIDC"]
             KEYCLOAK["Keycloak v26.6.2<br/>OIDC Identity Provider"]
+            OPENLDAP["OpenLDAP v1.5.0<br/>Directory Service (dc=zerotrust,dc=lan)"]
+            OIDC_PROXY["oidc-proxy (Caddy Sidecar)<br/>Permanent Internal OIDC Broker"]
             POSTGRES["PostgreSQL 16<br/>Identity Vault"]
             REDIS["Redis 7<br/>Session Cache"]
             MAILPIT["Mailpit<br/>SMTP Sinkhole"]
@@ -98,11 +100,13 @@ graph TB
     KALI -->|"1. HTTPS Attack / C2 / SQLi"| TRAEFIK
     TRAEFIK -->|"2. Forward Auth Request (:9091)"| AUTHELIA
     AUTHELIA -->|"3. Check Sessions / Auth"| REDIS
-    AUTHELIA -->|"4. User Credential Query"| POSTGRES
-    AUTHELIA -->|"5. OIDC Delegation"| KEYCLOAK
-    TRAEFIK -->|"6. Direct Routing (Coraza Bypassed)"| JUICESHOP
-    TRAEFIK -.->|"6b. Intended: Proxy Clean Request (Fix Pending)"| CORAZA
-    CORAZA -.->|"7. Intended Clean Web Traffic"| JUICESHOP
+    AUTHELIA -->|"4. User Credential Query"| OPENLDAP
+    AUTHELIA -->|"5. Storage / DB"| POSTGRES
+    KEYCLOAK -->|"6. Internal Token Exchange / Discovery"| OIDC_PROXY
+    OIDC_PROXY -->|"7. Plain HTTP Relay (:9091)"| AUTHELIA
+    TRAEFIK -->|"8. Direct Routing (Coraza Bypassed)"| JUICESHOP
+    TRAEFIK -.->|"8b. Intended: Proxy Clean Request (Fix Pending)"| CORAZA
+    CORAZA -.->|"9. Intended Clean Web Traffic"| JUICESHOP
 
     PC01 -->|"8. Sysmon / Security Logs (TCP 1514 mTLS)"| TRAEFIK
     DC01 -->|"9. AD Event Logs (TCP 1514 mTLS)"| TRAEFIK
@@ -147,8 +151,9 @@ graph TB
  |                                | Forward Auth (/api/authz/forward-auth)                                             |
  |  [ Secure Enclave Bridge: auth_net (internal: true - No Host Port Exposure) ]                                         |
  |  +---------------------------------------------------------------------------------------------------------------+  |
- |  | Authelia v4.39.20 (Port 9091)   | Keycloak v26.6.2 (Port 8080)    | PostgreSQL 16 Vault (Port 5432)            |  |
- |  | Redis 7 Session Cache (Port 6379)| Mailpit Sinkhole (Port 8025)    | Portainer CE v2.39.2 (Port 9000)           |  |
+ |  | Authelia v4.39.20 (Port 9091)   | Keycloak v26.6.2 (Port 8080)    | OpenLDAP v1.5.0 (Port 389)                 |  |
+ |  | oidc-proxy Caddy Sidecar (:8080)| PostgreSQL 16 Vault (Port 5432) | Redis 7 Session Cache (Port 6379)          |  |
+ |  | Mailpit Sinkhole (Port 8025)    | Portainer CE v2.39.2 (Port 9000)                                             |  |
  |  +---------------------------------------------------------------------------------------------------------------+  |
  |                                                                                                                     |
  |  Host Extensions: Zeek NTA 5-Node (sniffing br_proxy, ens34, ens33) | Target: OWASP Juice Shop (192.168.19.175:3000) |
@@ -248,8 +253,9 @@ graph TB
   |                                        |                                              |
   |   [ Secure Enclave Bridge: auth_net (internal: true) ]                                |
   |   +--------------------------------------------------------------------------------+  |
-  |   | Authelia v4.39.20 (:9091) | Keycloak v26.6.2 (:8080) | PostgreSQL 16 (:5432)   |  |
-  |   | Redis 7 Cache (:6379)     | Mailpit Sinkhole (:8025) | Portainer CE (:9000)      |  |
+  |   | Authelia v4.39.20 (:9091) | Keycloak v26.6.2 (:8080) | OpenLDAP v1.5.0 (:389)  |  |
+  |   | oidc-proxy Sidecar (:8080)| PostgreSQL 16 (:5432)    | Redis 7 Cache (:6379)   |  |
+  |   | Mailpit Sinkhole (:8025)  | Portainer CE (:9000)                               |  |
   |   +--------------------------------------------------------------------------------+  |
   +---------------------------------------------------------------------------------------+
 ```
@@ -258,7 +264,7 @@ graph TB
   - `443/TCP`: Host exposed → Traefik (TLS 1.3 termination, Forward-Auth enforced).
   - `1514/TCP`: Host exposed → Traefik TCP Proxy → `minisoc2:1514` (Wazuh agent mTLS).
   - `1515/TCP`: Host exposed → Traefik TCP Proxy → `minisoc2:1515` (Wazuh agent enrollment).
-  - `5432, 6379, 8025, 8080, 9000, 9091`: **HOST BLOCKED** (`auth_net` internal: true).
+  - `389, 5432, 6379, 8025, 8080, 9000, 9091`: **HOST BLOCKED** (`auth_net` internal: true).
 
 #### 3.3.1 Access Control Model — Customers vs. Employees
 Two distinct authentication domains exist behind the same edge gateway:
@@ -368,6 +374,7 @@ access_control:
 - [x] **Fix Shuffle Backend / OpenSearch Dependency**: `shuffle-backend` was crash-looping — requires OpenSearch, none was deployed. Added `shuffle-opensearch` service + backend env vars (`SHUFFLE_OPENSEARCH_URL`, `SHUFFLE_ELASTIC=true`, `SHUFFLE_OPENSEARCH_SKIPSSL_VERIFY=true`) via `docker-compose.override.yml`, base compose file untouched. Backend confirmed stable.
 - [x] **Wire Wazuh Alerts to Shuffle Webhook (Logstash)**: `logstash.conf` `${SHUFFLE_WEBHOOK}` was hardcoded wrong directly in `docker-compose.yml` (stale path/port), not read from `.env` despite appearing to be. Corrected via override file to the live webhook URL; confirmed container reads it correctly.
 - [x] **Map Custom Wazuh Rules to MITRE ATT&CK**: Rule 100100 confirmed firing with T1190 via wazuh-logtest; mitre.id fields validated in local_rules.xml.
+- [x] **OpenLDAP Pipeline Integration & Keycloak OIDC Federation (Stages 1-3)**: Centralized identity migration completed in three stages. Stage 1: OpenLDAP deployed (`osixia/openldap:1.5.0`) on internal `auth_net`, base DN `dc=zerotrust,dc=lan`, with `ou=People`, `ou=Groups`, `ou=Security_Groups` (`admins`, `it_ops`, `security`, `users`), and dedicated read-only `authelia-bind` service account with explicit ACL grant. Stage 2: Authelia's `authentication_backend` migrated from local `users_database.yml` to OpenLDAP; full password + TOTP (Google Authenticator) login verified end-to-end for testuser and ezio. Stage 3: Keycloak federated as an OIDC relying party with Authelia as upstream IdP (realm: `aegis`, IdP alias: `authelia`) — verified full SSO flow from Keycloak login -> redirect to Authelia -> LDAP auth + TOTP -> return to Keycloak -> authenticated session. Mitigated Keycloak 26.x truststore limitation via permanent internal Caddy sidecar proxy (`oidc-proxy`) on `auth_net`.
 
 ---
 
@@ -381,11 +388,10 @@ access_control:
   - Install and register Wazuh Agents on all 3 Zone 2 nodes.
 
 ### 5.2 High Priority (SOC Telemetry & Automation)
-- [ ] **Build Shuffle SOAR Workflow (`misp_enrichment`)**: Workflow `misp_enrichment` created with live webhook trigger, reachable via reverse proxy and Docker network. MISP node added (`Search events / restSearch`), auth confirmed (200, success:true). Disambiguation test in progress: seeding a real MISP event/attribute to confirm `$exec.data.srcip` resolves before building the decision/branch node. Keycloak revocation dropped from automated workflow (cross-zone network path unreachable), designated as manual step in demo playbook.
-- [ ] **OpenLDAP Pipeline Integration**: Centralized directory service integration for enterprise IAM (not started).
-- [ ] **End-to-End Live Attack Validation**: Trigger real attack, confirm telemetry flow across full pipeline to Shuffle SOAR webhook (not started).
+- [ ] **Build Shuffle SOAR Workflow (`misp_enrichment`)**: Workflow `misp_enrichment` created with live webhook trigger, reachable via reverse proxy and Docker network. MISP node added (`Search events / restSearch`), auth confirmed (200, success:true). Disambiguation test verified: alert T1055 flowed unprompted from Wazuh -> ES -> Logstash -> Shuffle, triggering a matching MISP search. Next: build decision/branch node (match -> action). Keycloak revocation dropped from automated workflow (cross-zone network path unreachable), designated as manual step in demo playbook.
+- [ ] **End-to-End Live Attack Validation**: Trigger multi-stage attack, confirm telemetry flow across full pipeline to Shuffle SOAR webhook.
 - [ ] **Write L1 SOC Playbooks**: Complete Markdown documentation for `brute-force.md`, `malware.md`, and `exfiltration.md`.
-- [ ] **Construct Kibana Dashboards**: Finalize SOC Morning, Network Traffic, Phishing Analysis, and MITRE Matrix dashboards.
+- [ ] **Construct Kibana Dashboards**: Finalize SOC Morning, Network Traffic, Phishing Analysis, and MITRE Matrix dashboards (Coraza, Authelia, Traefik, Keycloak).
 
 ### 5.3 Medium Priority & Jury Preparation
 - [ ] **Deploy REMnux VM in Zone 1**: Setup malware static analysis toolkit.
@@ -439,6 +445,44 @@ access_control:
 | **"Too many fields for JSON decoder" flood on minisoc2** | High | Unresolved | Log flood on minisoc2 `wazuh-analysisd`: "Too many fields for JSON decoder" occurring during alert ingestion. Root cause unresolved; may be silently dropping Wazuh alerts when event payload fields exceed decoder limits. |
 | **logstash.conf TLS still disabled** | Medium | Open | Elasticsearch CA certificate was never copied from `minisoc1` to `minisoc3`. Logstash transport pipeline currently runs with `ssl_certificate_verification => false`. |
 | **Full .env exposed in chat session — secrets burned** | Critical | Pending Rotation | Full `.env` was exposed in a chat session. All secrets in it (`ES_PASSWORD`, `MISP_MYSQL_ROOT_PASSWORD`, `MISP_MYSQL_PASSWORD`, `MISP_ADMIN_PASSWORD`, `MISP_GPG_PASSPHRASE`, `REDIS_PASSWORD`, `SHUFFLE_OPENSEARCH_PASSWORD`) must be treated as burned and rotated across all hosts. |
+| **Identity layer secrets burned during debugging** | Critical | Pending Rotation | New secrets burned by exposure during identity migration debugging requiring rotation before defense: `LDAP_ADMIN_PASSWORD`, `LDAP_CONFIG_PASSWORD`, `LDAP_BIND_PASSWORD`, Authelia's OIDC RSA private key, Authelia `storage.encryption_key`, Authelia OIDC client secret for Keycloak, Authelia session secret, Redis password, Postgres Authelia password. |
+| **Plaintext secrets in authelia/configuration.yml** | High | Open | Plaintext secrets remaining in `authelia/configuration.yml` (`storage.encryption_key`, `storage.postgres.password`, `session.redis.password`, `identity_validation.reset_password.jwt_secret`, OIDC `client_secret`). Require migration to `AUTHELIA_*`-prefixed environment variables. |
+| **Missing LDAP attributes (sn, givenName)** | Medium | Resolved / Hardened | OpenLDAP directory user objects (`testuser`, `ezio`) initially lacked `sn` and `givenName` inetOrgPerson attributes, causing Keycloak's First-Broker-Login review-profile authenticator to halt automated provisioning. Schema updated and LDIF re-applied. |
+| **Keycloak 26.x truststore & oidc-proxy architecture** | Medium | Architecture Rationale | Keycloak 26.x SimpleHttpRequest cannot validate internal self-signed TLS (`*.zerotrust.lan`) on internal Docker network without fragile container keystore hacking. Mitigated permanently by deploying `oidc-proxy` (Caddy sidecar) on `auth_net` over HTTP :8080 with Host header rewriting. Client traffic remains 100% TLS 1.3 at Traefik edge. |
+| **Stray "AEGIS.CORP" realm & bootstrap admin** | Low | Open | Stray `AEGIS.CORP` realm created in Keycloak during manual GUI experimentation pending deletion before defense to avoid ambiguity with planned Zone 2 Active Directory. Deprecate bootstrap admin. |
+
+---
+
+### 7.2 Engineering Reflections & OIDC Federation Bug Chain (Stages 1–3 Identity Migration)
+
+The centralized identity migration completed in three stages:
+1. **Stage 1 (OpenLDAP):** Central directory deployed (`osixia/openldap:1.5.0`) on `auth_net` (`dc=zerotrust,dc=lan`) with dedicated read-only `authelia-bind` service account.
+2. **Stage 2 (Authelia):** Authentication backend migrated from local `users_database.yml` to LDAP; password + TOTP verified end-to-end.
+3. **Stage 3 (Keycloak OIDC Federation):** Keycloak federated as an OIDC relying party with Authelia as upstream IdP (`realm: aegis`, `IdP alias: authelia`).
+
+#### The 4-Bug Handshake Cascade (Keycloak-Authelia OIDC Broker Handshake)
+During Stage 3, connecting Keycloak to Authelia over `auth_net` triggered a chain reaction of four interdependent technical hurdles:
+1. **Discovery Issuer String Mismatch (RFC 8414):** Keycloak strictly validates that `.well-known/openid-configuration` issuer string matches the IdP URL. Querying internal Docker DNS (`http://authelia:9091`) returned `https://authelia.zerotrust.lan`, triggering client rejection.
+2. **Keycloak 26.x JVM SimpleHttpRequest Truststore Failure:** Pointing Keycloak to `https://authelia.zerotrust.lan` triggered `SSLHandshakeException: PKIX path building failed` because Quarkus JVM runtime did not inherit host CA certs.
+3. **Quarkus Build-Time vs Runtime Truststore Parameter Conflict:** Passing `-Djavax.net.ssl.trustStore` or `-Dkc.truststore.paths` failed because Quarkus treats truststore options as build-time flags, preventing runtime dynamic certificate injection without violating immutable container deployment.
+4. **Architectural Resolution (`oidc-proxy` Caddy Sidecar):** Deployed `oidc-proxy` on `auth_net` listening on port `8080`. It forwards Keycloak's backchannel discovery and token calls to `http://authelia:9091` over plain HTTP while transparently rewriting `Host: authelia.zerotrust.lan`. This satisfies RFC 8414 issuer matching, completely eliminates JVM truststore failures, and preserves kernel-isolated Zero-Trust networking (`internal: true`) with zero host port exposure.
+
+#### Complete 11-Bug Incident Catalog
+- **Bug 1 (Directory Schema):** OpenLDAP bind service account ACL authorization failure (resolved via explicit slapd ACL grant).
+- **Bug 2 (Directory Schema):** LDAP objectClass and inetOrgPerson attribute mismatch (resolved via schema alignment).
+- **Bug 3 (Credential Hygiene):** Authelia TOTP secret mapping in SQL vs LDAP backend (resolved via uid normalization).
+- **Bug 4 (Directory Schema):** Authelia startup crash on malformed posixGroup filter (resolved via `memberUid={username}`).
+- **Bug 5 (OIDC Protocol):** Handshake Bug 1 — Discovery issuer string mismatch (RFC 8414).
+- **Bug 6 (Quarkus / JVM):** Handshake Bug 2 — Keycloak 26.x JVM SimpleHttpRequest truststore failure (PKIX path building).
+- **Bug 7 (Quarkus / JVM):** Handshake Bug 3 — Quarkus build-time vs runtime truststore parameter conflict.
+- **Bug 8 (Network Isolation):** Handshake Bug 4 — Architectural resolution via `oidc-proxy` Caddy sidecar.
+- **Bug 9 (OIDC Protocol):** Client secret authentication method mismatch (`client_secret_basic` vs `client_secret_post`).
+- **Bug 10 (Directory Schema):** First-Broker-Login profile completion interruption due to missing `givenName`/`sn` in LDAP.
+- **Bug 11 (Credential Hygiene):** Stray "AEGIS.CORP" realm and bootstrap admin account residue in Keycloak.
+
+#### Architectural Lessons Learned & Defense Talking Points
+- **Zero-Trust Network Isolation vs Inter-Container TLS:** Encrypting plaintext inside a closed kernel network namespace (`internal: true`) provides negligible security gain while introducing massive JVM truststore maintenance debt. The security boundary is enforced at the network namespace layer by the Linux kernel.
+- **Architectural Justification (Keycloak Behind Authelia):** Authelia is the Edge Policy Enforcement Point (PEP) handling forward-auth and continuous step-up MFA. Keycloak is the Identity Federation Broker (PDP) prepared to federate with Zone 2 Active Directory (`aegis.corp`) and external SAML providers. OpenLDAP is the centralized source of truth.
 
 ---
 
@@ -530,7 +574,7 @@ access_control:
 ```plain
 ~/aegis/
 ├── gateway/
-│   ├── docker-compose.yml              # Core Gateway: Traefik, Authelia, Keycloak, Postgres, Redis, Mailpit, Portainer
+│   ├── docker-compose.yml              # Core Gateway: Traefik, Authelia, Keycloak, OpenLDAP, oidc-proxy, Postgres, Redis, Mailpit, Portainer
 │   ├── .env                            # Centralized active secrets (single source of truth)
 │   ├── traefik/
 │   │   ├── traefik.yml                 # Static config (entrypoints, logging, providers)
@@ -538,10 +582,13 @@ access_control:
 │   │   └── certs/
 │   │       ├── zerotrust.crt           # Wildcard SAN cert (*.zerotrust.lan)
 │   │       └── zerotrust.key           # Private key
+│   ├── ldap/                           # OpenLDAP centralized directory (dc=zerotrust,dc=lan)
+│   │   └── bootstrap/                  # LDIF initial schema and user/group definitions
+│   ├── oidc-proxy/                     # Caddy sidecar proxy bridging Keycloak-Authelia OIDC HTTP calls on auth_net
+│   │   └── Caddyfile                   # Reverse proxy configuration routing :8080 to authelia:9091
 │   ├── authelia/
-│   │   ├── configuration.yml           # MFA policy, Argon2id settings, OIDC provider config
-│   │   ├── users_database.yml          # Local user store with unique Argon2id hashes
-│   │   └── oidc.key                    # RSA-2048 private key file
+│   │   ├── configuration.yml           # MFA policy, Argon2id settings, LDAP authentication_backend & OIDC provider config
+│   │   └── oidc.key                    # RSA-4096 private key file
 │   ├── keycloak/
 │   │   └── .env                        # KC environment config (KC_DB_PASSWORD, admin creds)
 │   ├── postgres/

@@ -269,7 +269,7 @@ export const ExecutiveSummaryView: React.FC = () => {
           </div>
           <p className="text-[11px] text-[#94A3B8] mt-1">Zone 4 Detection Pipeline Verified</p>
           <div className="mt-2 text-[10px] text-[#38BDF8]/90 bg-[#38BDF8]/10 px-2 py-1.5 rounded border border-[#38BDF8]/30 leading-snug">
-            Zone 4 detection pipeline (Zeek/Suricata/Authelia → Wazuh agent → MITRE-tagged rules on minisoc2) verified end-to-end via wazuh-logtest as of September 13, 2026. Still outstanding: Shuffle SOAR workflow graph (containers healthy, workflow logic not yet built) and OpenLDAP pipeline (not started).
+            Zone 4 detection pipeline (Zeek/Suricata/Authelia → Wazuh agent → MITRE-tagged rules on minisoc2) verified end-to-end via wazuh-logtest. OpenLDAP centralized identity pipeline &amp; Keycloak OIDC federation verified across Stages 1-3. Shuffle SOAR enrichment verified with live Wazuh alert (T1055).
           </div>
         </div>
 

@@ -48,9 +48,9 @@ export const RoadmapView: React.FC = () => {
       milestones: [
         { id: 'w2-1', label: 'Deploy minisoc3 automation stack (Shuffle SOAR, Logstash, MISP split)', completed: true },
         { id: 'w2-2', label: 'Build Shuffle SOAR webhook listener -> MISP lookup -> Wazuh Active Response', completed: false },
-        { id: 'w2-3', label: 'Deploy custom local_rules.xml on minisoc2 tagged with MITRE ATT&CK IDs', completed: false },
-        { id: 'w2-4', label: 'Configure Gateway Filebeat shipping Traefik, Zeek, and Suricata logs to minisoc1:9200', completed: false },
-        { id: 'w2-5', label: 'Establish OpenLDAP pipeline for directory and user attribute synchronization', completed: false },
+        { id: 'w2-3', label: 'Deploy custom local_rules.xml on minisoc2 tagged with MITRE ATT&CK IDs', completed: true },
+        { id: 'w2-4', label: 'Configure Gateway Filebeat shipping Traefik, Zeek, and Suricata logs to minisoc1:9200', completed: true },
+        { id: 'w2-5', label: 'Establish OpenLDAP pipeline for directory and user attribute synchronization', completed: true },
       ],
     },
     {
