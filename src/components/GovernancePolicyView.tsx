@@ -563,17 +563,17 @@ export const GovernancePolicyView: React.FC = () => {
                   🛍️
                 </div>
                 <div>
-                  <h4 className="text-sm font-bold text-[#4ADE80] font-mono">Customer-Facing Domain</h4>
-                  <p className="text-[11px] text-[#94A3B8] font-mono">shop.zerotrust.lan (Storefront)</p>
+                  <h4 className="text-sm font-bold text-[#4ADE80] font-mono">Customer-Facing Application</h4>
+                  <p className="text-[11px] text-[#94A3B8] font-mono">juiceshop.zerotrust.lan (Public Storefront)</p>
                 </div>
               </div>
               <span className="status-badge-success font-mono font-bold">
-                policy: bypass
+                WAF-Only (Coraza)
               </span>
             </div>
 
             <p className="text-xs text-[#F1F5F9]/80 font-sans leading-relaxed">
-              Customer-facing paths (such as the OWASP Juice Shop public storefront) are explicitly configured with <code className="text-[#4ADE80] bg-black/40 px-1 py-0.5 rounded font-mono">policy: bypass</code> in Authelia — zero enterprise MFA and zero employee SSO delegation.
+              Customer-facing applications (such as <code className="text-[#4ADE80] bg-black/40 px-1 py-0.5 rounded font-mono">juiceshop.zerotrust.lan</code>) remain completely decoupled from Authelia — zero Authelia policy, zero employee MFA, zero employee SSO delegation. Protected inline by Coraza WAF.
             </p>
 
             <div className="space-y-2 text-xs font-sans">
@@ -583,7 +583,7 @@ export const GovernancePolicyView: React.FC = () => {
                   Native Application Authentication
                 </strong>
                 <p className="text-[#94A3B8] text-[11px]">
-                  Customers register and sign in through the application's local user database. Corporate Active Directory credentials are not required or exposed.
+                  Customers register and sign in through the application's local user database. Corporate Active Directory/LDAP credentials are not required or exposed.
                 </p>
               </div>
 
@@ -608,26 +608,26 @@ export const GovernancePolicyView: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-[#38BDF8] font-mono">Employee & Admin Domain</h4>
-                  <p className="text-[11px] text-[#94A3B8] font-mono">*.zerotrust.lan + /admin routes</p>
+                  <p className="text-[11px] text-[#94A3B8] font-mono">*.zerotrust.lan (admins, it_ops, security, users)</p>
                 </div>
               </div>
               <span className="status-badge-accent font-mono font-bold">
-                policy: two_factor
+                Group-Scoped 2FA
               </span>
             </div>
 
             <p className="text-xs text-[#F1F5F9]/80 font-sans leading-relaxed">
-              Internal engineering tools, management consoles (Portainer, Traefik, Keycloak), and administration endpoints mandate <code className="text-[#38BDF8] bg-black/40 px-1 py-0.5 rounded font-mono">policy: two_factor</code> via Authelia forward-auth.
+              Internal engineering tools, management consoles (Portainer, Traefik, Keycloak), and administration endpoints mandate <code className="text-[#38BDF8] bg-black/40 px-1 py-0.5 rounded font-mono">policy: two_factor</code> via Authelia forward-auth, strictly scoped by LDAP-derived group membership.
             </p>
 
             <div className="space-y-2 text-xs font-sans">
               <div className="bg-[#0F172A] p-3 rounded border border-[#334155] space-y-1">
                 <strong className="text-white flex items-center gap-1.5 font-mono text-[11px]">
                   <ShieldCheck className="w-3.5 h-3.5 text-[#38BDF8]" />
-                  Active Directory Group Scoping
+                  LDAP Security Group Scoping (ou=Security_Groups)
                 </strong>
                 <p className="text-[#94A3B8] text-[11px]">
-                  Access tokens issued by Keycloak contain Active Directory group claims. Gateway rules enforce granular RBAC on every URL prefix.
+                  Admin interfaces for Keycloak and Traefik are restricted to <code className="text-white font-mono">group:admins</code> with an immediate explicit deny. Portainer (Docker socket) is restricted to <code className="text-white font-mono">group:admins</code> and <code className="text-white font-mono">group:it_ops</code>.
                 </p>
               </div>
 
@@ -680,7 +680,7 @@ export const GovernancePolicyView: React.FC = () => {
             <button
               onClick={() =>
                 handleCopy(
-                  `access_control:\n  default_policy: deny\n  rules:\n    # 1. Customer Storefront (Public access without employee SSO)\n    - domain: "shop.zerotrust.lan"\n      policy: bypass\n\n    # 2. Storefront Admin Panel (Step-up MFA scoped to juice-shop admin group)\n    - domain: "shop.zerotrust.lan"\n      resources: ["^/admin.*"]\n      policy: two_factor\n      subject: "group:juiceshop-admins"\n\n    # 3. Internal Engineering & SOC Domains (Strict 2FA)\n    - domain: "*.zerotrust.lan"\n      policy: two_factor`,
+                  `access_control:\n  default_policy: deny\n  rules:\n    # 1. Authelia portal — bypass (is the auth layer itself)\n    - domain: "authelia.zerotrust.lan"\n      policy: bypass\n\n    # 2. Keycloak OIDC protocol endpoints — bypass (required for OAuth2 flow)\n    - domain: "keycloak.zerotrust.lan"\n      resources:\n        - "^/realms/.*/protocol/openid-connect/.*"\n        - "^/realms/.*/login-actions/.*"\n        - "^/health/.*"\n        - "^/js/.*"\n        - "^/resources/.*"\n        - "^/realms/.*/account/.*"\n      policy: bypass\n\n    # 3. Keycloak admin interfaces — two_factor, group:admins only, explicit deny otherwise\n    - domain: "keycloak.zerotrust.lan"\n      policy: two_factor\n      subject: "group:admins"\n    - domain: "keycloak.zerotrust.lan"\n      policy: deny\n\n    # 4. Traefik dashboard — two_factor, group:admins only, explicit deny otherwise\n    - domain: "traefik.zerotrust.lan"\n      policy: two_factor\n      subject: "group:admins"\n    - domain: "traefik.zerotrust.lan"\n      policy: deny\n\n    # 5. Mailpit SMTP sinkhole — bypass (dev/test SMTP sinkhole, documented known limitation)\n    - domain: "mailpit.zerotrust.lan"\n      policy: bypass\n\n    # 6. Portainer (Docker socket, root-equivalent power) — two_factor, admins or it_ops, explicit deny otherwise\n    - domain: "portainer.zerotrust.lan"\n      policy: two_factor\n      subject:\n        - "group:admins"\n        - "group:it_ops"\n    - domain: "portainer.zerotrust.lan"\n      policy: deny\n\n    # (juiceshop.zerotrust.lan has NO Authelia policy — public-facing, protected only by Coraza WAF)\n\n    # 7. Wildcard fallback — two_factor, any authenticated user\n    - domain: "*.zerotrust.lan"\n      policy: two_factor`,
                   'authelia_yaml_spec'
                 )
               }
@@ -695,25 +695,68 @@ export const GovernancePolicyView: React.FC = () => {
 {`access_control:
   default_policy: deny
   rules:
-    # 1. Customer Storefront (Public access without employee SSO)
-    - domain: "shop.zerotrust.lan"
+    # 1. Authelia portal — bypass (is the auth layer itself)
+    - domain: "authelia.zerotrust.lan"
       policy: bypass
 
-    # 2. Storefront Admin Panel (Step-up MFA scoped to juice-shop admin group)
-    - domain: "shop.zerotrust.lan"
-      resources: ["^/admin.*"]
-      policy: two_factor
-      subject: "group:juiceshop-admins"
+    # 2. Keycloak OIDC protocol endpoints — bypass (required for OAuth2 flow)
+    - domain: "keycloak.zerotrust.lan"
+      resources:
+        - "^/realms/.*/protocol/openid-connect/.*"
+        - "^/realms/.*/login-actions/.*"
+        - "^/health/.*"
+        - "^/js/.*"
+        - "^/resources/.*"
+        - "^/realms/.*/account/.*"
+      policy: bypass
 
-    # 3. Internal Engineering & SOC Domains (Strict 2FA)
+    # 3. Keycloak admin interfaces — two_factor, group:admins only, explicit deny otherwise
+    - domain: "keycloak.zerotrust.lan"
+      policy: two_factor
+      subject: "group:admins"
+    - domain: "keycloak.zerotrust.lan"
+      policy: deny
+
+    # 4. Traefik dashboard — two_factor, group:admins only, explicit deny otherwise
+    - domain: "traefik.zerotrust.lan"
+      policy: two_factor
+      subject: "group:admins"
+    - domain: "traefik.zerotrust.lan"
+      policy: deny
+
+    # 5. Mailpit SMTP sinkhole — bypass (dev/test SMTP sinkhole, documented known limitation)
+    - domain: "mailpit.zerotrust.lan"
+      policy: bypass
+
+    # 6. Portainer (Docker socket, root-equivalent power) — two_factor, admins or it_ops, explicit deny otherwise
+    - domain: "portainer.zerotrust.lan"
+      policy: two_factor
+      subject:
+        - "group:admins"
+        - "group:it_ops"
+    - domain: "portainer.zerotrust.lan"
+      policy: deny
+
+    # (juiceshop.zerotrust.lan has NO Authelia policy — public-facing, protected only by Coraza WAF)
+
+    # 7. Wildcard fallback — two_factor, any authenticated user
     - domain: "*.zerotrust.lan"
       policy: two_factor`}
           </div>
 
-          <div className="flex items-start gap-2 bg-[#0F172A] border border-emerald-500/30 rounded p-3 text-xs text-[#F1F5F9]/90 font-sans">
-            <CheckCircle2 className="w-4 h-4 text-[#4ADE80] shrink-0 mt-0.5" />
-            <div>
-              <strong className="text-[#4ADE80] font-mono">[IN-BROWSER_ISOLATION] TOTP MFA Security Boundary:</strong> TOTP MFA secrets are rendered <span className="text-white font-semibold">once in-browser</span> during authenticated enrollment and <span className="text-[#4ADE80] font-semibold">NEVER transit email / Mailpit</span>. This is safe by design and completely distinct from the mail-sinkhole issue documented in the Security Debt Register.
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+            <div className="flex items-start gap-2 bg-[#0F172A] border border-amber-500/30 rounded p-3 text-xs text-[#F1F5F9]/90 font-sans">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <strong className="text-amber-300 font-mono">[RULE_FALLTHROUGH_FIX] Explicit Deny Requirement:</strong> Authelia evaluates rules top-to-bottom and matches on domain + resources + subject. When only the subject fails to match, it falls through to subsequent rules. Without an explicit <code className="text-amber-300">policy: deny</code> rule immediately following the group rule, non-admin users fall through to the wildcard <code className="text-sky-300">*.zerotrust.lan</code> rule and are granted access.
+              </div>
+            </div>
+
+            <div className="flex items-start gap-2 bg-[#0F172A] border border-emerald-500/30 rounded p-3 text-xs text-[#F1F5F9]/90 font-sans">
+              <CheckCircle2 className="w-4 h-4 text-[#4ADE80] shrink-0 mt-0.5" />
+              <div>
+                <strong className="text-[#4ADE80] font-mono">[IN-BROWSER_ISOLATION] TOTP MFA Security Boundary:</strong> TOTP MFA secrets are rendered <span className="text-white font-semibold">once in-browser</span> during authenticated enrollment and <span className="text-[#4ADE80] font-semibold">NEVER transit email / Mailpit</span>. This is safe by design and completely distinct from the mail-sinkhole issue documented in the Security Debt Register.
+              </div>
             </div>
           </div>
         </div>

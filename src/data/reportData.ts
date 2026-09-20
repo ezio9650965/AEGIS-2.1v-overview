@@ -45,6 +45,15 @@ export const INITIAL_CHECKLIST_DONE: ChecklistItem[] = [
   { id: 'l5', title: 'Update Keycloak Admin Password', description: 'Rotated via kcadm.sh set-password against the live Keycloak instance (NOT by editing keycloak/.env alone — that only affects a fresh database bootstrap, not an already-provisioned instance). Old password was base64-encoded in .env, which provided no real protection — trivially decoded with `base64 -d`.', category: 'critical', completed: true, who: 'eagle' },
   { id: 'l6', title: 'Generate Strong AUTHELIA_SESSION_SECRET', description: 'Generated via openssl rand -hex 32, applied to root .env, Authelia restarted and confirmed healthy.', category: 'critical', completed: true, who: 'eagle' },
   { id: 'l9', title: 'Configure Gateway Log Ingestion via Wazuh Agent', description: "Implemented via the Wazuh agent's own localfile log collector on the Gateway (not a separate Filebeat instance) — 5 sources now monitored and confirmed reaching minisoc2: Zeek's conn.log, dns.log, ssl.log; Suricata's eve.json; and Authelia's own JSON log file (added via configuration.yml's log.file_path option, replacing reliance on Docker's stdout log wrapper). Verified via ossec.log showing all 5 'Analyzing file' entries with no errors.", category: 'high', completed: true, who: 'ezio' },
+  {
+    id: 'd28',
+    title: 'Tighten Authelia access_control to use groups',
+    description:
+      "Authelia's access_control rules updated to use LDAP-derived group membership instead of domain-only policies, now that ou=Security_Groups is populated. keycloak.zerotrust.lan and traefik.zerotrust.lan admin interfaces restricted to subject: group:admins; portainer.zerotrust.lan (controls the Docker socket, root-equivalent power) restricted to group:admins and group:it_ops. juiceshop.zerotrust.lan remains fully decoupled from Authelia (public-facing, customer app, WAF-only via Coraza — see prior routing fix). All other *.zerotrust.lan domains remain open to any authenticated user via the default wildcard rule. Verified end-to-end with testuser (LDAP groups: it_ops, users — not admins): correctly denied (403) on Keycloak and Traefik, correctly allowed on Portainer, fully bypassed on Juice Shop.",
+    category: 'critical',
+    completed: true,
+    who: 'both',
+  },
 ];
 
 export const INITIAL_CHECKLIST_LEFT: ChecklistItem[] = [
@@ -57,6 +66,15 @@ export const INITIAL_CHECKLIST_LEFT: ChecklistItem[] = [
     description:
       "Centralized identity migration completed in three stages. Stage 1: OpenLDAP deployed (osixia/openldap:1.5.0) on the internal auth_net, base DN dc=zerotrust,dc=lan, with ou=People, ou=Groups, ou=Security_Groups (admins, it_ops, security, users), and a dedicated read-only authelia-bind service account with explicit ACL grant. Stage 2: Authelia's authentication_backend migrated from the local users_database.yml file to this LDAP directory; full password + TOTP (Google Authenticator) login verified end-to-end for testuser and ezio. Stage 3: Keycloak federated as an OIDC relying party with Authelia as upstream IdP (realm: aegis, IdP alias: authelia) — verified full SSO flow from https://keycloak.zerotrust.lan/realms/aegis/account/ through Authelia login/consent to a rendered Keycloak account console with LDAP-derived attributes. Architecture rationale documented: Keycloak-behind-Authelia is a deliberate choice for future SAML/B2C/external-IdP federation, not required capability today — flagged as a legitimate design justification, not scope creep, for jury questioning. Eleven distinct bugs encountered and resolved across all three stages (see Known Issues / Lessons Learned below); four of them chained together in the Keycloak-Authelia OIDC broker handshake alone.",
     category: 'high',
+    completed: true,
+    who: 'both',
+  },
+  {
+    id: 'l10d',
+    title: 'Tighten Authelia access_control to use groups',
+    description:
+      "Authelia's access_control rules updated to use LDAP-derived group membership instead of domain-only policies, now that ou=Security_Groups is populated. keycloak.zerotrust.lan and traefik.zerotrust.lan admin interfaces restricted to subject: group:admins; portainer.zerotrust.lan (controls the Docker socket, root-equivalent power) restricted to group:admins and group:it_ops. juiceshop.zerotrust.lan remains fully decoupled from Authelia (public-facing, customer app, WAF-only via Coraza — see prior routing fix). All other *.zerotrust.lan domains remain open to any authenticated user via the default wildcard rule. Verified end-to-end with testuser (LDAP groups: it_ops, users — not admins): correctly denied (403) on Keycloak and Traefik, correctly allowed on Portainer, fully bypassed on Juice Shop.",
+    category: 'critical',
     completed: true,
     who: 'both',
   },
@@ -408,6 +426,15 @@ export const OIDC_BUG_CHAIN: BugChainItem[] = [
     rootCause: 'Created during exploratory manual GUI configuration before establishing the programmatic realm import.',
     remediation: 'Cataloged in debt register (ki-6) for deletion prior to defense to prevent architectural ambiguity with Zone 2 Active Directory (aegis.corp).',
   },
+  {
+    id: 'bug-12',
+    stage: 'Stage 2: Authelia',
+    title: 'Authelia access_control Rule Fallthrough on Subject Mismatch',
+    category: 'Network Isolation',
+    symptom: 'Restricting keycloak.zerotrust.lan and traefik.zerotrust.lan to subject: group:admins had no actual enforcement effect; non-admin authenticated users still matched wildcard rule and were granted access.',
+    rootCause: 'Authelia evaluates access_control rules top-to-bottom and applies the first FULL match (domain + resources + subject all matching). When only subject fails to match, evaluation does not deny; it falls through to subsequent rules, including permissive wildcards.',
+    remediation: 'Added explicit policy: deny rules immediately following each group-restricted rule for the same domain before any wildcard rule. Verified testuser (it_ops, users) was denied (403) on Keycloak and Traefik, allowed on Portainer, and bypassed on Juice Shop.',
+  },
 ];
 
 export const LESSONS_LEARNED: LessonLearnedItem[] = [
@@ -438,5 +465,12 @@ export const LESSONS_LEARNED: LessonLearnedItem[] = [
     takeaway: 'Directory services must have complete objectclass schemas (inetOrgPerson) from day one, because downstream federated IdPs enforce strict user profile validation.',
     architecturalContext: 'Missing standard attributes like sn and givenName caused downstream broker authentication flows to stall. Clean SSO requires end-to-end schema alignment across OpenLDAP -> Authelia OIDC claims -> Keycloak user attributes.',
     juryDefenseTalkingPoint: 'Jury question: "How did you ensure user attributes stayed consistent across the migration?" Answer: By standardizing on inetOrgPerson in OpenLDAP and explicitly mapping claims (given_name, family_name, email, groups) through Authelia to Keycloak\'s user attribute mappers.',
+  },
+  {
+    id: 'lesson-5',
+    domain: 'Authelia Access Control Rule Fallthrough on Subject Mismatch',
+    takeaway: 'Authelia evaluates access_control rules top-to-bottom and applies the first FULL match (domain + resources + subject all matching) — but if only the subject fails to match (e.g., a group-restricted rule), evaluation does not deny; it falls through to the next matching rule, including a permissive wildcard rule later in the list.',
+    architecturalContext: 'This produced a real access-control gap during testing: restricting keycloak.zerotrust.lan and traefik.zerotrust.lan to subject: group:admins had no actual enforcement effect, because non-admin authenticated users still matched the later wildcard rule (*.zerotrust.lan, policy: two_factor, no subject restriction) and were granted access anyway. The fix requires an explicit policy: deny rule immediately following each group-restricted rule, for the same domain, before any wildcard rule is reached — Authelia does not implicitly deny on subject mismatch alone.',
+    juryDefenseTalkingPoint: 'Jury question: "Why do you have explicit deny rules immediately after group-restricted rules in Authelia?" Answer: Authelia evaluates rules top-to-bottom and applies the first full match. If only the subject fails to match, Authelia does not implicitly deny; it falls through to subsequent rules. Without an explicit deny immediately following the group rule, non-admin users matched the catch-all *.zerotrust.lan two-factor rule and were granted access. We verified the fix by confirming a non-admin test account (testuser, groups: it_ops/users) was correctly denied (403) on admin-restricted domains after adding explicit deny rules, whereas it had previously been incorrectly granted access.',
   },
 ];

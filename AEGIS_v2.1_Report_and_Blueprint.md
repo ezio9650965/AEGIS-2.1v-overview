@@ -266,30 +266,65 @@ graph TB
   - `1515/TCP`: Host exposed → Traefik TCP Proxy → `minisoc2:1515` (Wazuh agent enrollment).
   - `389, 5432, 6379, 8025, 8080, 9000, 9091`: **HOST BLOCKED** (`auth_net` internal: true).
 
-#### 3.3.1 Access Control Model — Customers vs. Employees
+#### 3.3.1 Access Control Model — Customers vs. Employees & Role-Based Enforcement
 Two distinct authentication domains exist behind the same edge gateway:
-1. **Customer-Facing Paths** (e.g. `shop.zerotrust.lan` / Juice Shop storefront) use `policy: bypass` in Authelia — no MFA, no employee SSO. Customers authenticate via the application's native account system. Enterprise-style MFA on a public storefront would destroy user conversion and is explicitly **NOT** how AEGIS is designed.
-2. **Employee / Admin Paths** (internal tools, admin panels, SOC access) require `policy: two_factor` via Authelia, scoped by Active Directory group membership via Keycloak.
+1. **Customer-Facing Application (`juiceshop.zerotrust.lan`)**: Fully decoupled from Authelia — no Authelia policy at all. Customers authenticate via the application's native account system, and the service is protected strictly by Coraza WAF (OWASP Core Rule Set). Enterprise-style MFA on a public customer app would destroy conversion and is explicitly **NOT** how AEGIS is designed.
+2. **Employee / Admin Paths**: Governed by Authelia `access_control` with LDAP-derived group membership (`ou=Security_Groups: admins, it_ops, security, users`).
 
 ```yaml
 # authelia/configuration.yml
 access_control:
   default_policy: deny
   rules:
-    # 1. Customer Storefront (Public access without employee SSO)
-    - domain: "shop.zerotrust.lan"
+    # 1. Authelia portal — always bypass (is the auth layer itself)
+    - domain: "authelia.zerotrust.lan"
       policy: bypass
 
-    # 2. Storefront Admin Panel (Step-up MFA scoped to juice-shop admin group)
-    - domain: "shop.zerotrust.lan"
-      resources: ["^/admin.*"]
-      policy: two_factor
-      subject: "group:juiceshop-admins"
+    # 2. Keycloak OIDC protocol endpoints — bypass (required for OAuth2 / OIDC flow)
+    - domain: "keycloak.zerotrust.lan"
+      resources:
+        - "^/realms/.*/protocol/openid-connect/.*"
+        - "^/realms/.*/login-actions/.*"
+        - "^/health/.*"
+        - "^/js/.*"
+        - "^/resources/.*"
+        - "^/realms/.*/account/.*"
+      policy: bypass
 
-    # 3. Internal Engineering & SOC Domains (Strict 2FA)
+    # 3. Keycloak admin interfaces — two_factor, group:admins only, explicit deny otherwise
+    - domain: "keycloak.zerotrust.lan"
+      policy: two_factor
+      subject: "group:admins"
+    - domain: "keycloak.zerotrust.lan"
+      policy: deny
+
+    # 4. Traefik dashboard — two_factor, group:admins only, explicit deny otherwise
+    - domain: "traefik.zerotrust.lan"
+      policy: two_factor
+      subject: "group:admins"
+    - domain: "traefik.zerotrust.lan"
+      policy: deny
+
+    # 5. Mailpit SMTP sinkhole — bypass (dev/test SMTP sinkhole, documented known limitation)
+    - domain: "mailpit.zerotrust.lan"
+      policy: bypass
+
+    # 6. Portainer (Docker socket, root-equivalent power) — two_factor, admins or it_ops, explicit deny otherwise
+    - domain: "portainer.zerotrust.lan"
+      policy: two_factor
+      subject:
+        - "group:admins"
+        - "group:it_ops"
+    - domain: "portainer.zerotrust.lan"
+      policy: deny
+
+    # (Note: juiceshop.zerotrust.lan has no Authelia policy at all — public-facing, protected only by Coraza WAF)
+
+    # 7. Wildcard fallback — two_factor, any authenticated user
     - domain: "*.zerotrust.lan"
       policy: two_factor
 ```
+- **Crucial Rule Evaluation Fix (Subject Mismatch Fallthrough)**: Authelia evaluates rules top-to-bottom and applies the first FULL match (domain + resources + subject). If only the subject fails to match (e.g., non-admin visiting `keycloak.zerotrust.lan`), Authelia does *not* implicitly deny; it falls through to subsequent matching rules — specifically the permissive wildcard rule (`*.zerotrust.lan`, `policy: two_factor`). To prevent unauthorized access, an explicit `policy: deny` rule MUST immediately follow each group-restricted rule for that domain before the wildcard rule is reached. Verified end-to-end with `testuser` (groups: `it_ops`, `users`): 403 denied on Keycloak and Traefik, allowed on Portainer, and bypassed on Juice Shop.
 - **Session-Cookie Hijacking Mitigation**: Admin-path MFA re-validates even within an already-valid general session. If an attacker hijacks a standard user session cookie, they cannot silently pivot to `/admin` without completing a secondary hardware/TOTP challenge.
 - **TOTP MFA Security Boundary**: TOTP MFA secrets are rendered **once in-browser** during authenticated enrollment and **NEVER transit email / Mailpit**. This is safe by design and entirely immune to mail-sinkhole exposure.
 
@@ -375,6 +410,7 @@ access_control:
 - [x] **Wire Wazuh Alerts to Shuffle Webhook (Logstash)**: `logstash.conf` `${SHUFFLE_WEBHOOK}` was hardcoded wrong directly in `docker-compose.yml` (stale path/port), not read from `.env` despite appearing to be. Corrected via override file to the live webhook URL; confirmed container reads it correctly.
 - [x] **Map Custom Wazuh Rules to MITRE ATT&CK**: Rule 100100 confirmed firing with T1190 via wazuh-logtest; mitre.id fields validated in local_rules.xml.
 - [x] **OpenLDAP Pipeline Integration & Keycloak OIDC Federation (Stages 1-3)**: Centralized identity migration completed in three stages. Stage 1: OpenLDAP deployed (`osixia/openldap:1.5.0`) on internal `auth_net`, base DN `dc=zerotrust,dc=lan`, with `ou=People`, `ou=Groups`, `ou=Security_Groups` (`admins`, `it_ops`, `security`, `users`), and dedicated read-only `authelia-bind` service account with explicit ACL grant. Stage 2: Authelia's `authentication_backend` migrated from local `users_database.yml` to OpenLDAP; full password + TOTP (Google Authenticator) login verified end-to-end for testuser and ezio. Stage 3: Keycloak federated as an OIDC relying party with Authelia as upstream IdP (realm: `aegis`, IdP alias: `authelia`) — verified full SSO flow from Keycloak login -> redirect to Authelia -> LDAP auth + TOTP -> return to Keycloak -> authenticated session. Mitigated Keycloak 26.x truststore limitation via permanent internal Caddy sidecar proxy (`oidc-proxy`) on `auth_net`.
+- [x] **Tighten Authelia access_control to use groups**: Authelia's access_control rules updated to use LDAP-derived group membership instead of domain-only policies, now that `ou=Security_Groups` is populated. `keycloak.zerotrust.lan` and `traefik.zerotrust.lan` admin interfaces restricted to `subject: group:admins`; `portainer.zerotrust.lan` (controls the Docker socket, root-equivalent power) restricted to `group:admins` and `group:it_ops`. `juiceshop.zerotrust.lan` remains fully decoupled from Authelia (public-facing, customer app, WAF-only via Coraza — see prior routing fix). All other `*.zerotrust.lan` domains remain open to any authenticated user via the default wildcard rule. Verified end-to-end with `testuser` (LDAP groups: `it_ops`, `users` — not `admins`): correctly denied (403) on Keycloak and Traefik, correctly allowed on Portainer, fully bypassed on Juice Shop.
 
 ---
 
@@ -467,7 +503,7 @@ During Stage 3, connecting Keycloak to Authelia over `auth_net` triggered a chai
 3. **Quarkus Build-Time vs Runtime Truststore Parameter Conflict:** Passing `-Djavax.net.ssl.trustStore` or `-Dkc.truststore.paths` failed because Quarkus treats truststore options as build-time flags, preventing runtime dynamic certificate injection without violating immutable container deployment.
 4. **Architectural Resolution (`oidc-proxy` Caddy Sidecar):** Deployed `oidc-proxy` on `auth_net` listening on port `8080`. It forwards Keycloak's backchannel discovery and token calls to `http://authelia:9091` over plain HTTP while transparently rewriting `Host: authelia.zerotrust.lan`. This satisfies RFC 8414 issuer matching, completely eliminates JVM truststore failures, and preserves kernel-isolated Zero-Trust networking (`internal: true`) with zero host port exposure.
 
-#### Complete 11-Bug Incident Catalog
+#### Complete 12-Bug Incident Catalog
 - **Bug 1 (Directory Schema):** OpenLDAP bind service account ACL authorization failure (resolved via explicit slapd ACL grant).
 - **Bug 2 (Directory Schema):** LDAP objectClass and inetOrgPerson attribute mismatch (resolved via schema alignment).
 - **Bug 3 (Credential Hygiene):** Authelia TOTP secret mapping in SQL vs LDAP backend (resolved via uid normalization).
@@ -479,8 +515,10 @@ During Stage 3, connecting Keycloak to Authelia over `auth_net` triggered a chai
 - **Bug 9 (OIDC Protocol):** Client secret authentication method mismatch (`client_secret_basic` vs `client_secret_post`).
 - **Bug 10 (Directory Schema):** First-Broker-Login profile completion interruption due to missing `givenName`/`sn` in LDAP.
 - **Bug 11 (Credential Hygiene):** Stray "AEGIS.CORP" realm and bootstrap admin account residue in Keycloak.
+- **Bug 12 (Network Isolation / Access Control):** Authelia access_control rule fallthrough on subject mismatch (resolved by placing an explicit `policy: deny` rule immediately following each group-restricted rule for that domain).
 
 #### Architectural Lessons Learned & Defense Talking Points
+- **Authelia Access Control Rule Fallthrough on Subject Mismatch:** Authelia evaluates access_control rules top-to-bottom and applies the first FULL match (domain + resources + subject all matching) — but if only the subject fails to match (e.g., a group-restricted rule), evaluation does not deny; it falls through to the next matching rule, including a permissive wildcard rule later in the list. This produced a real access-control gap during testing: restricting `keycloak.zerotrust.lan` and `traefik.zerotrust.lan` to `subject: group:admins` had no actual enforcement effect, because non-admin authenticated users still matched the later wildcard rule (`*.zerotrust.lan`, `policy: two_factor`, no subject restriction) and were granted access anyway. The fix requires an explicit `policy: deny` rule immediately following each group-restricted rule, for the same domain, before any wildcard rule is reached — Authelia does not implicitly deny on subject mismatch alone. Verified the fix by confirming a non-admin test account (`testuser`, groups: `it_ops`/`users`) was correctly denied (403) on admin-restricted domains after adding the explicit deny rules, whereas it had previously been incorrectly granted access.
 - **Zero-Trust Network Isolation vs Inter-Container TLS:** Encrypting plaintext inside a closed kernel network namespace (`internal: true`) provides negligible security gain while introducing massive JVM truststore maintenance debt. The security boundary is enforced at the network namespace layer by the Linux kernel.
 - **Architectural Justification (Keycloak Behind Authelia):** Authelia is the Edge Policy Enforcement Point (PEP) handling forward-auth and continuous step-up MFA. Keycloak is the Identity Federation Broker (PDP) prepared to federate with Zone 2 Active Directory (`aegis.corp`) and external SAML providers. OpenLDAP is the centralized source of truth.
 

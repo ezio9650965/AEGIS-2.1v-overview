@@ -544,8 +544,7 @@ access_control:
     - domain: authelia.zerotrust.lan
       policy: bypass
 
-    # Rule 2: Keycloak OIDC protocol endpoints — bypass required for OAuth2 flow
-    # These are the callback/token endpoints Authelia itself uses
+    # Rule 2: Keycloak OIDC protocol endpoints — bypass required for OAuth2 / OIDC flow
     - domain: keycloak.zerotrust.lan
       resources:
         - "^/realms/.*/protocol/openid-connect/.*"
@@ -556,15 +555,39 @@ access_control:
         - "^/realms/.*/account/.*"
       policy: bypass
 
-    # Rule 3: Keycloak admin console — two_factor (CHANGED from bypass)
+    # Rule 3: Keycloak admin console — two_factor, restricted to group:admins
+    # Explicit deny follows immediately to prevent fallthrough to wildcard rule on subject mismatch
     - domain: keycloak.zerotrust.lan
       policy: two_factor
+      subject: "group:admins"
+    - domain: keycloak.zerotrust.lan
+      policy: deny
 
-    # Rule 4: Traefik dashboard — two_factor (CHANGED from one_factor)
+    # Rule 4: Traefik dashboard — two_factor, restricted to group:admins
+    # Explicit deny follows immediately to prevent fallthrough to wildcard rule on subject mismatch
     - domain: traefik.zerotrust.lan
       policy: two_factor
+      subject: "group:admins"
+    - domain: traefik.zerotrust.lan
+      policy: deny
 
-    # Rule 5: Everything else — two_factor
+    # Rule 5: Mailpit SMTP sinkhole — bypass (dev/test sinkhole, documented known limitation)
+    - domain: mailpit.zerotrust.lan
+      policy: bypass
+
+    # Rule 6: Portainer (Docker socket, root-equivalent power) — two_factor, admins or it_ops
+    # Explicit deny follows immediately to prevent fallthrough to wildcard rule on subject mismatch
+    - domain: portainer.zerotrust.lan
+      policy: two_factor
+      subject:
+        - "group:admins"
+        - "group:it_ops"
+    - domain: portainer.zerotrust.lan
+      policy: deny
+
+    # (juiceshop.zerotrust.lan is decoupled from Authelia — public-facing, protected only by Coraza WAF)
+
+    # Rule 7: Wildcard fallback — two_factor for all other authenticated users
     - domain: "*.zerotrust.lan"
       policy: two_factor
 

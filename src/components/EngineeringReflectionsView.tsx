@@ -60,14 +60,14 @@ export const EngineeringReflectionsView: React.FC = () => {
               </h2>
             </div>
             <p className="text-xs text-[#94A3B8]">
-              Post-mortem analysis of the Stages 1–3 centralized identity migration (OpenLDAP → Authelia → Keycloak).
-              Documents 11 distinct resolved failure points, the 4-bug cascaded handshake chain, and core lessons learned for the PFE 2026 defense jury.
+              Post-mortem analysis of the Stages 1–3 centralized identity migration (OpenLDAP → Authelia → Keycloak) and group-based access control.
+              Documents {OIDC_BUG_CHAIN.length} distinct resolved failure points, the 4-bug cascaded handshake chain, and core lessons learned for the PFE 2026 defense jury.
             </p>
           </div>
           <div className="flex items-center gap-3 shrink-0">
             <div className="bg-[#0F172A] border border-[#334155] rounded px-3 py-1.5 text-right font-mono text-[11px]">
               <span className="text-[#94A3B8] block text-[10px]">TOTAL INCIDENTS RESOLVED</span>
-              <span className="text-emerald-400 font-bold">11 Production Bugs</span>
+              <span className="text-emerald-400 font-bold">{OIDC_BUG_CHAIN.length} Production Bugs</span>
             </div>
             <div className="bg-[#0F172A] border border-sky-500/30 rounded px-3 py-1.5 text-right font-mono text-[11px]">
               <span className="text-[#94A3B8] block text-[10px]">CASCADE CHAIN</span>
