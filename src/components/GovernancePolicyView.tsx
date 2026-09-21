@@ -122,13 +122,14 @@ interface SimulationPersona {
 
 const PERSONAS: SimulationPersona[] = [
   { id: 'p1', name: 'Public Customer', group: 'Anonymous Web User', isCustomer: true, avatar: '🛍️', hasMFA: false, sessionAgeHours: 0 },
-  { id: 'p2', name: 'Junior Frontend Dev (Alice)', group: 'Developers', isCustomer: false, avatar: '👩‍💻', hasMFA: true, sessionAgeHours: 1 },
-  { id: 'p3', name: 'Marketing Manager (Bob)', group: 'Marketing', isCustomer: false, avatar: '📈', hasMFA: true, sessionAgeHours: 3 },
+  { id: 'p9', name: 'IT Ops Engineer (testuser)', group: 'it_ops', isCustomer: false, avatar: '🔧', hasMFA: true, sessionAgeHours: 1 },
+  { id: 'p6', name: 'Network Admin (Eagle)', group: 'admins', isCustomer: false, avatar: '🛡️', hasMFA: true, sessionAgeHours: 1.5 },
+  { id: 'p2', name: 'Junior Frontend Dev (Alice)', group: 'users', isCustomer: false, avatar: '👩‍💻', hasMFA: true, sessionAgeHours: 1 },
+  { id: 'p3', name: 'Marketing Manager (Bob)', group: 'users', isCustomer: false, avatar: '📈', hasMFA: true, sessionAgeHours: 3 },
   { id: 'p4', name: 'HR Specialist (Clara)', group: 'HR', isCustomer: false, avatar: '📋', hasMFA: true, sessionAgeHours: 2.5 },
-  { id: 'p5', name: 'DevOps Lead (David)', group: 'DevOps', isCustomer: false, avatar: '⚙️', hasMFA: true, sessionAgeHours: 3.5 },
-  { id: 'p6', name: 'Network Admin (Eagle)', group: 'IT', isCustomer: false, avatar: '🛡️', hasMFA: true, sessionAgeHours: 1.5 },
+  { id: 'p5', name: 'DevOps Lead (David)', group: 'it_ops', isCustomer: false, avatar: '⚙️', hasMFA: true, sessionAgeHours: 3.5 },
   { id: 'p7', name: 'Chief Executive Officer (CEO)', group: 'Executive', isCustomer: false, avatar: '👔', hasMFA: true, sessionAgeHours: 4 },
-  { id: 'p8', name: 'AEGIS SOC Analyst (Ezio)', group: 'AEGIS-SOC-Tier1', isCustomer: false, avatar: '🦅', hasMFA: true, sessionAgeHours: 2 },
+  { id: 'p8', name: 'AEGIS SOC Analyst (Ezio)', group: 'security', isCustomer: false, avatar: '🦅', hasMFA: true, sessionAgeHours: 2 },
 ];
 
 interface DestinationEndpoint {
@@ -142,10 +143,13 @@ interface DestinationEndpoint {
 }
 
 const ENDPOINTS: DestinationEndpoint[] = [
-  { id: 'e1', name: 'Juice Shop Public Storefront', url: 'https://shop.zerotrust.lan/', domain: 'shop.zerotrust.lan', path: '/', zone: 'Zone 3 (DMZ)', description: 'Public e-commerce storefront for customers' },
-  { id: 'e2', name: 'Juice Shop Admin Panel', url: 'https://shop.zerotrust.lan/admin/dashboard', domain: 'shop.zerotrust.lan', path: '/admin/dashboard', zone: 'Zone 3 (Protected)', description: 'Product and user administration interface' },
-  { id: 'e3', name: 'Portainer CE Container Manager', url: 'https://portainer.zerotrust.lan/', domain: 'portainer.zerotrust.lan', path: '/', zone: 'Zone 3 (Auth Enclave)', description: 'Docker container management console' },
-  { id: 'e4', name: 'Traefik Dynamic Routing Dashboard', url: 'https://traefik.zerotrust.lan/dashboard/', domain: 'traefik.zerotrust.lan', path: '/dashboard/', zone: 'Zone 3 (Gateway)', description: 'Edge reverse proxy configuration & routing metrics' },
+  { id: 'e1', name: 'Juice Shop Public Storefront (WAF only)', url: 'https://juiceshop.zerotrust.lan/', domain: 'juiceshop.zerotrust.lan', path: '/', zone: 'Zone 3 (DMZ)', description: 'Public e-commerce storefront (Decoupled from Authelia, protected only by Coraza WAF)' },
+  { id: 'e8', name: 'Keycloak OIDC Protocol Endpoint', url: 'https://keycloak.zerotrust.lan/realms/aegis/protocol/openid-connect/auth', domain: 'keycloak.zerotrust.lan', path: '/realms/aegis/protocol/openid-connect/auth', zone: 'Zone 3 (Auth Enclave)', description: 'OAuth2/OIDC token & auth protocol (Rule 2: policy bypass)' },
+  { id: 'e9', name: 'Keycloak Admin Console', url: 'https://keycloak.zerotrust.lan/admin/', domain: 'keycloak.zerotrust.lan', path: '/admin/', zone: 'Zone 3 (Auth Enclave)', description: 'Keycloak master administration interface (Rule 3a: admins 2FA, 3b: explicit deny)' },
+  { id: 'e4', name: 'Traefik Dynamic Routing Dashboard', url: 'https://traefik.zerotrust.lan/dashboard/', domain: 'traefik.zerotrust.lan', path: '/dashboard/', zone: 'Zone 3 (Gateway)', description: 'Edge reverse proxy configuration (Rule 4a: admins 2FA, 4b: explicit deny)' },
+  { id: 'e10', name: 'Mailpit Development SMTP Sinkhole', url: 'https://mailpit.zerotrust.lan/', domain: 'mailpit.zerotrust.lan', path: '/', zone: 'Zone 3 (Dev Enclave)', description: 'Developer email sinkhole web UI (Rule 5: policy bypass)' },
+  { id: 'e3', name: 'Portainer CE Container Manager', url: 'https://portainer.zerotrust.lan/', domain: 'portainer.zerotrust.lan', path: '/', zone: 'Zone 3 (Auth Enclave)', description: 'Docker container management socket (Rule 6a: admins/it_ops 2FA, 6b: explicit deny)' },
+  { id: 'e11', name: 'Internal Enterprise App (*.zerotrust.lan)', url: 'https://internal.zerotrust.lan/', domain: 'internal.zerotrust.lan', path: '/', zone: 'Zone 3 (Protected)', description: 'Standard enterprise internal tool (Rule 7: wildcard fallback two_factor)' },
   { id: 'e5', name: 'HR Payroll & PII System', url: 'https://hris.zerotrust.lan/payroll', domain: 'hris.zerotrust.lan', path: '/payroll', zone: 'Zone 2 (Internal)', description: 'Confidential employee salaries and identity records' },
   { id: 'e6', name: 'Kibana 8.19 Raw Multi-Tenant SOC', url: 'https://minisoc2.zerotrust.lan/kibana', domain: 'minisoc2.zerotrust.lan', path: '/kibana', zone: 'Zone 4 (MSSP SOC)', description: 'Raw SIEM telemetry, MITRE alerts & elasticsearch index viewer' },
   { id: 'e7', name: 'Executive Posture Rollup Portal', url: 'https://executive.zerotrust.lan/scorecard', domain: 'executive.zerotrust.lan', path: '/scorecard', zone: 'Zone 3 (Corporate)', description: 'High-level Red/Yellow/Green SLA and MTTD rollups' },
@@ -463,120 +467,147 @@ export const GovernancePolicyView: React.FC = () => {
 
   // Evaluate Simulation Decision
   const evaluatePolicy = () => {
-    // 1. Customer Storefront
-    if (currentEndpoint.domain === 'shop.zerotrust.lan' && !currentEndpoint.path.startsWith('/admin')) {
+    // 1. Decoupled Juice Shop (Public Storefront)
+    if (currentEndpoint.domain === 'juiceshop.zerotrust.lan' || currentEndpoint.domain === 'shop.zerotrust.lan') {
       return {
-        decision: 'ALLOW (BYPASS)',
-        policy: 'policy: bypass',
+        decision: 'ALLOW (AUTHELIA DECOUPLED - WAF ONLY)',
+        policy: 'No Authelia Middleware Attached',
         status: 200,
         color: 'emerald',
-        reason: 'Customer-facing public route. Traefik bypasses Authelia forward-auth to preserve storefront user conversion.',
+        reason: 'Public customer-facing application. Fully decoupled from Authelia forward-auth to eliminate user friction; perimeter protection enforced exclusively by Coraza WAF (OWASP Core Rule Set).',
         requiresStepUp: false,
-        adCheck: 'None (Public)',
+        adCheck: 'None (Bypassed / Public Storefront)',
       };
     }
 
-    // 2. Customer on any protected internal route
+    // 2. Rule 1: Authelia Self-Auth Portal
+    if (currentEndpoint.domain === 'authelia.zerotrust.lan') {
+      return {
+        decision: 'ALLOW (RULE 1: SELF-AUTH BYPASS)',
+        policy: 'policy: bypass',
+        status: 200,
+        color: 'sky',
+        reason: 'Authelia web portal itself. Excluded from forward-auth loop to prevent recursive redirection deadlocks.',
+        requiresStepUp: false,
+        adCheck: 'Authelia Service Boundary',
+      };
+    }
+
+    // 3. Rule 2: Keycloak OIDC Protocol Endpoints
+    if (currentEndpoint.domain === 'keycloak.zerotrust.lan' && (currentEndpoint.path.includes('/protocol/openid-connect/') || currentEndpoint.path.includes('/login-actions/') || currentEndpoint.path.includes('/health/'))) {
+      return {
+        decision: 'ALLOW (RULE 2: OIDC PROTOCOL BYPASS)',
+        policy: 'policy: bypass',
+        status: 200,
+        color: 'sky',
+        reason: 'OIDC/OAuth2 discovery and backchannel endpoints bypassed at Authelia so relying parties can negotiate tokens and redirect flows cleanly.',
+        requiresStepUp: false,
+        adCheck: 'OIDC Protocol Delegation',
+      };
+    }
+
+    // 4. Rule 5: Mailpit SMTP Sinkhole
+    if (currentEndpoint.domain === 'mailpit.zerotrust.lan') {
+      return {
+        decision: 'ALLOW (RULE 5: DEV SINKHOLE BYPASS)',
+        policy: 'policy: bypass',
+        status: 200,
+        color: 'sky',
+        reason: 'Development email sinkhole bypassed in lab environment. Documented limitation in Security Debt Register.',
+        requiresStepUp: false,
+        adCheck: 'Dev Environment Only',
+      };
+    }
+
+    // 5. Anonymous Customer attempting to reach internal services
     if (currentPersona.isCustomer) {
       return {
         decision: 'DENY (401 UNAUTHORIZED)',
         policy: 'policy: two_factor (default deny)',
         status: 401,
         color: 'rose',
-        reason: 'Public anonymous customer has no Active Directory account in aegis.corp and is blocked at the gateway.',
+        reason: 'Anonymous customer has no OpenLDAP account in dc=zerotrust,dc=lan and is blocked by Traefik forward-auth middleware.',
         requiresStepUp: false,
-        adCheck: 'Failed: Unauthenticated',
+        adCheck: 'Failed: Unauthenticated (No LDAP Record in ou=People)',
       };
     }
 
-    // 3. Storefront Admin Panel
-    if (currentEndpoint.domain === 'shop.zerotrust.lan' && currentEndpoint.path.startsWith('/admin')) {
-      if (currentPersona.group === 'Developers' || currentPersona.group === 'IT') {
-        if (!simStepUpMfaCompleted) {
-          return {
-            decision: 'CHALLENGE (STEP-UP MFA REQUIRED)',
-            policy: 'policy: two_factor (subject: group:juiceshop-admins)',
-            status: 401,
-            color: 'amber',
-            reason: 'User has valid general session, but /admin.* enforces step-up re-authentication to prevent session-cookie hijacking.',
-            requiresStepUp: true,
-            adCheck: `Passed: Member of ${currentPersona.group}`,
-          };
-        } else {
-          return {
-            decision: 'ALLOW (STEP-UP 2FA VERIFIED)',
-            policy: 'policy: two_factor',
-            status: 200,
-            color: 'emerald',
-            reason: 'Admin-path step-up challenge satisfied. User granted access to store management.',
-            requiresStepUp: false,
-            adCheck: `Passed: Member of ${currentPersona.group}`,
-          };
-        }
-      } else {
+    // 6. Rule 3a & 3b: Keycloak Admin Console
+    if (currentEndpoint.domain === 'keycloak.zerotrust.lan') {
+      if (currentPersona.group === 'admins' || currentPersona.group === 'IT') {
         return {
-          decision: 'DENY (403 FORBIDDEN)',
-          policy: 'policy: two_factor (subject mismatch)',
-          status: 403,
-          color: 'rose',
-          reason: `User is authenticated as ${currentPersona.group}, but /admin.* is strictly restricted to juiceshop-admins (Developers/IT).`,
-          requiresStepUp: false,
-          adCheck: `Failed: ${currentPersona.group} not in juiceshop-admins`,
-        };
-      }
-    }
-
-    // 4. Raw SOC Kibana
-    if (currentEndpoint.domain.includes('minisoc2')) {
-      if (currentPersona.group === 'AEGIS-SOC-Tier1') {
-        return {
-          decision: 'ALLOW (SOC ANALYST TIER 1)',
-          policy: 'policy: two_factor (MSSP Tier 1 Enclave)',
+          decision: 'ALLOW (RULE 3a: GROUP:ADMINS 2FA VERIFIED)',
+          policy: 'policy: two_factor (subject: group:admins)',
           status: 200,
           color: 'emerald',
-          reason: 'Authorized AEGIS SOC Operator granted full multi-tenant Kibana and MITRE alert triage console access.',
+          reason: 'Keycloak master admin console granted to member of LDAP Security Group "admins" with 2FA (password + TOTP).',
           requiresStepUp: false,
-          adCheck: 'Passed: AEGIS SOC Operational Unit',
+          adCheck: `Passed: Member of ${currentPersona.group}`,
         };
       } else {
         return {
-          decision: 'DENY (403 FORBIDDEN - MSSP ISOLATION)',
-          policy: 'policy: deny (MSSP Service Boundary)',
+          decision: 'DENY (403 FORBIDDEN - RULE 3b EXPLICIT DENY)',
+          policy: 'policy: deny (explicit fallthrough blocker)',
           status: 403,
           color: 'rose',
-          reason: `Raw Kibana console is restricted to AEGIS SOC Analysts. Client roles (${currentPersona.group}) receive scoped escalation advisories only.`,
+          reason: `Subject mismatch on Rule 3a (${currentPersona.group} != group:admins). Explicit deny rule 3b terminates evaluation immediately, preventing wildcard fallthrough.`,
           requiresStepUp: false,
-          adCheck: 'Failed: Client accounts cannot access shared SOC backend',
+          adCheck: `Failed: ${currentPersona.group} not in group:admins`,
         };
       }
     }
 
-    // 5. Portainer & Traefik Admin
-    if (currentEndpoint.domain.includes('portainer') || currentEndpoint.domain.includes('traefik')) {
-      if (currentPersona.group === 'IT' || (currentPersona.group === 'DevOps' && currentEndpoint.domain.includes('portainer'))) {
+    // 7. Rule 4a & 4b: Traefik Dynamic Routing Dashboard
+    if (currentEndpoint.domain === 'traefik.zerotrust.lan') {
+      if (currentPersona.group === 'admins' || currentPersona.group === 'IT') {
         return {
-          decision: 'ALLOW (AUTHORIZED INFRA ADMIN)',
-          policy: 'policy: two_factor (subject: group:it, group:devops)',
+          decision: 'ALLOW (RULE 4a: GROUP:ADMINS 2FA VERIFIED)',
+          policy: 'policy: two_factor (subject: group:admins)',
           status: 200,
           color: 'emerald',
-          reason: `Granted access based on Active Directory infrastructure engineering group membership (${currentPersona.group}).`,
+          reason: 'Edge Traefik reverse proxy dashboard granted to member of LDAP group:admins with password + TOTP 2FA.',
           requiresStepUp: false,
-          adCheck: `Passed: ${currentPersona.group} infrastructure role`,
+          adCheck: `Passed: Member of ${currentPersona.group}`,
         };
       } else {
         return {
-          decision: 'DENY (403 FORBIDDEN)',
-          policy: 'policy: deny',
+          decision: 'DENY (403 FORBIDDEN - RULE 4b EXPLICIT DENY)',
+          policy: 'policy: deny (explicit fallthrough blocker)',
           status: 403,
           color: 'rose',
-          reason: `Access to core gateway and container infrastructure is strictly denied to group ${currentPersona.group}. Corporate title does not grant infrastructure privileges.`,
+          reason: `Subject mismatch on Rule 4a (${currentPersona.group} != group:admins). Explicit deny rule 4b immediately blocks request with HTTP 403, preventing wildcard fallthrough.`,
           requiresStepUp: false,
-          adCheck: `Failed: ${currentPersona.group} lacks infrastructure authorization`,
+          adCheck: `Failed: ${currentPersona.group} not in group:admins`,
         };
       }
     }
 
-    // 6. HRIS / Payroll
+    // 8. Rule 6a & 6b: Portainer CE (Docker socket control)
+    if (currentEndpoint.domain === 'portainer.zerotrust.lan') {
+      if (currentPersona.group === 'admins' || currentPersona.group === 'it_ops' || currentPersona.group === 'IT' || currentPersona.group === 'DevOps') {
+        return {
+          decision: 'ALLOW (RULE 6a: ADMINS / IT_OPS 2FA VERIFIED)',
+          policy: 'policy: two_factor (subject: group:admins, group:it_ops)',
+          status: 200,
+          color: 'emerald',
+          reason: `Portainer root Docker socket management granted to authorized infrastructure group (${currentPersona.group}) upon password + TOTP 2FA.`,
+          requiresStepUp: false,
+          adCheck: `Passed: Infrastructure group ${currentPersona.group}`,
+        };
+      } else {
+        return {
+          decision: 'DENY (403 FORBIDDEN - RULE 6b EXPLICIT DENY)',
+          policy: 'policy: deny (explicit fallthrough blocker)',
+          status: 403,
+          color: 'rose',
+          reason: `Subject mismatch on Rule 6a (${currentPersona.group} is not in admins or it_ops). Explicit deny rule 6b terminates evaluation with HTTP 403.`,
+          requiresStepUp: false,
+          adCheck: `Failed: ${currentPersona.group} not in admins or it_ops`,
+        };
+      }
+    }
+
+    // 9. HRIS / Payroll (Zone 2 Internal)
     if (currentEndpoint.domain.includes('hris')) {
       if (currentPersona.group === 'HR') {
         if (currentPersona.sessionAgeHours > 2) {
@@ -612,29 +643,42 @@ export const GovernancePolicyView: React.FC = () => {
       }
     }
 
-    // 7. Executive Posture Portal
-    if (currentEndpoint.domain.includes('executive')) {
-      if (currentPersona.group === 'Executive' || currentPersona.group === 'IT') {
+    // 10. Raw SOC Kibana
+    if (currentEndpoint.domain.includes('minisoc2')) {
+      if (currentPersona.group === 'security' || currentPersona.group === 'AEGIS-SOC-Tier1') {
         return {
-          decision: 'ALLOW (EXECUTIVE POSTURE ROLLUP)',
-          policy: 'policy: two_factor (subject: group:executive)',
+          decision: 'ALLOW (SOC ANALYST TIER 1)',
+          policy: 'policy: two_factor (MSSP Tier 1 Enclave)',
           status: 200,
           color: 'emerald',
-          reason: 'Access granted to high-level posture summaries, SLA compliance trends, and MTTR risk scorecards.',
+          reason: 'Authorized AEGIS SOC Operator granted full multi-tenant Kibana and MITRE alert triage console access.',
           requiresStepUp: false,
-          adCheck: `Passed: ${currentPersona.group} authorized`,
+          adCheck: 'Passed: AEGIS SOC Operational Unit',
         };
       } else {
         return {
-          decision: 'DENY (403 FORBIDDEN)',
-          policy: 'policy: deny',
+          decision: 'DENY (403 FORBIDDEN - MSSP ISOLATION)',
+          policy: 'policy: deny (MSSP Service Boundary)',
           status: 403,
           color: 'rose',
-          reason: `Staff in group ${currentPersona.group} cannot view executive posture scorecard.`,
+          reason: `Raw Kibana console is restricted to AEGIS SOC Analysts. Client roles (${currentPersona.group}) receive scoped escalation advisories only.`,
           requiresStepUp: false,
-          adCheck: `Failed: ${currentPersona.group} not in Executive`,
+          adCheck: 'Failed: Client accounts cannot access shared SOC backend',
         };
       }
+    }
+
+    // 11. Rule 7: Wildcard Fallback for any other *.zerotrust.lan internal application
+    if (currentEndpoint.domain.endsWith('.zerotrust.lan')) {
+      return {
+        decision: 'ALLOW (RULE 7: WILDCARD 2FA VERIFIED)',
+        policy: 'policy: two_factor (any authenticated user)',
+        status: 200,
+        color: 'emerald',
+        reason: 'Internal enterprise service on *.zerotrust.lan. Any authenticated employee with valid LDAP credentials and TOTP MFA is granted access.',
+        requiresStepUp: false,
+        adCheck: `Passed: Authenticated LDAP identity (${currentPersona.group})`,
+      };
     }
 
     // Default
@@ -645,7 +689,7 @@ export const GovernancePolicyView: React.FC = () => {
       color: 'rose',
       reason: 'No explicit Authelia rule matched. Default deny policy enforced.',
       requiresStepUp: false,
-      adCheck: 'Default Deny Enforced',
+      adCheck: 'Failed: Default Deny',
     };
   };
 

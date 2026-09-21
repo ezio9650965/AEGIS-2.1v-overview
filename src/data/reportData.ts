@@ -69,15 +69,6 @@ export const INITIAL_CHECKLIST_LEFT: ChecklistItem[] = [
     completed: true,
     who: 'both',
   },
-  {
-    id: 'l10d',
-    title: 'Group-based Authelia access_control using LDAP Security_Groups',
-    description:
-      "Authelia's access_control rules updated to use LDAP-derived group membership instead of domain-only policies, now that ou=Security_Groups is populated (admins, it_ops, security, users). keycloak.zerotrust.lan and traefik.zerotrust.lan admin interfaces restricted to subject: group:admins; portainer.zerotrust.lan (controls the Docker socket, root-equivalent power) restricted to group:admins and group:it_ops. juiceshop.zerotrust.lan remains fully decoupled from Authelia entirely (public-facing customer app, protected only by Coraza WAF). All other *.zerotrust.lan domains remain open to any authenticated user via the default wildcard rule. Verified end-to-end with testuser (LDAP groups: it_ops, users — not admins): correctly denied (403) on Keycloak and Traefik, correctly allowed on Portainer, fully bypassed on Juice Shop.",
-    category: 'critical',
-    completed: true,
-    who: 'both',
-  },
   { id: 'l11', title: 'Write 3 L1 SOC Playbooks in Markdown', description: 'Create brute-force.md, malware.md, and exfiltration.md in /opt/soc/playbooks/.', category: 'high', completed: false, who: 'both' },
   { id: 'l12', title: 'Map Custom Wazuh Rules to MITRE ATT&CK', description: 'Rule 100100 confirmed firing with T1190 via wazuh-logtest; mitre.id fields validated in local_rules.xml.', category: 'high', completed: true, who: 'ezio' },
   { id: 'l13', title: 'Build Kibana Dashboards', description: 'Import and build SOC Morning, Phishing Analysis, and MITRE Matrix views. Note: Zeek and Suricata dashboards are now completed ([Filebeat Zeek] Overview, [Filebeat Suricata] Events/Alert Overview, and combined AEGIS Network Overview); Authelia, Traefik, Coraza, and Keycloak dashboards are still outstanding.', category: 'high', completed: false, who: 'ezio' },
