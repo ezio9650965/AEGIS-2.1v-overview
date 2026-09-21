@@ -151,6 +151,195 @@ const ENDPOINTS: DestinationEndpoint[] = [
   { id: 'e7', name: 'Executive Posture Rollup Portal', url: 'https://executive.zerotrust.lan/scorecard', domain: 'executive.zerotrust.lan', path: '/scorecard', zone: 'Zone 3 (Corporate)', description: 'High-level Red/Yellow/Green SLA and MTTD rollups' },
 ];
 
+export interface AutheliaRuleItem {
+  id: string;
+  order: string;
+  domain: string;
+  policy: 'bypass' | 'two_factor' | 'deny';
+  subject?: string;
+  resources?: string[];
+  type: 'Bypass' | 'Group-Restricted Admin' | 'Fallthrough Deny' | 'Wildcard Fallback' | 'Decoupled';
+  description: string;
+  rationale: string;
+  testuserVerdict: {
+    status: '403 Forbidden' | '2FA Required (Allowed)' | 'Bypassed (200 OK)';
+    color: 'rose' | 'emerald' | 'sky';
+    detail: string;
+  };
+}
+
+export const AUTHELIA_LIVE_RULES: AutheliaRuleItem[] = [
+  {
+    id: 'rule-1',
+    order: '1',
+    domain: 'authelia.zerotrust.lan',
+    policy: 'bypass',
+    type: 'Bypass',
+    description: 'Authelia Authentication Portal itself',
+    rationale: 'Self-authentication bypass. Authelia is the forward-auth provider itself and cannot require forward-auth without creating an infinite redirect loop.',
+    testuserVerdict: {
+      status: 'Bypassed (200 OK)',
+      color: 'sky',
+      detail: 'Direct access to login and TOTP challenge screen.',
+    },
+  },
+  {
+    id: 'rule-2',
+    order: '2',
+    domain: 'keycloak.zerotrust.lan',
+    policy: 'bypass',
+    resources: [
+      '^/realms/.*/protocol/openid-connect/.*',
+      '^/realms/.*/login-actions/.*',
+      '^/health/.*',
+      '^/js/.*',
+      '^/resources/.*',
+      '^/realms/.*/account/.*',
+    ],
+    type: 'Bypass',
+    description: 'Keycloak OIDC & OAuth2 Protocol Endpoints',
+    rationale: 'Protocol bypass required for OIDC federation. Bypasses Authelia forward-auth so downstream apps and relying parties can perform authorization-code redirects and token exchanges without recursive authentication deadlocks.',
+    testuserVerdict: {
+      status: 'Bypassed (200 OK)',
+      color: 'sky',
+      detail: 'Allows browser redirect to Keycloak realm login actions without edge 401/403 interference.',
+    },
+  },
+  {
+    id: 'rule-3a',
+    order: '3a',
+    domain: 'keycloak.zerotrust.lan',
+    policy: 'two_factor',
+    subject: 'group:admins',
+    type: 'Group-Restricted Admin',
+    description: 'Keycloak Admin Console & Realm Configurations',
+    rationale: 'Administrative interface restricted strictly to LDAP directory admins (cn=admins,ou=Security_Groups,dc=zerotrust,dc=lan). Requires password + TOTP 2FA.',
+    testuserVerdict: {
+      status: '403 Forbidden',
+      color: 'rose',
+      detail: 'testuser (groups: it_ops, users) fails subject match (not in admins). Triggers immediate evaluation of rule 3b.',
+    },
+  },
+  {
+    id: 'rule-3b',
+    order: '3b',
+    domain: 'keycloak.zerotrust.lan',
+    policy: 'deny',
+    subject: 'All other subjects (non-admins)',
+    type: 'Fallthrough Deny',
+    description: 'Keycloak Fallthrough Prevention Deny Rule',
+    rationale: 'CRITICAL SECURITY HARDENING: Authelia evaluates top-to-bottom and does NOT implicitly deny on subject mismatch alone. Without this explicit deny, non-admins fell through to the downstream *.zerotrust.lan wildcard rule and gained unauthorized access.',
+    testuserVerdict: {
+      status: '403 Forbidden',
+      color: 'rose',
+      detail: 'Immediately terminated by explicit deny rule 3b before wildcard rule 7 is reached.',
+    },
+  },
+  {
+    id: 'rule-4a',
+    order: '4a',
+    domain: 'traefik.zerotrust.lan',
+    policy: 'two_factor',
+    subject: 'group:admins',
+    type: 'Group-Restricted Admin',
+    description: 'Traefik v3 Reverse Proxy Dashboard & Routing API',
+    rationale: 'Restricted strictly to group:admins. Traefik dashboard controls live routing tables, dynamic TLS certificates, and middleware definitions.',
+    testuserVerdict: {
+      status: '403 Forbidden',
+      color: 'rose',
+      detail: 'testuser is not in group:admins; fails subject match, triggering rule 4b.',
+    },
+  },
+  {
+    id: 'rule-4b',
+    order: '4b',
+    domain: 'traefik.zerotrust.lan',
+    policy: 'deny',
+    subject: 'All other subjects (non-admins)',
+    type: 'Fallthrough Deny',
+    description: 'Traefik Fallthrough Prevention Deny Rule',
+    rationale: 'CRITICAL SECURITY HARDENING: Explicit deny immediately terminates evaluation for non-admin subjects targeting traefik.zerotrust.lan, preventing downstream wildcard fallthrough.',
+    testuserVerdict: {
+      status: '403 Forbidden',
+      color: 'rose',
+      detail: 'Immediately blocked with 403 Forbidden.',
+    },
+  },
+  {
+    id: 'rule-5',
+    order: '5',
+    domain: 'mailpit.zerotrust.lan',
+    policy: 'bypass',
+    type: 'Bypass',
+    description: 'Mailpit Development SMTP Sinkhole',
+    rationale: 'Development and testing SMTP sinkhole bypass. Documented known limitation in the Security Debt Register. TOTP enrollment secrets never transit this sinkhole.',
+    testuserVerdict: {
+      status: 'Bypassed (200 OK)',
+      color: 'sky',
+      detail: 'Direct access to mail sinkhole UI for dev verification.',
+    },
+  },
+  {
+    id: 'rule-6a',
+    order: '6a',
+    domain: 'portainer.zerotrust.lan',
+    policy: 'two_factor',
+    subject: 'group:admins OR group:it_ops',
+    type: 'Group-Restricted Admin',
+    description: 'Portainer CE (Controls Docker Socket — Root-Equivalent Power)',
+    rationale: 'Portainer mounts /var/run/docker.sock giving root-level host container control. Restricted to LDAP directory groups admins and it_ops with mandatory 2FA.',
+    testuserVerdict: {
+      status: '2FA Required (Allowed)',
+      color: 'emerald',
+      detail: 'testuser is a member of group:it_ops! Subject match succeeds -> completes password + TOTP 2FA -> granted access.',
+    },
+  },
+  {
+    id: 'rule-6b',
+    order: '6b',
+    domain: 'portainer.zerotrust.lan',
+    policy: 'deny',
+    subject: 'All other subjects (non-admins, non-it_ops)',
+    type: 'Fallthrough Deny',
+    description: 'Portainer Fallthrough Prevention Deny Rule',
+    rationale: 'CRITICAL SECURITY HARDENING: Blocks general users (marketing, hr, sales) from accessing the Docker management console before wildcard evaluation.',
+    testuserVerdict: {
+      status: '403 Forbidden',
+      color: 'rose',
+      detail: 'Evaluated only if neither group:admins nor group:it_ops matches (e.g. general staff).',
+    },
+  },
+  {
+    id: 'rule-decoupled',
+    order: '—',
+    domain: 'juiceshop.zerotrust.lan',
+    policy: 'bypass',
+    type: 'Decoupled',
+    description: 'OWASP Juice Shop (Public E-Commerce Storefront)',
+    rationale: 'Fully decoupled from Authelia forward-auth entirely. Public customer-facing app protected exclusively inline by Coraza WAF (OWASP Core Rule Set). Preserves customer conversion without corporate 2FA.',
+    testuserVerdict: {
+      status: 'Bypassed (200 OK)',
+      color: 'emerald',
+      detail: 'Customer traffic routes straight through Traefik + Coraza WAF without touching Authelia.',
+    },
+  },
+  {
+    id: 'rule-7',
+    order: '7',
+    domain: '*.zerotrust.lan',
+    policy: 'two_factor',
+    subject: 'Any authenticated user (ou=People)',
+    type: 'Wildcard Fallback',
+    description: 'Internal Enterprise Wildcard Fallback',
+    rationale: 'Catch-all rule for all other internal enterprise tools on *.zerotrust.lan. Mandates LDAP authentication + TOTP 2FA for any valid employee.',
+    testuserVerdict: {
+      status: '2FA Required (Allowed)',
+      color: 'emerald',
+      detail: 'Authenticated LDAP employees pass standard 2FA verification.',
+    },
+  },
+];
+
 interface ColumnHeaderTooltipProps {
   title: string;
   tooltipTitle: string;
@@ -237,6 +426,7 @@ export const GovernancePolicyView: React.FC = () => {
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
   const [searchFilter, setSearchFilter] = useState<string>('');
+  const [selectedRuleCategory, setSelectedRuleCategory] = useState<string>('all');
 
   // Simulator State
   const [simPersonaId, setSimPersonaId] = useState<string>('p1');
@@ -248,6 +438,15 @@ export const GovernancePolicyView: React.FC = () => {
     setCopiedCode(id);
     setTimeout(() => setCopiedCode(null), 2500);
   };
+
+  const filteredAutheliaRules = AUTHELIA_LIVE_RULES.filter((rule) => {
+    if (selectedRuleCategory === 'all') return true;
+    if (selectedRuleCategory === 'bypass') return rule.type === 'Bypass';
+    if (selectedRuleCategory === 'group') return rule.type === 'Group-Restricted Admin';
+    if (selectedRuleCategory === 'deny') return rule.type === 'Fallthrough Deny';
+    if (selectedRuleCategory === 'wildcard') return rule.type === 'Wildcard Fallback' || rule.type === 'Decoupled';
+    return true;
+  });
 
   const filteredRoles = ROLE_MAPPINGS.filter((r) => {
     const matchesGroup = selectedGroup === 'all' || r.group === selectedGroup;
@@ -756,6 +955,231 @@ export const GovernancePolicyView: React.FC = () => {
               <CheckCircle2 className="w-4 h-4 text-[#4ADE80] shrink-0 mt-0.5" />
               <div>
                 <strong className="text-[#4ADE80] font-mono">[IN-BROWSER_ISOLATION] TOTP MFA Security Boundary:</strong> TOTP MFA secrets are rendered <span className="text-white font-semibold">once in-browser</span> during authenticated enrollment and <span className="text-[#4ADE80] font-semibold">NEVER transit email / Mailpit</span>. This is safe by design and completely distinct from the mail-sinkhole issue documented in the Security Debt Register.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Live Authelia Access Control Ruleset Specification & Evaluation Matrix */}
+        <div className="pro-card p-5 space-y-4 border-[#38BDF8]/40 shadow-xl">
+          <div className="terminal-panel-header flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#334155]">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-[#38BDF8]" />
+              <div>
+                <h4 className="text-base font-bold text-white font-mono flex items-center gap-2">
+                  <span>Live Authelia Access Control Ruleset Specification & Evaluation Matrix</span>
+                </h4>
+                <p className="text-xs text-[#94A3B8] font-sans mt-0.5">
+                  Field-verified top-to-bottom rule order executed at the forward-auth boundary. Explicitly maps protocol bypasses, group-restricted administration endpoints, and the critical explicit deny rules preventing wildcard fallthrough.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-mono font-bold text-sky-300 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/30">
+                11 Rules Enforced
+              </span>
+              <span className="text-[10px] font-mono font-bold text-rose-300 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/30">
+                3 Fallthrough Blockers
+              </span>
+              <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                Coraza Decoupled
+              </span>
+            </div>
+          </div>
+
+          {/* Interactive Category Filter Pills */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-[#94A3B8] font-mono flex items-center gap-1 mr-1">
+              <Filter className="w-3.5 h-3.5 text-[#38BDF8]" />
+              <span>Rule Filter:</span>
+            </span>
+            {[
+              { id: 'all', label: 'All Rules (11)', count: 11 },
+              { id: 'bypass', label: 'Bypasses (3)', count: 3 },
+              { id: 'group', label: 'Group-Restricted Admin (3)', count: 3 },
+              { id: 'deny', label: 'Fallthrough Deny Rules (3)', count: 3 },
+              { id: 'wildcard', label: 'Decoupled / Wildcard (2)', count: 2 },
+            ].map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setSelectedRuleCategory(f.id)}
+                className={`px-2.5 py-1 rounded text-xs transition-all cursor-pointer font-mono ${
+                  selectedRuleCategory === f.id
+                    ? 'bg-[#38BDF8] text-black font-bold shadow-sm'
+                    : 'bg-[#0F172A] text-[#94A3B8] hover:text-white border border-[#334155]'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Rules Table */}
+          <div className="overflow-x-auto rounded border border-[#334155]">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-[#0F172A] text-[#94A3B8] border-b border-[#334155] font-mono text-[11px]">
+                  <th className="p-3 w-16">Seq</th>
+                  <th className="p-3 w-56">Domain & Resources</th>
+                  <th className="p-3 w-40">Policy & Subject</th>
+                  <th className="p-3 w-44">Rule Type</th>
+                  <th className="p-3">Security Rationale & Hardening</th>
+                  <th className="p-3 w-52">Live Verdict (<code className="text-amber-300">testuser</code>)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#334155] bg-[#1E293B]/60">
+                {filteredAutheliaRules.map((r) => (
+                  <tr key={r.id} className="hover:bg-slate-800/80 transition-colors">
+                    <td className="p-3 font-mono font-bold text-white text-center">
+                      <span className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700">
+                        {r.order}
+                      </span>
+                    </td>
+                    <td className="p-3 font-mono">
+                      <div className="text-white font-bold">{r.domain}</div>
+                      {r.resources && r.resources.length > 0 && (
+                        <div className="mt-1 space-y-0.5">
+                          <span className="text-[10px] text-sky-400 block font-sans">Scoped Resource Regexes:</span>
+                          {r.resources.slice(0, 2).map((res, i) => (
+                            <div key={i} className="text-[10px] text-slate-400 bg-slate-900/90 px-1 py-0.2 rounded border border-slate-800 truncate max-w-xs">
+                              {res}
+                            </div>
+                          ))}
+                          {r.resources.length > 2 && (
+                            <span className="text-[9px] text-slate-500 italic">
+                              +{r.resources.length - 2} more resource patterns
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-3 font-mono">
+                      <div className="flex flex-col gap-1">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border text-center ${
+                            r.policy === 'bypass'
+                              ? 'bg-sky-500/10 text-sky-300 border-sky-500/30'
+                              : r.policy === 'two_factor'
+                              ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                              : 'bg-rose-500/10 text-rose-300 border-rose-500/30'
+                          }`}
+                        >
+                          policy: {r.policy}
+                        </span>
+                        {r.subject && (
+                          <span className="text-[10px] text-slate-300 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-800">
+                            {r.subject}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-3">
+                      <span
+                        className={`inline-block px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                          r.type === 'Bypass'
+                            ? 'bg-sky-500/10 text-sky-400 border-sky-500/30'
+                            : r.type === 'Group-Restricted Admin'
+                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                            : r.type === 'Fallthrough Deny'
+                            ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
+                            : r.type === 'Decoupled'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                            : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
+                        }`}
+                      >
+                        {r.type}
+                      </span>
+                      <div className="text-[11px] text-slate-300 mt-1">{r.description}</div>
+                    </td>
+                    <td className="p-3 text-[#CBD5E1] text-xs leading-relaxed font-sans">
+                      {r.rationale}
+                    </td>
+                    <td className="p-3 font-mono">
+                      <div
+                        className={`px-2 py-1 rounded text-[11px] font-bold border flex items-center justify-between gap-1.5 ${
+                          r.testuserVerdict.color === 'rose'
+                            ? 'bg-rose-500/15 text-rose-300 border-rose-500/40'
+                            : r.testuserVerdict.color === 'emerald'
+                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40'
+                            : 'bg-sky-500/15 text-sky-300 border-sky-500/40'
+                        }`}
+                      >
+                        <span>{r.testuserVerdict.status}</span>
+                        {r.testuserVerdict.color === 'rose' ? (
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
+                        ) : (
+                          <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-sans mt-1 leading-snug">
+                        {r.testuserVerdict.detail}
+                      </p>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Deep-Dive Architectural Explainer Card */}
+          <div className="p-4 bg-[#0F172A] border border-[#334155] rounded-lg space-y-3">
+            <div className="flex items-center gap-2 text-sm font-bold text-white font-mono">
+              <AlertTriangle className="w-4 h-4 text-amber-400" />
+              <span>Architectural Post-Mortem: Authelia Rule Fallthrough on Subject Mismatch</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              <div className="bg-[#1E293B] p-3 rounded border border-slate-800">
+                <span className="text-rose-400 font-mono font-bold block mb-1 uppercase text-[10px]">
+                  1. The Vulnerability Trap
+                </span>
+                <p className="text-slate-300 leading-relaxed font-sans">
+                  Restricting <code className="text-rose-300 font-mono">keycloak.zerotrust.lan</code> and <code className="text-rose-300 font-mono">traefik.zerotrust.lan</code> to <code className="text-rose-300 font-mono">subject: group:admins</code> initially had <strong className="text-white">zero actual enforcement effect</strong>. Non-admin users were granted access regardless.
+                </p>
+              </div>
+
+              <div className="bg-[#1E293B] p-3 rounded border border-slate-800">
+                <span className="text-amber-400 font-mono font-bold block mb-1 uppercase text-[10px]">
+                  2. Root Cause Mechanics
+                </span>
+                <p className="text-slate-300 leading-relaxed font-sans">
+                  Authelia evaluates rules top-to-bottom and requires ALL criteria (domain + resources + subject) to match. A subject mismatch alone <strong className="text-white">does NOT deny</strong>; evaluation falls through to subsequent rules, eventually matching the permissive wildcard <code className="text-sky-300 font-mono">*.zerotrust.lan</code> (two_factor, no subject filter).
+                </p>
+              </div>
+
+              <div className="bg-[#1E293B] p-3 rounded border border-slate-800">
+                <span className="text-emerald-400 font-mono font-bold block mb-1 uppercase text-[10px]">
+                  3. The Hardening Fix
+                </span>
+                <p className="text-slate-300 leading-relaxed font-sans">
+                  An explicit <code className="text-emerald-300 font-mono">policy: deny</code> rule was added immediately after each group-restricted rule for the exact same domain, blocking non-matching subjects before wildcard evaluation is ever reached.
+                </p>
+              </div>
+            </div>
+
+            {/* Live Verification Summary Matrix */}
+            <div className="pt-2 border-t border-slate-800">
+              <div className="text-[11px] font-mono text-slate-300 mb-2 font-bold flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Live Verification Results with <code className="text-amber-300">testuser</code> (LDAP Groups: <code className="text-sky-300">it_ops</code>, <code className="text-sky-300">users</code> — non-admin):</span>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] font-mono">
+                <div className="bg-[#1E293B] p-2 rounded border border-rose-500/30 flex items-center justify-between">
+                  <span className="text-slate-300">keycloak.zerotrust.lan</span>
+                  <span className="text-rose-400 font-bold bg-rose-500/10 px-1.5 py-0.5 rounded">403 DENIED</span>
+                </div>
+                <div className="bg-[#1E293B] p-2 rounded border border-rose-500/30 flex items-center justify-between">
+                  <span className="text-slate-300">traefik.zerotrust.lan</span>
+                  <span className="text-rose-400 font-bold bg-rose-500/10 px-1.5 py-0.5 rounded">403 DENIED</span>
+                </div>
+                <div className="bg-[#1E293B] p-2 rounded border border-emerald-500/30 flex items-center justify-between">
+                  <span className="text-slate-300">portainer.zerotrust.lan</span>
+                  <span className="text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded">2FA ALLOWED (it_ops)</span>
+                </div>
+                <div className="bg-[#1E293B] p-2 rounded border border-sky-500/30 flex items-center justify-between">
+                  <span className="text-slate-300">juiceshop.zerotrust.lan</span>
+                  <span className="text-sky-400 font-bold bg-sky-500/10 px-1.5 py-0.5 rounded">BYPASSED (WAF-only)</span>
+                </div>
               </div>
             </div>
           </div>

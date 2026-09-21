@@ -145,6 +145,100 @@ export const EngineeringReflectionsView: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Authelia Access Control Fallthrough Deep Dive Card */}
+        <div className="mt-6 bg-[#0F172A] border border-[#334155] rounded-lg p-5">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-rose-400" />
+              <h3 className="text-sm font-bold text-[#F1F5F9] font-mono tracking-wide uppercase">
+                Authelia access_control Rule Fallthrough on Subject Mismatch (Real Bug Caught During Testing)
+              </h3>
+            </div>
+            <span className="text-[10px] font-mono bg-rose-500/10 border border-rose-500/30 text-rose-300 px-2 py-0.5 rounded">
+              Access Control Enforcement Gap
+            </span>
+          </div>
+
+          <p className="text-xs text-[#94A3B8] mb-4 leading-relaxed">
+            Authelia evaluates <code className="text-amber-300 bg-slate-800 px-1 py-0.5 rounded">access_control</code> rules top-to-bottom and applies the first FULL match (domain + resources + subject) — but a subject mismatch alone does not deny; it falls through to later matching rules, including a permissive wildcard.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 relative">
+            <div className="bg-[#1E293B] border border-[#334155] rounded-lg p-3.5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-mono bg-rose-500/20 text-rose-300 px-1.5 py-0.5 rounded font-bold">
+                    THE TRAP
+                  </span>
+                  <span className="text-[10px] text-[#94A3B8] font-mono">Silent Pass-Through</span>
+                </div>
+                <h4 className="text-xs font-bold text-[#F1F5F9] mb-1.5">Zero Enforcement Effect</h4>
+                <div className="text-[11px] text-[#94A3B8] bg-[#0F172A] p-2 rounded border border-slate-800 font-mono">
+                  Restricting <code className="text-rose-300">keycloak.zerotrust.lan</code> and <code className="text-rose-300">traefik.zerotrust.lan</code> to <code className="text-rose-300">subject: group:admins</code> had zero actual enforcement effect at first, because non-admin users still matched the later wildcard rule (<code className="text-amber-300">*.zerotrust.lan</code>, policy: two_factor, no subject restriction) and were granted access regardless.
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-[#1E293B] border border-[#334155] rounded-lg p-3.5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold">
+                    ROOT CAUSE
+                  </span>
+                  <span className="text-[10px] text-[#94A3B8] font-mono">Evaluation Logic</span>
+                </div>
+                <h4 className="text-xs font-bold text-[#F1F5F9] mb-1.5">No Implicit Deny on Subject</h4>
+                <div className="text-[11px] text-[#94A3B8] bg-[#0F172A] p-2 rounded border border-slate-800 font-mono">
+                  Authelia does not implicitly deny on subject mismatch alone. If domain matches but subject fails, the engine continues downward through the rule list until finding another rule that satisfies all criteria.
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-[#1E293B] border border-[#334155] rounded-lg p-3.5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-mono bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold">
+                    REMEDIATION
+                  </span>
+                  <span className="text-[10px] text-[#94A3B8] font-mono">Explicit Deny Rule</span>
+                </div>
+                <h4 className="text-xs font-bold text-[#F1F5F9] mb-1.5">Immediate Block Rule</h4>
+                <div className="text-[11px] text-[#94A3B8] bg-[#0F172A] p-2 rounded border border-slate-800 font-mono">
+                  An explicit <code className="text-emerald-300">policy: deny</code> rule was added immediately after each group-restricted rule, for the same domain, before the wildcard rule is reached.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Live Verification Box */}
+          <div className="mt-4 p-3.5 bg-slate-900/90 rounded border border-emerald-500/40 text-xs">
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <span className="font-mono font-bold text-emerald-300 text-xs uppercase tracking-wide">
+                Live Verification Matrix (testuser — LDAP groups: it_ops, users)
+              </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2 font-mono text-[11px]">
+              <div className="bg-[#0F172A] p-2 rounded border border-slate-800 flex items-center justify-between">
+                <span className="text-[#CBD5E1]">keycloak.zerotrust.lan</span>
+                <span className="text-rose-400 font-bold bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/30">403 DENIED</span>
+              </div>
+              <div className="bg-[#0F172A] p-2 rounded border border-slate-800 flex items-center justify-between">
+                <span className="text-[#CBD5E1]">traefik.zerotrust.lan</span>
+                <span className="text-rose-400 font-bold bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/30">403 DENIED</span>
+              </div>
+              <div className="bg-[#0F172A] p-2 rounded border border-slate-800 flex items-center justify-between">
+                <span className="text-[#CBD5E1]">portainer.zerotrust.lan</span>
+                <span className="text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/30">2FA ALLOWED (it_ops)</span>
+              </div>
+              <div className="bg-[#0F172A] p-2 rounded border border-slate-800 flex items-center justify-between">
+                <span className="text-[#CBD5E1]">juiceshop.zerotrust.lan</span>
+                <span className="text-sky-400 font-bold bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/30">BYPASSED (WAF-only)</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Core Architectural Lessons Learned */}
@@ -186,18 +280,18 @@ export const EngineeringReflectionsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Complete 11-Bug Post-Mortem Directory */}
+      {/* Complete Incident Catalog */}
       <div className="bg-[#1E293B] border border-[#334155] rounded-lg p-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 pb-4 border-b border-[#334155]">
           <div>
             <div className="flex items-center gap-2">
               <Terminal className="w-5 h-5 text-[#FBBF24]" />
               <h3 className="text-base font-bold text-[#F1F5F9]">
-                Complete Incident Catalog: 11 Resolved Identity Bugs
+                Complete Incident Catalog: {OIDC_BUG_CHAIN.length} Resolved Identity & Access Bugs
               </h3>
             </div>
             <p className="text-xs text-[#94A3B8] mt-1">
-              Field-by-field breakdown of bugs encountered during LDAP schema provisioning, Authelia integration, and Keycloak Relying Party configuration.
+              Field-by-field breakdown of bugs encountered during LDAP schema provisioning, Authelia integration, Keycloak Relying Party configuration, and group-based access control.
             </p>
           </div>
 
