@@ -29,7 +29,7 @@ export interface KnownIssue {
   severity: 'Critical' | 'High' | 'Medium' | 'Low';
   description: string;
   impact: string;
-  status: 'Open' | 'Unresolved' | 'Pending Rotation';
+  status: 'Open' | 'Unresolved' | 'Pending Rotation' | 'Resolved';
 }
 
 export interface DemoAct {

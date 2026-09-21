@@ -12,6 +12,7 @@ import { SecurityDebtView } from './components/SecurityDebtView';
 import { EngineeringReflectionsView } from './components/EngineeringReflectionsView';
 import { JuryDemoView } from './components/JuryDemoView';
 import { FileStructureView } from './components/FileStructureView';
+import { DeploymentGuideView } from './components/DeploymentGuideView';
 import { TerminalBootScreen } from './components/TerminalBootScreen';
 
 import {
@@ -27,12 +28,18 @@ export default function App() {
   const [doneItems, setDoneItems] = useState(INITIAL_CHECKLIST_DONE);
   const [leftItems, setLeftItems] = useState(INITIAL_CHECKLIST_LEFT);
 
-  // Synchronize active view with URL hash or ?section= query param for crawlers, scrapers & direct linking
+  // Synchronize active view with URL hash, pathname (/deployment) or ?section= query param
   useEffect(() => {
     const handleUrlSync = () => {
+      const pathname = window.location.pathname;
       const hash = window.location.hash.replace('#', '');
       const params = new URLSearchParams(window.location.search);
       const sectionParam = params.get('section') || hash;
+
+      if (pathname === '/deployment' || hash === 'deployment' || hash === 'sec-deployment' || sectionParam === 'sec-deployment') {
+        setActiveSectionId('sec-deployment');
+        return;
+      }
       if (sectionParam && SECTIONS.some((s) => s.id === sectionParam)) {
         setActiveSectionId(sectionParam);
       }
@@ -48,8 +55,14 @@ export default function App() {
 
   const handleSelectSection = (id: string) => {
     setActiveSectionId(id);
-    if (window.location.hash !== `#${id}`) {
-      window.history.pushState(null, '', `#${id}`);
+    if (id === 'sec-deployment') {
+      window.history.pushState(null, '', '/deployment');
+    } else {
+      if (window.location.pathname === '/deployment') {
+        window.history.pushState(null, '', `/#${id}`);
+      } else if (window.location.hash !== `#${id}`) {
+        window.history.pushState(null, '', `#${id}`);
+      }
     }
   };
 
@@ -144,6 +157,8 @@ export default function App() {
         return <SubTopologiesView />;
       case 'sec-11':
         return <GovernancePolicyView />;
+      case 'sec-deployment':
+        return <DeploymentGuideView />;
       case 'sec-4':
         return (
           <ChecklistsView

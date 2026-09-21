@@ -13,6 +13,8 @@ import {
   Play,
   FolderTree,
   Search,
+  Terminal,
+  BookOpen,
 } from 'lucide-react';
 
 interface NavigationProps {
@@ -39,6 +41,8 @@ const ICON_MAP: Record<string, React.ElementType> = {
   GraduationCap,
   Play,
   FolderTree,
+  Terminal,
+  BookOpen,
 };
 
 export const Navigation: React.FC<NavigationProps> = ({

@@ -152,26 +152,20 @@ Two complementary attack-testing methodologies validate AEGIS detection and resp
 
 ## The Access Control Model
 
-**One policy applies behind this gateway: `default_policy: deny`, with
-`two_factor` required everywhere.** There is no public-facing bypass domain
-— an earlier design draft described a customer-storefront bypass path, but
-that was never implemented and has been removed from this documentation to
-match the real deployed configuration.
+**One overarching policy applies behind this gateway: `default_policy: deny`, with `two_factor` required for internal resources.** 
 
-The only bypass rules that exist are narrow and structural, not
-access-level exceptions:
-- Authelia's own login portal (`authelia.zerotrust.lan`) — it IS the auth
-  layer, so it can't gate itself.
-- Keycloak's OIDC protocol/callback endpoints
-  (`/realms/*/protocol/openid-connect/*`, `/realms/*/login-actions/*`, and
-  a few static asset paths) — these must stay reachable for the OAuth2
-  authorization-code flow to complete before a session exists at all.
+The live policy enforces strict structural and group-based controls:
+- **Public Customer Application Decoupled from Authelia**: OWASP Juice Shop (`juiceshop.zerotrust.lan`) is decoupled from Authelia Forward-Auth entirely. It serves as a public-facing e-commerce storefront protected exclusively inline by Coraza WAF (OWASP Core Rule Set), inspecting requests for SQLi, XSS, and RCE without requiring corporate credentials.
+- **Self-Authentication Bypass**: Authelia's own login portal (`authelia.zerotrust.lan`) is bypassed because it is the Forward-Auth provider itself.
+- **OIDC Protocol Bypass**: Keycloak's OIDC protocol endpoints (`/realms/*/protocol/openid-connect/*`, `/realms/*/login-actions/*`) are bypassed so relying parties and browser flows can complete OAuth2 token exchanges without authentication deadlocks.
+- **Role-Based Administrative Restrictions**:
+  - `keycloak.zerotrust.lan` admin console: Restricted strictly to `group:admins` with mandatory 2FA, immediately followed by an explicit `policy: deny` rule.
+  - `traefik.zerotrust.lan` dashboard: Restricted strictly to `group:admins` with mandatory 2FA, immediately followed by an explicit `policy: deny` rule.
+  - `portainer.zerotrust.lan` (Docker socket manager): Restricted to `group:admins` OR `group:it_ops` with mandatory 2FA, followed by an explicit `policy: deny` rule.
+- **Explicit Deny Hardening**: Authelia does not implicitly deny on subject mismatch alone. Explicit `policy: deny` rules were placed after each group restriction before the catch-all wildcard rule (`*.zerotrust.lan`, `policy: two_factor`) is reached.
+- **Development Sinkhole**: Mailpit (`mailpit.zerotrust.lan`) is bypassed for dev/testing verification.
 
-Everything else — Keycloak's admin console, the Traefik dashboard,
-Portainer, Mailpit, and any application placed behind this gateway —
-requires a full MFA-backed session. See `src/components/zones/` in this
-repo for the live, interactive version of this policy with the actual
-redacted config file.
+See `src/components/GovernancePolicyView.tsx` and `src/components/zones/` for interactive policy simulations and live configuration inspections.
 
 ---
 
@@ -205,7 +199,6 @@ Highlights:
   the full before/after with verification evidence for each.
 
 ### Known Issues & Active Security Debt (Unresolved / Under Active Investigation)
-- **Coraza WAF routing bypass**: Traefik's dynamic config (`traefik-dynamic.yml`) routes Juice Shop traffic directly, skipping WAF inspection entirely. Coraza container is healthy and running, but receives zero traffic (`coraza_logs/access.log` last write predates this finding by days). Fix identified (repoint the juiceshop service to `http://coraza:8080`) but not yet applied as of September 19, 2026.
 - **Scoping distinction — Ingress vs. Bidirectional Egress Enforcement**: Ingress Zero-Trust enforcement (Traefik edge reverse proxy + Authelia Forward-Auth MFA + Coraza WAF request inspection) is currently distinct from full bidirectional egress traffic enforcement. In the current implementation, ingress policy enforces authentication and filtering on inbound requests to protected internal workloads; however, outbound egress traffic originating from internal workloads, containers, or hosts is not yet routed through a mandatory egress proxy or transparent Zero-Trust egress gateway filter.
 - **"Too many fields for JSON decoder" flood on minisoc2**: Root cause unresolved; observed during alert ingestion. May be silently dropping Wazuh alerts.
 - **logstash.conf TLS still disabled**: Elasticsearch CA certificate was never copied from minisoc1 to minisoc3; transport currently runs with `ssl_certificate_verification => false`.
@@ -214,11 +207,12 @@ Highlights:
 - **Session secrets burned during OIDC debugging — credential rotation required**: New secrets burned by exposure during this session's debugging, requiring rotation before defense: `LDAP_ADMIN_PASSWORD`, `LDAP_CONFIG_PASSWORD`, `LDAP_BIND_PASSWORD`, Authelia's OIDC RSA private key, Authelia `storage.encryption_key`, Authelia OIDC client secret for Keycloak, Authelia session secret, Redis password, Postgres Authelia password. (These are in addition to the already-flagged Elasticsearch and Keycloak admin passwords.)
 - **Stray "AEGIS.CORP" realm in Keycloak pending deletion**: A stray "AEGIS.CORP" realm was created in Keycloak during earlier UI experimentation and needs deletion before defense (do not confuse with the actual planned Zone 2 `aegis.corp` Active Directory domain, which remains unbuilt — `l1`).
 - **Temporary/bootstrap Keycloak admin account still in use**: Temporary/bootstrap Keycloak admin account is still in use; needs a permanent admin created and the bootstrap account removed.
-- **Missing `sn`/`givenName` attributes on LDAP users**: LDAP users (`testuser`, `ezio`) are missing `sn` and `givenName` attributes, which caused a Keycloak First-Broker-Login profile-completion prompt/failure; needs fixing at the LDAP source plus an update to Authelia's attribute map (`given_name`/`family_name`).
+- **Missing `sn`/`givenName` attributes on LDAP users**: LDAP users (`testuser`, `ezio`) were initially missing `sn` and `givenName` attributes, which caused a Keycloak First-Broker-Login profile-completion prompt/failure; requires permanent schema attribute standardization in bootstrap LDIF.
 - **Abandoned truststore debugging artifacts pending cleanup**: Abandoned truststore debugging artifacts (`traefik/certs/truststore.p12`, `keycloak-cacerts-with-aegis.p12`, stale JVM env vars from the failed truststore fix attempts) need cleanup.
 - **oidc-proxy inter-container HTTP communication (Acceptable Risk / Scoped)**: `oidc-proxy`'s use of plain HTTP between containers on internal Docker bridge (`auth_net`, `internal: true`, no external route) is flagged as architecturally acceptable (internal isolated Docker network namespace with no host port exposure), not a residual risk or vulnerability — stated here explicitly so it is not read as an overlooked security gap.
 
 ### Lessons Learned & Engineering Reflections (Identity Migration & OIDC Federation)
+- **Authelia access_control rule fallthrough on subject mismatch**: Authelia evaluates access_control rules top-to-bottom and applies the first FULL match (domain + resources + subject) — but a subject mismatch alone does not deny; it falls through to later matching rules, including a permissive wildcard. An explicit `policy: deny` rule is required immediately after each group-restricted rule for the same domain to prevent unauthorized access.
 - **Authelia environment variable substitution allow-list**: Authelia's configuration file env-var substitution is strictly allow-listed — only variables with `AUTHELIA_*` or `X_AUTHELIA_*` prefixes are honored. Arbitrary `${VAR}` syntax fails silently, leaving variables unexpanded or falling back to default values.
 - **LDAP Result Code 32 ("No Such Object") semantics**: In OpenLDAP, Result Code 32 can indicate an Access Control List (ACL) denial rather than the literal absence of an object or subtree. This was conclusively diagnosed by re-executing the identical search query as `cn=admin,dc=zerotrust,dc=lan`, which successfully returned the entries that `authelia-bind` was denied.
 - **Keycloak 26.x HTTP client truststore limitations & sidecar mitigation**: Keycloak 26.x's internal HTTP client (`SimpleHttpRequest`) does not honor its own configured truststore for outbound OIDC discovery and token exchange requests. Multiple standard Java/Keycloak remediations (`KC_TRUSTSTORE_PATHS`, `JAVA_TOOL_OPTIONS`, direct JVM `cacerts` certificate injection) were attempted and failed. The working and robust mitigation was introducing an internal Caddy sidecar proxy (`oidc-proxy`) on `auth_net` that handles server-to-server OIDC calls over plain HTTP within the trusted internal Docker bridge, while Traefik continues to terminate TLS for all browser-facing traffic. This is framed as a deliberate architectural mitigation aligned with Zero-Trust's "enforce trust at the boundary" principle, not a temporary workaround.
@@ -227,12 +221,18 @@ Highlights:
 - **Cross-user authentication-bypass vector in Authelia TOTP storage**: A genuine security finding was identified in Authelia's data model: user MFA/TOTP device secrets are persisted in PostgreSQL keyed strictly by username, entirely decoupled from the LDAP directory backend. Deleting a user from LDAP does not purge their registered MFA tokens from PostgreSQL. If a username is subsequently reissued to a different individual, the new identity inherits the previous user's active TOTP secret, creating a cross-user authentication-bypass vector unless an explicit database storage cleanup step is integrated into user deprovisioning workflows.
 
 ### Resolved Issues & Architectural Debt
+- **Coraza WAF Routing Bypass — RESOLVED**:
+  - *Root Cause*: Traefik's dynamic router (`traefik-dynamic.yml`) routed `juiceshop.zerotrust.lan` traffic directly to the target container, skipping the Coraza WAF container entirely.
+  - *Real Fix*: Repointed Traefik dynamic routing to `http://coraza:8080`, verified Coraza inline request inspection with OWASP Core Rule Set, decoupled Juice Shop from Authelia (WAF-only protection), adjusted Coraza log permissions to `0755` for Filebeat ingestion, and verified live HTTP 403 blocks against SQLi, UNION, and XSS attack payloads.
 - **Zeek & Suricata Log Ingestion & Mapping Collisions — RESOLVED**:
   - *Root Cause*: Forcing Zeek and Suricata raw events through the same Wazuh archives index/mapping (`wazuh-archives-4.x-*`) caused Elasticsearch mapping collisions (`data.id` keyword vs. object; `data.service` object vs. string), dropping real events with HTTP 400.
   - *Real Fix*: Installed Filebeat directly on `ztagateway` (where raw log files reside: `/opt/zeek/spool/manager/{conn,dns}.log` and `/var/log/suricata/eve.json`), using native Filebeat Zeek and Suricata modules, shipping to their own ECS-normalized data stream (`.ds-filebeat-8.19.13-*`, `event.module: zeek` / `suricata`), completely separate from `wazuh-archives-*`.
   - *Verification*: Verified with real data: 931+ Zeek connection events, 93,000+ Suricata events, zero mapping errors.
   - *Pipeline Rollback*: The now-unnecessary `aegis-zeek-normalize` ingest pipeline call was rolled back from the Wazuh archives pipeline (restored from backup, re-verified empty via `_ingest/pipeline` inspection).
   - *Dashboards*: Kibana dashboards built and confirmed rendering real data: `[Filebeat Zeek] Overview`, `[Filebeat Suricata] Events Overview`, `[Filebeat Suricata] Alert Overview`, plus a new combined `"AEGIS Network Overview (Zeek+Suricata)"` dashboard. Closes checklist items `l14` and `l15`.
+- **Per-Source Alert Index Split & Kibana Security Dashboards — RESOLVED**:
+  - *Root Cause*: Aggregating Authelia authentication events, Coraza WAF blocks, and Keycloak OIDC logs into a single generic index caused high ingestion latency and field clashes.
+  - *Real Fix*: Implemented per-source split on minisoc2/minisoc1 (`wazuh-alerts-authelia-*`, `wazuh-alerts-coraza-*`, `wazuh-alerts-keycloak-*`), generated encryption keys in `kibana.yml`, and deployed two dedicated production dashboards: "Identity & Access Security Overview" and "Edge WAF Security Overview".
 
 ---
 
@@ -240,12 +240,12 @@ Highlights:
 
 | Zone | Status |
 |---|---|
-| Zone 3 (Gateway) | Built, hardened, sensors verified |
+| Zone 3 (Gateway) | Built, hardened, sensors verified, Coraza WAF verified inline, group-based access control active |
 | Zone 4 minisoc1/2 | Pre-existing, operational |
 | Zone 4 minisoc3 | Infrastructure deployed and verified (5-container Shuffle with shuffle-opensearch, 4-container MISP, Logstash webhook wired, Nginx .dz HTTPS proxy); SOAR workflow in progress (misp_enrichment trigger & MISP node verified) |
 | Zone 4 detection rules on minisoc2 | Verified operational: Rule 100100 confirmed firing with T1190 via wazuh-logtest; mitre.id fields validated in local_rules.xml |
 | Zone 4 Zeek/Suricata Ingestion & Dashboards | Operational: Dedicated Filebeat ECS data streams (.ds-filebeat-8.19.13-*) and 4 verified Kibana dashboards |
-| Zone 4 OpenLDAP ingestion | Completed (Stages 1-3: OpenLDAP + Authelia LDAP backend + Keycloak OIDC federation via oidc-proxy) |
+| Zone 4 OpenLDAP & Identity/WAF Telemetry | Completed: Stages 1-3 (OpenLDAP + Authelia LDAP + Keycloak OIDC via oidc-proxy) + Per-source index split + 2 dedicated Kibana dashboards |
 | Zone 2 (Enterprise Grid) | Not built |
 | Zone 1 (Threatscape) | Not built |
 | Atomic Red Team coverage testing | Not started |
@@ -269,14 +269,16 @@ src/
 │   ├── zones/          Per-zone deep-dive views (topology, file
 │   │                   structure, redacted configs) — Zone 3 is
 │   │                   the reference implementation
+│   ├── DeploymentGuideView.tsx Standalone replication guide (§1–§11 at /deployment)
 │   ├── MasterTopologyView.tsx
 │   ├── SubTopologiesView.tsx
 │   ├── FileStructureView.tsx
 │   └── ...             Other report sections (roadmap, security
 │                       debt register, jury demo script, etc.)
 ├── data/
-│   └── reportData.ts   Task/status tracking data consumed by the
-│                       dashboard views above
+│   ├── reportData.ts   Task/status tracking data consumed by the
+│   │                   dashboard views above
+│   └── deploymentGuideData.ts Commands, verification matrix, & secrets list
 └── App.tsx
 ```
 
@@ -284,6 +286,8 @@ Live deployment configs referenced throughout the app (Docker Compose,
 Traefik, Authelia, Keycloak, etc.) are not stored as separate files in this
 repo — they're embedded, redacted, and downloadable directly from the
 relevant zone's page on the live site.
+
+A complete, standalone reproduction walkthrough is available directly in the web app under the top-level **Deployment Guide** section (`/deployment`), covering §1–§11 with copy-pasteable commands, verification checks, and troubleshooting post-mortems for the OpenLDAP + Authelia + Keycloak + Coraza stack.
 
 ---
 
@@ -295,7 +299,7 @@ Reproducing it requires: a Docker host for Zone 3, three AlmaLinux nodes
 in your own `.env` files (never committed — see `.env.example` for the
 required variable names).
 
-Full setup notes: `docs/SETUP.md`
+For an end-to-end replication of the Zone 3 Identity & WAF stack from scratch, consult the interactive **Deployment Guide** (`/deployment`) in the dashboard or `docs/SETUP.md`.
 
 Deploying this in a real organization (not just a lab)? See `docs/DEPLOYMENT.md` for the enterprise rollout walkthrough — placement, identity migration strategy, connecting to a remote SOC, and a known gap around host-level monitoring of the gateway itself.
 

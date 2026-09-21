@@ -31,9 +31,9 @@ AEGIS v2.1 represents a tactical restructuring of the project to eliminate fragi
 ### 1.3 Honest Per-Zone Implementation Status & Regression Notice
 > **⚠️ Regression Risk Notice**: Gateway hardening (Argon2id parameters, session policy, Keycloak mode, orphaned secret files) has previously regressed silently between work sessions on this project — likely due to config files being reverted from an older snapshot. Status in this report reflects the most recent live verification (September 8, 2026), not a permanent guarantee. Recommend periodic live re-audits rather than trusting checklist state alone.
 
-- **Zone 3 Gateway Sensors & Hardening**: **Done (Operational\*, with documented WAF bypass gap)** — Verified via live audit as of September 19, 2026. All 9 core containers healthy, dual bridge isolation (`proxy_net` DMZ + `auth_net` `internal: true`) active, Forward-Auth MFA enforced, Suricata IDS operational. *Audit finding*: Coraza WAF is deployed and healthy but NOT currently in the traffic path — a routing configuration gap, not a WAF failure (`traefik-dynamic.yml` routes Juice Shop traffic directly, skipping WAF inspection; fix identified to repoint service to `http://coraza:8080`, not yet applied/verified as of September 19, 2026).
+- **Zone 3 Gateway Sensors & Hardening**: **Done (Fully Operational & Verified)** — Verified via live audits (September 19–21, 2026). All 9 core containers healthy, dual bridge isolation (`proxy_net` DMZ + `auth_net` `internal: true`) active, Forward-Auth MFA enforced with group-based restrictions and explicit deny rules, and Suricata IDS operational. Coraza WAF routing bypass has been fully resolved: Traefik dynamic routing repointed to `http://coraza:8080`, inline blocking verified against SQLi/UNION/XSS with HTTP 403, and Juice Shop decoupled from Authelia for public WAF-only protection.
 - **Zone 2 AD Enterprise Grid**: **Not Started (Pending deployment)** — Domain controller promotion (`CORP-DC01`), workstation enrollment (`CORP-PC01`), database server setup (`CORP-DB01`), and Wazuh agent deployments pending.
-- **Zone 4 Detection Pipeline & SOC Automation**: **Telemetry Pipeline Verified & SOAR In Progress (Operational\*)** — Zone 4 detection pipeline (Zeek/Suricata/Authelia → Wazuh agent → MITRE-tagged rules on minisoc2) verified end-to-end via wazuh-logtest. Centralized identity migration (OpenLDAP + Authelia LDAP backend + Keycloak OIDC federation via oidc-proxy) completed across Stages 1-3. `minisoc3` automation stack (5-container Shuffle with shuffle-opensearch + Logstash webhook wired + MISP TLS port 443 + Nginx .dz reverse proxy) healthy. Shuffle SOAR workflow `misp_enrichment` verified with real live Wazuh alert (T1055) and matching MISP restSearch lookup. Outstanding: decision/branch node and full multi-stage attack flow.
+- **Zone 4 Detection Pipeline & SOC Automation**: **Telemetry Pipeline Verified & SOAR In Progress (Operational\*)** — Zone 4 detection pipeline (Zeek/Suricata/Authelia/Coraza/Keycloak → Wazuh agent → MITRE-tagged rules on minisoc2) verified end-to-end. Centralized identity migration (OpenLDAP + Authelia LDAP backend + Keycloak OIDC federation via oidc-proxy) completed across Stages 1-3. Per-source index split (`wazuh-alerts-authelia-*`, `wazuh-alerts-coraza-*`, `wazuh-alerts-keycloak-*`) active with 2 dedicated Kibana dashboards. `minisoc3` automation stack (5-container Shuffle with shuffle-opensearch + Logstash webhook wired + MISP TLS port 443 + Nginx .dz reverse proxy) healthy. Shuffle SOAR workflow `misp_enrichment` verified with real live Wazuh alert (T1055) and matching MISP restSearch lookup. Outstanding: decision/branch node and full multi-stage attack flow.
 - **Zone 1 Threatscape & Red Team Engine**: **Configured & Ready** — Kali Linux APT station with Sliver C2, sqlmap, mimikatz, and REMnux sandbox environment prepared.
 
 ### 1.4 What AEGIS Does and How It Enforces Zero Trust
@@ -104,9 +104,8 @@ graph TB
     AUTHELIA -->|"5. Storage / DB"| POSTGRES
     KEYCLOAK -->|"6. Internal Token Exchange / Discovery"| OIDC_PROXY
     OIDC_PROXY -->|"7. Plain HTTP Relay (:9091)"| AUTHELIA
-    TRAEFIK -->|"8. Direct Routing (Coraza Bypassed)"| JUICESHOP
-    TRAEFIK -.->|"8b. Intended: Proxy Clean Request (Fix Pending)"| CORAZA
-    CORAZA -.->|"9. Intended Clean Web Traffic"| JUICESHOP
+    TRAEFIK -->|"8. Ingress Route (:8080)"| CORAZA
+    CORAZA -->|"9. Inspected Clean Web Traffic"| JUICESHOP
 
     PC01 -->|"8. Sysmon / Security Logs (TCP 1514 mTLS)"| TRAEFIK
     DC01 -->|"9. AD Event Logs (TCP 1514 mTLS)"| TRAEFIK
@@ -673,6 +672,60 @@ During Stage 3, connecting Keycloak to Authelia over `auth_net` triggered a chai
     ├── mitre-mapping.md                # Comprehensive rule-to-technique matrix
     └── demo-script.md                  # 15-minute jury demonstration transcript
 ```
+
+---
+
+## Section 11: § X — Identity Federation & WAF Integration (September 2026)
+
+### 11.1 Centralized Directory Deployment (OpenLDAP)
+To eliminate localized credential silos (`users_database.yml`) and lay the foundation for enterprise identity federation, an OpenLDAP directory server (`osixia/openldap:1.5.0`) was introduced on the isolated `auth_net` bridge:
+- **Base DN**: `dc=zerotrust,dc=lan`
+- **Organizational Units**: `ou=People,dc=zerotrust,dc=lan` and `ou=Security_Groups,dc=zerotrust,dc=lan`
+- **Security Groups**: `admins` (GID 10000, members: `ezio`), `it_ops` (GID 10001, members: `testuser`), `users` (GID 10002, members: `testuser`, `ezio`).
+- **Service Account**: `cn=authelia-bind,ou=People,dc=zerotrust,dc=lan` with tailored slapd ACL grants for user query and credential verification.
+- **Schema Alignment**: Configured with `inetOrgPerson` and `posixAccount` structural object classes, ensuring standard attributes (`uid`, `mail`, `cn`, `givenName`, `sn`) are populated to satisfy downstream OIDC claim mappings.
+
+### 11.2 Authelia LDAP Backend Migration & MFA Persistence Analysis
+Authelia v4.39 was transitioned from flat YAML file authentication to the live OpenLDAP directory:
+- **User Filter**: `(&(objectCategory=person)(objectClass=inetOrgPerson)(uid={input}))`
+- **Group Filter**: `(&(memberUid={username})(objectClass=posixGroup))`
+- **Environment Variable Allow-List**: Standardized configuration variable substitution to the strictly required `AUTHELIA_*` namespace (`AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD`), preventing silent unexpanded variable failures.
+- **Architectural Security Finding (TOTP Decoupling)**: Authelia stores 2FA/TOTP device secrets in PostgreSQL keyed strictly by username. Migrating directory backends preserved valid TOTP secrets for matching user IDs. However, in production offboarding, deleting a user in LDAP leaves the TOTP record in PostgreSQL, creating an account takeover risk if a username is recycled. Comprehensive deprovisioning requires a coordinated database purge.
+
+### 11.3 Keycloak OIDC Federation & The 4-Layer Handshake Chain
+Keycloak v26.6.2 was federated to Authelia as an OpenID Connect Relying Party, establishing an enterprise identity broker pattern while retaining edge Forward-Auth. Connecting these two modern Zero-Trust systems across an internal Docker bridge triggered a 4-layer cascaded protocol conflict:
+1. **Layer 1: PKIX Truststore Failure**: Keycloak's Quarkus runtime `SimpleHttpRequest` client failed to validate Traefik's self-signed wildcard TLS certificates (`SSLHandshakeException: PKIX path building failed`) because it bypasses runtime truststore flags.
+2. **Layer 2: Plain HTTP Rejection**: Attempting internal plain HTTP backchannel calls to Authelia failed with `invalid X-Forwarded-Proto: http`, as Authelia mandates HTTPS headers for OIDC endpoints.
+3. **Layer 3: RFC 8414 Effective Issuer Mismatch**: Keycloak mandates that the issuer string in `.well-known/openid-configuration` match the configured IdP URL exactly. Authelia calculates its issuer from incoming `Host` headers. Routing to internal container hostnames broke issuer verification.
+4. **Layer 4: Client Secret Authentication Mismatch**: Keycloak defaulted to `client_secret_basic` (HTTP Basic Authorization header), while Authelia's OIDC provider required `client_secret_post` form-data exchange.
+- **Remediation**: Deployed `oidc-proxy` (lightweight Caddy sidecar) on `auth_net` listening on port 8080. It transparently proxies Keycloak's backchannel calls to Authelia (:9091) over plain HTTP, injecting `X-Forwarded-Proto: https` and rewriting the `Host` header to `authelia.zerotrust.lan`. Configured Keycloak client auth to `Client secret sent as post`. This preserves strict RFC 8414 issuer matching, bypasses JVM truststore issues, and keeps `auth_net` completely isolated (`internal: true`).
+
+### 11.4 Group-Based Authelia Access Control & Explicit Deny Fix
+Authelia `access_control` rules were hardened from basic user authentication to LDAP group-based authorization:
+- **Rule 1 (Bypass)**: `authelia.zerotrust.lan` (Portal self-bypass).
+- **Rule 2 (Bypass)**: `keycloak.zerotrust.lan` OIDC protocol & login action endpoints.
+- **Rule 3a & 3b (Keycloak Admin)**: Restricted to `group:admins` with `policy: two_factor`. Followed immediately by an explicit `policy: deny` rule for all other subjects.
+- **Rule 4a & 4b (Traefik Dashboard)**: Restricted to `group:admins` with `policy: two_factor`. Followed immediately by an explicit `policy: deny` rule.
+- **Rule 5 (Bypass)**: `mailpit.zerotrust.lan` (Dev/test sinkhole).
+- **Rule 6a & 6b (Portainer)**: Restricted to `group:admins` OR `group:it_ops` with `policy: two_factor`. Followed immediately by an explicit `policy: deny` rule.
+- **Rule 7 (Wildcard Fallback)**: `*.zerotrust.lan` with `policy: two_factor` for authenticated directory users.
+- **CRITICAL LESSON LEARNED (Subject Mismatch Fallthrough)**: Authelia evaluates rules top-to-bottom and does NOT implicitly deny on subject mismatch; unmatched subjects fall through to later matching rules. Without explicit deny rules following each group constraint, non-admin users fell through to Rule 7 (`*.zerotrust.lan`) and were granted unauthorized access. Adding explicit deny rules immediately after group restrictions closed this gap, verified live with `testuser` (403 Forbidden on Keycloak/Traefik admins; 200 OK on Portainer).
+
+### 11.5 Coraza WAF Verification & Juice Shop Decoupling
+- **Routing Bypass Resolution**: Corrected `traefik-dynamic.yml` to route `juiceshop.zerotrust.lan` through `http://coraza:8080` instead of directly to the Juice Shop container.
+- **Juice Shop Decoupling**: Fully decoupled Juice Shop from Authelia Forward-Auth to simulate a genuine public e-commerce portal protected exclusively by edge WAF inspection (OWASP Core Rule Set).
+- **Inline Attack Blocking**: Executed live penetration tests against Juice Shop; Coraza successfully blocked SQL injection, UNION payloads, and XSS vectors with HTTP 403 Forbidden.
+- **Log Ingestion Hardening**: Set Coraza audit log directory permissions to `0755` so the Filebeat daemon running on the host can ingest `coraza_logs/access.log`.
+
+### 11.6 Per-Source Alert Index Split & Production Kibana Dashboards
+- **Index Split**: Resolved single-stream mapping bottlenecks on Zone 4 Elasticsearch by implementing per-source Wazuh alert indices:
+  - `wazuh-alerts-authelia-*` (Authentication failures, MFA events, brute-force attempts)
+  - `wazuh-alerts-coraza-*` (WAF CRS rule violations, web attacks, 403 blocks)
+  - `wazuh-alerts-keycloak-*` (OIDC federation events, token grants, client authentications)
+- **Kibana Security Dashboards**: Deployed and verified two dedicated production Kibana dashboards:
+  1. **Identity & Access Security Overview**: Real-time MFA step-up latency, failed login geolocations, brute-force spikes, and group authorization verdicts.
+  2. **Edge WAF Security Overview**: CRS anomaly scores, top attacked URIs, attack categories (SQLi, XSS, RCE), and client IP block rates.
+- **Kibana Encryption Key Configured**: Configured `xpack.encryptedSavedObjects.encryptionKey` in `kibana.yml`, resolving ephemeral UI state loss and enabling persistent alert visualizations.
 
 ---
 *AEGIS v2.1 Master Report & Blueprint — Generated for Academic PFE Defense 2026.*
