@@ -1423,8 +1423,8 @@ olcAccess: {0}to * by dn.exact="cn=authelia-bind,dc=zerotrust,dc=lan" read by * 
         \`
     }
 
-    # Proxy clean inspected requests to internal Juice Shop container
-    reverse_proxy juiceshop:3000
+    # Proxy clean inspected requests to Zone 2 Juice Shop VM origin (migrated from 192.168.19.175)
+    reverse_proxy 192.168.50.20:3000
 }`,
                       'coraza-caddyfile'
                     )
@@ -1446,7 +1446,7 @@ olcAccess: {0}to * by dn.exact="cn=authelia-bind,dc=zerotrust,dc=lan" read by * 
             SecRule REQUEST_URI "@beginsWith /socket.io/" "id:1001,phase:1,pass,nolog,ctl:ruleEngine=DetectionOnly"
         \`
     }
-    reverse_proxy juiceshop:3000
+    reverse_proxy 192.168.50.20:3000
 }`}</pre>
               </div>
             </div>

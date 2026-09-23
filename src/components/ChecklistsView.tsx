@@ -274,7 +274,7 @@ export const ChecklistsView: React.FC<ChecklistsViewProps> = ({
                     {getCategoryBadge(item.category)}
                   </div>
                 </div>
-                <p className="text-[11px] text-[#94A3B8] leading-relaxed font-mono">{item.description}</p>
+                <p className="text-[11px] text-[#94A3B8] leading-relaxed font-mono whitespace-pre-line">{item.description}</p>
 
                 {/* Control Actions Row */}
                 <div className="flex items-center gap-3 mt-3 pt-2 border-t border-[#334155]/60 text-[10px] text-[#94A3B8]">

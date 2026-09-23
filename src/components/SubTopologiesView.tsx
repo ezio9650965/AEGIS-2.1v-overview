@@ -274,13 +274,13 @@ export const SubTopologiesView: React.FC = () => {
                 </div>
 
                 <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
-                  <div className="font-bold text-[#FBBF24] mb-1">CORP-WEB01 (<span className="text-[#00d4ff]">192.168.20.175</span>)</div>
-                  <div className="text-[10px] text-[#94A3B8] mb-2">Ubuntu 22.04 - Vulnerable Web Application (Crown Jewel)</div>
+                  <div className="font-bold text-[#FBBF24] mb-1">Juice Shop VM (<span className="text-[#00d4ff]">192.168.50.20</span>)</div>
+                  <div className="text-[10px] text-[#94A3B8] mb-2">Ubuntu 22.04 - Vulnerable Web Application (Zone 2 Subnet, AD Join Scoped Out)</div>
                   <ul className="text-[11px] text-[#F1F5F9]/80 space-y-1">
-                    <li>• Primary host for juiceshop.zerotrust.lan</li>
-                    <li>• Instrumented with Coraza WAF (OWASP Top 10 Protection)</li>
-                    <li>• Wazuh Agent v4.7 (HIDS & Vulnerability Detection)</li>
-                    <li>• Telemetry: Traefik L7 JSON, SQLi/XSS Alerts, WAF Blocks</li>
+                    <li>• Resides on Zone 2 subnet `192.168.50.20/24` (VMnet3 via ens34)</li>
+                    <li>• Primary origin for `juiceshop.zerotrust.lan` behind Coraza WAF</li>
+                    <li>• AD join as CORP-WEB01 scoped out (public WAF-protected, no AD required)</li>
+                    <li>• Telemetry: Coraza WAF HTTP 403 blocks, SQLi/XSS alerts, Traefik edge logs</li>
                   </ul>
                 </div>
               </div>

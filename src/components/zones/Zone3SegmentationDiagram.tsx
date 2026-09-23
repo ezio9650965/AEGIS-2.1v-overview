@@ -641,13 +641,13 @@ default via 192.168.19.2 dev ens33 proto dhcp src 192.168.19.173 metric 100
           <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs font-bold text-amber-300 uppercase tracking-wider">
-              <span>Segmentation Gap Notice — Current Deployment vs. Architecture Blueprint</span>
-              <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded border border-amber-500/40">
-                KNOWN GAP
+              <span>Segmentation Status — Zone 2 Subnet Active & Cross-Zone Routing Verified</span>
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded border border-emerald-500/40">
+                ZONE 2 ACTIVE
               </span>
             </div>
             <p className="text-xs text-amber-100/90 leading-relaxed font-sans">
-              Network segmentation is a known gap between the intended design and current deployment, not yet a security guarantee. While gateway interface <code className="text-amber-300 font-mono">ens34</code> is statically configured at <code className="text-amber-300 font-mono">192.168.50.1/24</code>, terminal ground truth (<code className="text-amber-300 font-mono">ip a</code> / <code className="text-amber-300 font-mono">ip route</code>) confirms it is currently unused with zero active peers or routes. All client traffic (including the Windows 10 endpoint) and application services currently route over the flat <code className="text-amber-300 font-mono">192.168.19.0/24</code> subnet via <code className="text-amber-300 font-mono">ens33</code>. The intended Layer 3 physical isolation boundary will be realized when downstream targets are moved behind <code className="text-amber-300 font-mono">ens34</code>.
+              Layer 3 physical micro-segmentation is active: gateway interface <code className="text-amber-300 font-mono">ens34</code> (<code className="text-amber-300 font-mono">192.168.50.1/24</code>) connects to Zone 2 (<code className="text-amber-300 font-mono">VMnet3</code>). DC01 (<code className="text-amber-300 font-mono">192.168.50.10</code>), PC01 (<code className="text-amber-300 font-mono">192.168.50.100</code>), and Juice Shop VM (<code className="text-amber-300 font-mono">192.168.50.20</code>) are all deployed on the <code className="text-amber-300 font-mono">192.168.50.0/24</code> subnet with verified routing to Zone 3. Docker-bridge iptables FORWARD rules (<code className="text-amber-300 font-mono">br_proxy &lt;-&gt; ens34</code>, <code className="text-amber-300 font-mono">br_auth &lt;-&gt; ens34</code>) are persisted via <code className="text-amber-300 font-mono">netfilter-persistent</code>. Ingress path (<code className="text-amber-300 font-mono">browser -&gt; Traefik -&gt; Coraza -&gt; Juice Shop@192.168.50.20</code>) returns HTTP/2 200 with Coraza WAF security headers.
             </p>
           </div>
         </div>

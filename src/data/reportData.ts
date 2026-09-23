@@ -131,7 +131,24 @@ export const INITIAL_CHECKLIST_DONE: ChecklistItem[] = [
 ];
 
 export const INITIAL_CHECKLIST_LEFT: ChecklistItem[] = [
-  { id: 'l1', title: 'Deploy Zone 2 Enterprise Grid (CORP-DC01, CORP-PC01, CORP-DB01)', description: 'Promote DC01 (Win Server 2022 AD DS aegis.corp), join PC01, deploy DB01 PostgreSQL customer PII, install 3 Wazuh agents.', category: 'critical', completed: false, who: 'both' },
+  {
+    id: 'l1',
+    title: 'Deploy Zone 2 Enterprise Grid (CORP-DC01, CORP-PC01, Juice Shop, CORP-DB01)',
+    description:
+      'DC01 (Win Server 2022 AD DS aegis.corp), PC01 (Win10 "Patient Zero"), and Juice Shop VM (192.168.50.20) are all now deployed on the 192.168.50.0/24 subnet (VMnet3) with verified cross-zone routing to Zone 3 via ens34. CORP-WEB01 domain join is explicitly out of scope (deliberate scope decision: public-facing app behind Coraza WAF does not require AD auth). Remaining Zone 2 items: Wazuh agents on Zone 2 hosts (blocked on Zone 4 access), CORP-DB01 PostgreSQL customer PII (optional, not blocking). Partially complete (in-progress), not fully done.',
+    category: 'critical',
+    completed: false,
+    who: 'both',
+  },
+  {
+    id: 'l36',
+    title: 'Docker-bridge iptables FORWARD rules (br_proxy/br_auth <-> ens34) on ztagateway',
+    description:
+      'Added Docker-bridge iptables FORWARD rules (br_proxy <-> ens34, br_auth <-> ens34) on ztagateway, persisted via netfilter-persistent. Allows containerized services (Coraza, Traefik) to route to the Zone 2 subnet. Verified end-to-end with Juice Shop migrated to 192.168.50.20 and returning HTTP/2 200 with Coraza WAF security headers.',
+    category: 'high',
+    completed: true,
+    who: 'ezio',
+  },
   { id: 'l10', title: 'Build the Shuffle SOAR workflow itself (webhook receiver -> MISP lookup -> Wazuh Active Response)', description: "Found and fixed a real bug: the MISP node was calling /events/index (lists all events, ignores filters) instead of /attributes/restSearch, which explains all prior ambiguous empty-result tests. Root cause of MISP 500s/CSRF errors also found: config.php had been left root-owned after `cake setSetting` commands run via docker exec, while PHP-FPM runs as www-data — fixed via chown www-data:www-data, mode 640. Switched the enrichment call from Shuffle's built-in MISP app (which forces GET regardless of config) to a raw HTTP node calling https://misp-core/attributes/restSearch directly. Confirmed correct field: Wazuh Windows/Sysmon alerts carry the IP at $exec.agent.ip, not $exec.data.srcip (that field only exists for certain network/firewall decoders). Enrichment now returns a precise single-attribute match (X-Result-Count: 1) against a real published MISP event. Decision/branch node (match -> action, no match -> log) is the next task, not yet built. Active Response / automated remediation action explicitly deprioritized for now to focus on completing detection-to-enrichment correctness first.", category: 'high', completed: false, who: 'ezio' },
   { id: 'l10b', title: 'End-to-end live-alert test (trigger a real attack, confirm it flows Wazuh -> Elasticsearch -> Logstash -> Shuffle webhook)', description: 'A real live Wazuh alert (Sysmon Process Create, T1055 - Process Injection, rule 61640, agent patient_zero @ 192.168.19.174) flowed the full pipeline unprompted: Wazuh -> Elasticsearch -> Logstash -> Shuffle webhook (misp_enrichment), confirmed via Shuffle execution logs. This was organic detection traffic, not a synthetic test payload.', category: 'high', completed: true, who: 'ezio' },
   { id: 'l11', title: 'Write 3 L1 SOC Playbooks in Markdown', description: 'Create brute-force.md, malware.md, and exfiltration.md in /opt/soc/playbooks/.', category: 'high', completed: false, who: 'both' },
@@ -140,19 +157,36 @@ export const INITIAL_CHECKLIST_LEFT: ChecklistItem[] = [
   { id: 'l17', title: 'Script 3 Reproducible Attack Scenarios', description: 'Prepare automated scripts for SQLi, LSASS mimikatz dump, and Sliver C2 beaconing.', category: 'jury', completed: false, who: 'both' },
   { id: 'l18', title: 'Rehearse 15-Minute Jury Demo Script', description: 'Execute 5 dry-run rehearsals covering all 5 demo acts under 15 minutes.', category: 'jury', completed: false, who: 'both' },
   { id: 'l19', title: 'Atomic Red Team coverage testing', description: 'Run Atomic Red Team test battery against Zone 2 endpoints (Windows/Sysmon + Linux), grouped by tactic (Execution, Persistence, Privilege Escalation, Defense Evasion, Exfiltration), and build a technique -> detected/not-detected coverage matrix.', category: 'jury', completed: false, who: 'both' },
-  { id: 'l27', title: 'Stand up Elastic Security detection rules as cross-source correlation layer', description: 'Configure Elastic Security detection rules (Suricata priority + cross-source correlation) to query across zeek-*, suricata-*, and dedicated gateway indices. Correlates Suricata edge network intrusion alerts with endpoint host activity.', category: 'high', completed: false, who: 'ezio' },
+  {
+    id: 'l27',
+    title: 'Stand up Elastic Security detection rules as cross-source correlation layer',
+    description:
+      'Two detection rules deployed and verified firing on real data in Security > Alerts:\n- Rule 1 — Suricata Priority Alert: index filebeat-*, KQL event.dataset: "suricata.eve" and event.kind: "alert" and event.severity <= 2, severity High. Verified firing 180 real alerts from an nmap scan test (look-back window set to 15m to account for Filebeat ingestion lag per F-022).\n- Rule 2 — Authelia Brute Force: index authelia-*, Threshold rule type, KQL msg: "Unsuccessful 1FA authentication attempt*", grouped by remote_ip.keyword, threshold 5. Verified firing on a real repeated-failed-login test.\nRule 3 (Group ACL Denial) and Rule 4 (Traefik Directory Fuzzing) planned but not yet created (the latter needs field verification against traefik-*\'s real schema RequestPath, not ECS url.path). Partially complete (in-progress), not fully done.',
+    category: 'high',
+    completed: false,
+    who: 'ezio',
+  },
   { id: 'l28', title: 'Plan MISP threat-intel enrichment as an indicator-match step on top of alerts', description: 'Plan MISP threat-intel enrichment as an indicator-match step on top of alerts (via Elastic indicator-match rules or Shuffle pulling MISP data), distinct from the existing Shuffle enrichment workflow (l10) which currently does manual per-alert MISP lookups, not automated indicator matching at scale.', category: 'high', completed: false, who: 'ezio' },
   { id: 'l31', title: "Clean up Keycloak's redundant log env vars", description: "KC_LOG_CONSOLE_OUTPUT, KC_LOG_FILE, KC_LOG_FILE_PATH, KC_LOG_FORMAT are now redundant with the working command-line flags; consolidate to avoid future config drift. Verified via a clean --force-recreate rebuild: only KC_LOG_CONSOLE_OUTPUT and KC_LOG_LEVEL remained (sourced from docker-compose's inline environment block), and file logging continued working correctly.", category: 'medium', completed: true, who: 'eagle' },
   { id: 'l33', title: 'Wazuh ECS Field Normalization', description: 'Normalize legacy Wazuh archive and alert fields into Elastic Common Schema (ECS) to enable unified querying and rule correlation alongside native Filebeat Zeek/Suricata data streams.', category: 'high', completed: false, who: 'ezio' },
   { id: 'l34', title: 'Comprehensive Secret Rotation', description: 'Rotate burned credentials across all 9 exposed services prior to defense: Elastic superuser, Keycloak admin, LDAP admin/config/bind, Authelia OIDC RSA private key + client secrets, session secret, JWT secret, Redis/Postgres passwords.', category: 'critical', completed: false, who: 'both' },
   { id: 'l35', title: 'Coraza CRS Tuning for Juice Shop (/socket.io/)', description: 'Suppress high-volume false positives on Juice Shop /socket.io/ endpoint (~6k FPs/day) caused by Engine.io WebSocket polling triggering CRS rules.', category: 'medium', completed: false, who: 'ezio' },
+  {
+    id: 'l37',
+    title: 'Rebuild Edge WAF Security Kibana Dashboard',
+    description:
+      'Edge WAF Security dashboard needs rebuilding — was lost/not saved in a prior session (cause not yet diagnosed; check Kibana\'s saved-object list/dashboard history before assuming full data loss).',
+    category: 'medium',
+    completed: false,
+    who: 'ezio',
+  },
 ];
 
 export const ZONE_STATUS = {
-  status: 'Z3 Done (Hardened + WAF Inline) · Z4 Dashboards & Pipeline Live',
+  status: 'Z3 Done (Hardened + WAF Inline) · Z2 Subnet Active · Z4 Dashboards & Pipeline Live',
   summary:
-    'Zone 3 (ZTA Gateway) fully operational and verified: OpenLDAP directory deployed (dc=zerotrust,dc=lan), Authelia migrated to LDAP backend with password + TOTP MFA, Keycloak federated as upstream OIDC IdP via oidc-proxy Caddy sidecar, Coraza WAF inline on Juice Shop actively blocking real SQLi/UNION/XSS attacks with HTTP 403, and group-based access_control enforced with explicit deny rules. Zone 4 (MSSP SOC) advanced: per-source daily index split deployed (traefik, authelia, keycloak, coraza daily indices), two Kibana dashboards built and populated with real data (Identity & Access [5 panels], Edge WAF Security [4 panels]), and Kibana encryption key configured, unblocking Elastic Security.',
-  lastAuditDate: 'September 21, 2026',
+    'Zone 3 (ZTA Gateway) fully operational and verified: OpenLDAP directory deployed (dc=zerotrust,dc=lan), Authelia migrated to LDAP backend with password + TOTP MFA, Keycloak federated as upstream OIDC IdP via oidc-proxy Caddy sidecar, Coraza WAF inline actively blocking attacks with HTTP 403, and group-based access_control enforced with explicit deny rules. Zone 2 (Target Enclave) active: DC01, PC01, and Juice Shop VM (192.168.50.20) now running on 192.168.50.0/24 with Docker-bridge iptables FORWARD rules on ztagateway and verified cross-zone routing. Zone 4 (MSSP SOC) advanced: per-source daily index split, 2 Elastic Security detection rules firing on real data (Suricata priority + Authelia brute force), and persistent Kibana dashboards.',
+  lastAuditDate: 'September 22, 2026',
 };
 
 export const SECURITY_DEBT: SecurityDebtItem[] = [
@@ -366,6 +400,14 @@ export const KNOWN_ISSUES: KnownIssue[] = [
     severity: 'Low',
     description: "oidc-proxy's use of plain HTTP between containers on internal Docker bridge (auth_net, internal: true, no external route).",
     impact: 'Flagged as architecturally acceptable (internal isolated Docker network namespace with no host port exposure), not a residual risk or vulnerability. Documented explicitly to prevent misinterpretation as an overlooked gap.',
+    status: 'Open',
+  },
+  {
+    id: 'ki-11',
+    title: 'Edge WAF Security dashboard needs rebuilding',
+    severity: 'Medium',
+    description: "Edge WAF Security dashboard needs rebuilding — was lost/not saved in a prior session (cause not yet diagnosed; check Kibana's saved-object list/dashboard history before assuming full data loss).",
+    impact: 'Kibana WAF visualization panels (CRS anomaly scores, top attacked URIs, attack categories, client IP blocks) need reconstitution from filebeat-coraza-* data streams.',
     status: 'Open',
   },
 ];
@@ -625,5 +667,40 @@ export const LESSONS_LEARNED: LessonLearnedItem[] = [
     takeaway: 'Federating two modern security gateways across an isolated Docker network triggers a multi-layer protocol conflict spanning PKIX truststores, HTTP forward headers, OIDC issuer strings, and client authentication methods.',
     architecturalContext: 'Keycloak 26 running on Quarkus and Authelia v4.39 enforce strict zero-trust standards that clashed across four distinct layers: (1) Keycloak SimpleHttpRequest failed internal TLS (PKIX), (2) Authelia rejected plain HTTP (X-Forwarded-Proto), (3) Authelia rejected mismatched issuer hostnames, and (4) Authelia rejected Keycloak\'s default HTTP Basic client auth. Resolving this required an architectural sidecar (oidc-proxy) and exact client parameter alignment.',
     juryDefenseTalkingPoint: 'Jury question: "Describe the biggest technical challenge during identity federation." Answer: Overcoming the four-layer OIDC handshake chain between Keycloak 26 and Authelia. We resolved PKIX failures without breaking container isolation by deploying oidc-proxy on the internal auth_net, injected X-Forwarded-Proto and Host headers to satisfy RFC 8414 issuer verification, and aligned client authentication to client_secret_post.',
+  },
+  {
+    id: 'lesson-12',
+    domain: 'Detection Rule Mechanics: Scheduled Queries vs Live Tripwires',
+    takeaway: 'Detection rules are scheduled queries, not live tripwires. Elastic Security rules re-run their KQL/threshold logic on an interval against a lookback window — they do not stream-match events in real time.',
+    architecturalContext: 'End-to-end detection latency is the sum of ingestion lag (Filebeat batching), Elasticsearch indexing/refresh, and the rule\'s own execution interval + lookback — observed at roughly 6-10 minutes for an nmap scan to appear as alerts in this pipeline. This is a realistic, honestly-reportable MTTD bound for a self-hosted Filebeat-based architecture, not a defect.',
+    juryDefenseTalkingPoint: 'Jury question: "Why is there a several-minute delay between an nmap scan or brute-force attempt and the resulting Elastic Security alert?" Answer: Elastic Security rules execute scheduled batch queries over configured lookback windows rather than inline packet tripwires. Detection latency equals the sum of Filebeat batching, Elasticsearch indexing/refresh, and the rule execution schedule (observed at roughly 6-10 minutes in this architecture). In a production self-hosted SOC, this is a realistic, defensible MTTD bound that protects cluster compute from saturation while reliably batching high-volume telemetry.',
+  },
+  {
+    id: 'lesson-13',
+    domain: 'Threshold Rules & Alert Cardinality: Grouped Incidents vs Event Floods',
+    takeaway: 'Threshold rules fire once per group per qualifying window, not once per matching event.',
+    architecturalContext: 'The Authelia brute-force rule correctly fired a single alert for 5+ failed logins from one IP within its lookback window, rather than one alert per failed attempt — this is intended SOC behavior (one incident, one alert) but can look like under-counting to someone expecting a 1:1 event-to-alert ratio.',
+    juryDefenseTalkingPoint: 'Jury question: "Why did a brute-force attack consisting of 10 failed logins produce only one alert in the Security app instead of 10 separate alerts?" Answer: Threshold rules aggregate events by entity (remote_ip.keyword) over the evaluation window to prevent alert fatigue. The rule triggers a single consolidated incident for the entire brute-force wave. Analysts inspect the underlying raw events in Discover while maintaining clean, actionable incident queues in the SIEM.',
+  },
+  {
+    id: 'lesson-14',
+    domain: 'Signature-Based IDS vs Behavioral Scan Detection: Suricata / ET Open Scope',
+    takeaway: 'Signature-based IDS (Suricata/ET Open) does not inherently detect port scans as a category; ET Open rules match specific traffic patterns and protocol anomalies, not scan behavior itself.',
+    architecturalContext: 'A full nmap -p- scan (65,535 ports) produced roughly 100 alerts, not one per port scanned — because ET Open\'s rules match specific traffic patterns and protocol anomalies, not scan behavior itself. Dedicated port-scan detection requires either Suricata\'s stream-anomaly rules tuned for it, or a purpose-built detection rule (e.g., many distinct destination.port values from one source.ip within a short window) — this is planned as a future rule addition, not yet built.',
+    juryDefenseTalkingPoint: 'Jury question: "Why didn\'t Suricata generate 65,535 alerts during an nmap -p- full-range port scan?" Answer: ET Open is a signature-based ruleset that triggers on known exploit patterns and protocol violations, not port scan cardinality. Most scan packets merely hit closed ports without matching payload signatures. Comprehensive port-scan detection requires behavioral threshold rules (tracking distinct destination ports per source IP) or Zeek scan detection analyzers.',
+  },
+  {
+    id: 'lesson-15',
+    domain: 'F-021: Authelia Audit Log Verbosity (Debug vs Info Level)',
+    takeaway: 'Authelia logs successful authentications only at debug level, not info. At the default info level, only failures and warnings are visible; successful logins only appear once log level is raised to debug.',
+    architecturalContext: 'At default info level, Authelia emits "Unsuccessful 1FA authentication attempt..." and "requires 2FA, cannot be redirected yet". Successful logins ("Successful 1FA authentication attempt made by user \'X\'", "Successful TOTP authentication attempt made by user \'X\'") require debug logging. Debug logging was enabled to make success events visible for Kibana dashboarding. This is an explicit lab-only trade-off (more verbose logs, more disk/noise) that should not be presented as a general production recommendation without that caveat.',
+    juryDefenseTalkingPoint: 'Jury question: "Why is Authelia configured at debug log level in your gateway environment?" Answer: Authelia by design only records successful 1FA and TOTP authentication events at debug level, reserving info level strictly for failures and warnings. For our SOC dashboarding demonstration, debug level is required to visualize user login successes. We acknowledge this as a deliberate lab trade-off that in production would produce significant log noise, where dedicated audit loggers or event filtering should be implemented.',
+  },
+  {
+    id: 'lesson-16',
+    domain: 'F-022: Filebeat Ingestion Lag Under Burst Load (Queue Saturation)',
+    takeaway: 'Filebeat queue saturation causes ingestion lag under burst load (observed 9-minute gap between @timestamp and event.ingested during an nmap scan burst).',
+    architecturalContext: 'During an nmap-generated traffic burst, Filebeat\'s internal queue filled (queue.filled.pct: 1) while Elasticsearch\'s thread pool was confirmed clean, ruling out ES as the bottleneck. Mitigated by increasing the Suricata detection rule\'s look-back window from 5m to 15m to ensure delayed events are captured within the rule\'s evaluation window. This establishes a measured, realistic minimum MTTD bound (6-10 minutes) for this architecture under burst conditions.',
+    juryDefenseTalkingPoint: 'Jury question: "How does the ingestion pipeline behave under high-volume attack bursts?" Answer: Under burst conditions such as a multi-thousand-packet nmap scan, Filebeat\'s internal memory queue saturates (queue.filled.pct: 1), introducing an ingestion lag of up to 9 minutes before events are indexed in Elasticsearch. We mitigated this by setting our detection rule lookback window to 15m. Rather than obscuring this, we treat this 6-10 minute window as an honest, measured Mean Time to Detect bound for our self-hosted edge architecture.',
   },
 ];
