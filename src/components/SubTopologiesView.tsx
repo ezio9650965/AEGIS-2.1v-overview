@@ -198,18 +198,19 @@ export const SubTopologiesView: React.FC = () => {
             </div>
 
             <div className="bg-[#0F172A] border border-red-500/30 rounded-lg p-5">
-              <h3 className="text-sm font-bold text-red-400 uppercase tracking-wider mb-3">Zone 1: Threatscape & Red Team Emulation Engine</h3>
+              <h3 className="text-sm font-bold text-red-400 uppercase tracking-wider mb-3">Zone 1: Threatscape (Attack Surface & Red Team Engine)</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                 <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
                   <div className="font-bold text-white mb-2 flex items-center gap-2">
                     <Terminal className="w-4 h-4 text-red-400" />
-                    <span>Kali Linux APT Station (192.168.1.50)</span>
+                    <span>Kali Linux Adversary Station (192.168.1.50)</span>
                   </div>
-                  <ul className="text-[#94A3B8] space-y-1 text-[11px] list-disc list-inside">
-                    <li><strong className="text-white">Sliver C2 Framework:</strong> Go-based C2 server operating mTLS / DNS / HTTPS listeners.</li>
-                    <li><strong className="text-white">sqlmap:</strong> Automated SQL injection scanner targeting OWASP Juice Shop endpoints.</li>
-                    <li><strong className="text-white">mimikatz:</strong> Credential dumping tool (`sekurlsa::logonpasswords`).</li>
-                    <li><strong className="text-white">Burp Suite Professional:</strong> Layer 7 intercepting proxy and web payload generator.</li>
+                  <ul className="text-[#94A3B8] space-y-1.5 text-[11px] list-disc list-inside">
+                    <li><strong className="text-white">Atomic Red Team:</strong> Automated execution framework triggering mapped MITRE ATT&CK technique batteries.</li>
+                    <li><strong className="text-white">Web App Exploitation (SQLi & XSS):</strong> sqlmap, manual UNION SELECT payloads, and Cross-Site Scripting targeting web application endpoints.</li>
+                    <li><strong className="text-white">Directory Fuzzing & Path Traversal:</strong> gobuster, ffuf, dirbuster, and directory traversal wordlists probing edge and intranet paths.</li>
+                    <li><strong className="text-white">Credential Attacks:</strong> Brute force authentication attacks and password spraying targeting Authelia and Active Directory accounts.</li>
+                    <li><strong className="text-white">Sliver C2 & Burp Suite:</strong> Go-based C2 server with mTLS/DNS listeners and Layer 7 intercepting proxy.</li>
                   </ul>
                 </div>
 
@@ -218,10 +219,11 @@ export const SubTopologiesView: React.FC = () => {
                     <Cpu className="w-4 h-4 text-[#FBBF24]" />
                     <span>REMnux Static/Dynamic Malware Sandbox</span>
                   </div>
-                  <ul className="text-[#94A3B8] space-y-1 text-[11px] list-disc list-inside">
-                    <li><strong className="text-white">YARA Analysis:</strong> Pattern matching rules for dropped executable payloads.</li>
-                    <li><strong className="text-white">exiftool & strings:</strong> Static header and metadata extraction on artifacts.</li>
+                  <ul className="text-[#94A3B8] space-y-1.5 text-[11px] list-disc list-inside">
+                    <li><strong className="text-white">YARA Analysis:</strong> Pattern matching rules for dropped executable payloads and Mimikatz binaries.</li>
+                    <li><strong className="text-white">exiftool & strings:</strong> Static header, metadata extraction, and binary artifact profiling.</li>
                     <li><strong className="text-white">NetworkMiner:</strong> Passive network forensics and file extraction from Zeek pcaps.</li>
+                    <li><strong className="text-white">Exploit Verification:</strong> Confirming payload detonability prior to controlled replay against Zone 2.</li>
                   </ul>
                 </div>
               </div>
@@ -238,49 +240,49 @@ export const SubTopologiesView: React.FC = () => {
             </div>
 
             <div className="bg-[#0F172A] border border-[#FBBF24]/30 rounded-lg p-5">
-              <h3 className="text-sm font-bold text-[#FBBF24] uppercase tracking-wider mb-3">Zone 2: Small Enterprise Domain Grid (`aegis.corp` - 192.168.20.0/24)</h3>
+              <h3 className="text-sm font-bold text-[#FBBF24] uppercase tracking-wider mb-3">Zone 2: Target Grid (`aegis.corp` - 192.168.50.0/24)</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
                 <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
-                  <div className="font-bold text-[#FBBF24] mb-1">CORP-DC01 (<span className="text-[#00d4ff]">192.168.20.10</span>)</div>
+                  <div className="font-bold text-[#FBBF24] mb-1">CORP-DC01 (<span className="text-[#00d4ff]">192.168.50.10</span>)</div>
                   <div className="text-[10px] text-[#94A3B8] mb-2">Windows Server 2022 Domain Controller</div>
                   <ul className="text-[11px] text-[#F1F5F9]/80 space-y-1">
-                    <li>• Active Directory Domain Services (`aegis.corp`)</li>
-                    <li>• DNS Server & DHCP Server</li>
-                    <li>• Wazuh Agent v4.7</li>
-                    <li>• Telemetry: Win Events 4625, 4768, 4769</li>
+                    <li>• Primary enterprise identity store (`aegis.corp`)</li>
+                    <li>• Active Directory Domain Services (AD DS)</li>
+                    <li>• DNS Server & Kerberos Key Distribution Center</li>
+                    <li>• Wazuh Agent v4.7 (Win Events: 4625, 4768, 4769)</li>
                   </ul>
                 </div>
 
                 <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
-                  <div className="font-bold text-[#FBBF24] mb-1">CORP-PC01 (<span className="text-[#00d4ff]">192.168.20.100</span>)</div>
+                  <div className="font-bold text-[#FBBF24] mb-1">CORP-PC01 (<span className="text-[#00d4ff]">192.168.50.100</span>)</div>
                   <div className="text-[10px] text-[#94A3B8] mb-2">Windows 10 Workstation ("Patient Zero")</div>
                   <ul className="text-[11px] text-[#F1F5F9]/80 space-y-1">
                     <li>• Domain-joined to `aegis.corp`</li>
                     <li>• Sysmon v15 (SwiftOnSecurity config)</li>
-                    <li>• Wazuh Agent v4.7</li>
+                    <li>• Wazuh Agent v4.7 Active Response Target</li>
                     <li>• Telemetry: Event IDs 1, 3, 7, 10, 11, 22</li>
                   </ul>
                 </div>
 
                 <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
-                  <div className="font-bold text-[#FBBF24] mb-1">CORP-DB01 (<span className="text-[#00d4ff]">192.168.20.50</span>)</div>
-                  <div className="text-[10px] text-[#94A3B8] mb-2">Ubuntu 22.04 LTS Database Server</div>
+                  <div className="font-bold text-[#FBBF24] mb-1">CORP-WEB01 (<span className="text-[#00d4ff]">192.168.50.20</span>)</div>
+                  <div className="text-[10px] text-[#94A3B8] mb-2">Target Web Host (OWASP Juice Shop)</div>
                   <ul className="text-[11px] text-[#F1F5F9]/80 space-y-1">
-                    <li>• PostgreSQL 14 (Hosting `customers` PII table)</li>
-                    <li>• auditd FIM & Process Execution rules</li>
-                    <li>• Wazuh Agent v4.7</li>
-                    <li>• Telemetry: Query logs & shadow FIM</li>
+                    <li>• Vulnerable web app origin (`juiceshop.zerotrust.lan:3000`)</li>
+                    <li>• Layer 3 micro-segmented on Zone 2 (`VMnet3` via ens34)</li>
+                    <li>• Shielded inline by Coraza WAF (CRS 942100)</li>
+                    <li>• Decoupled from Authelia for public customer access</li>
                   </ul>
                 </div>
 
                 <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
-                  <div className="font-bold text-[#FBBF24] mb-1">Juice Shop VM (<span className="text-[#00d4ff]">192.168.50.20</span>)</div>
-                  <div className="text-[10px] text-[#94A3B8] mb-2">Ubuntu 22.04 - Vulnerable Web Application (Zone 2 Subnet, AD Join Scoped Out)</div>
+                  <div className="font-bold text-[#FBBF24] mb-1">Keycloak ↔ AD (<span className="text-[#00d4ff]">Identity Bridge</span>)</div>
+                  <div className="text-[10px] text-[#94A3B8] mb-2">Zone 2 / Zone 3 Enterprise Federation</div>
                   <ul className="text-[11px] text-[#F1F5F9]/80 space-y-1">
-                    <li>• Resides on Zone 2 subnet `192.168.50.20/24` (VMnet3 via ens34)</li>
-                    <li>• Primary origin for `juiceshop.zerotrust.lan` behind Coraza WAF</li>
-                    <li>• AD join as CORP-WEB01 scoped out (public WAF-protected, no AD required)</li>
-                    <li>• Telemetry: Coraza WAF HTTP 403 blocks, SQLi/XSS alerts, Traefik edge logs</li>
+                    <li>• AD DS (`CORP-DC01`) as primary identity authority</li>
+                    <li>• Federated with Keycloak via LDAP / OIDC sync</li>
+                    <li>• Scoped group sync (Marketing, HR, Devs, IT)</li>
+                    <li>• Eliminates siloed local credential stores</li>
                   </ul>
                 </div>
               </div>

@@ -414,8 +414,8 @@ export const SvgTopologyVisualizer: React.FC<SvgTopologyVisualizerProps> = ({
                 <text x="16" y="47" fill="#8b949e" fontSize="7" fontFamily="'JetBrains Mono', monospace">PORT :443/80</text>
                 {/* Status Dot */}
                 <circle cx="145" cy="18" r="3" fill="#ff3366" />
-                <text x="12" y="65" fill="#8b949e" fontSize="7.5" fontFamily="'JetBrains Mono', monospace">• sqlmap / Sliver C2</text>
-                <text x="12" y="75" fill="#8b949e" fontSize="7.5" fontFamily="'JetBrains Mono', monospace">• Burp Suite L7 Proxy</text>
+                <text x="12" y="65" fill="#8b949e" fontSize="7.5" fontFamily="'JetBrains Mono', monospace">• Atomic Red Team & SQLi/XSS</text>
+                <text x="12" y="75" fill="#8b949e" fontSize="7.5" fontFamily="'JetBrains Mono', monospace">• Fuzzing & Credential Spraying</text>
               </g>
 
               {/* Node 2: REMnux Sandbox */}
@@ -431,7 +431,7 @@ export const SvgTopologyVisualizer: React.FC<SvgTopologyVisualizerProps> = ({
                 <text x="34" y="30" fill="#ffb700" fontSize="8" fontFamily="'JetBrains Mono', monospace">Isolated Analysis</text>
                 <rect x="12" y="38" width="55" height="13" rx="2" fill="#2d333b" stroke="#30363d" />
                 <text x="16" y="47" fill="#8b949e" fontSize="7" fontFamily="'JetBrains Mono', monospace">AIRGAPPED</text>
-                <text x="12" y="64" fill="#8b949e" fontSize="7.5" fontFamily="'JetBrains Mono', monospace">• YARA & PCAP Forensic</text>
+                <text x="12" y="64" fill="#8b949e" fontSize="7.5" fontFamily="'JetBrains Mono', monospace">• YARA & Payload Detonation</text>
               </g>
             </g>
 
@@ -598,8 +598,8 @@ export const SvgTopologyVisualizer: React.FC<SvgTopologyVisualizerProps> = ({
                 className={`transition-all duration-300 ${isNodeDimmed('juiceshop') ? 'opacity-20' : 'opacity-100'}`}
               >
                 <rect width="120" height="52" rx="4" fill="#21262d" stroke="#30363d" strokeWidth="1" />
-                <text x="8" y="16" fill="#ffb700" fontSize="9" fontWeight="bold" fontFamily="'JetBrains Mono', monospace">OWASP Juice Shop</text>
-                <text x="8" y="27" fill="#00ff41" fontSize="7.5" fontFamily="'JetBrains Mono', monospace">Shielded by WAF</text>
+                <text x="8" y="16" fill="#ffb700" fontSize="9" fontWeight="bold" fontFamily="'JetBrains Mono', monospace">CORP-WEB01</text>
+                <text x="8" y="27" fill="#00ff41" fontSize="7.5" fontFamily="'JetBrains Mono', monospace">Juice Shop (WAF Shielded)</text>
                 <rect x="8" y="33" width="44" height="11" rx="2" fill="#2d333b" stroke="#30363d" />
                 <text x="12" y="41" fill="#8b949e" fontSize="6.5" fontFamily="'JetBrains Mono', monospace">:3000 Node</text>
               </g>
@@ -754,49 +754,65 @@ export const SvgTopologyVisualizer: React.FC<SvgTopologyVisualizerProps> = ({
               {/* Node: CORP-DC01 */}
               <g
                 id="node-dc01"
-                transform="translate(810, 80)"
+                transform="translate(810, 75)"
                 className={`transition-all duration-300 ${isNodeDimmed('dc01') ? 'opacity-20' : 'opacity-100'}`}
               >
-                <rect width="175" height="72" rx="6" fill="#21262d" stroke="#30363d" strokeWidth="1" />
-                <text x="12" y="17" fill="#ffb700" fontSize="10" fontWeight="bold" fontFamily="'JetBrains Mono', monospace">CORP-DC01 (AD DS)</text>
-                <text x="12" y="29" fill="#00d4ff" fontSize="8" fontFamily="'JetBrains Mono', monospace">192.168.20.10</text>
-                <rect x="12" y="36" width="60" height="12" rx="2" fill="#2d333b" stroke="#30363d" />
-                <text x="16" y="45" fill="#8b949e" fontSize="7" fontFamily="'JetBrains Mono', monospace">:389/:88/:53</text>
-                <circle cx="160" cy="15" r="3" fill="#00ff41" />
-                <text x="12" y="60" fill="#8b949e" fontSize="7" fontFamily="'JetBrains Mono', monospace">• Windows Server 2022</text>
-                <text x="12" y="69" fill="#00ff41" fontSize="7" fontFamily="'JetBrains Mono', monospace">✓ 100% Isolated & Untouched</text>
+                <rect width="175" height="68" rx="6" fill="#21262d" stroke="#30363d" strokeWidth="1" />
+                <text x="12" y="16" fill="#ffb700" fontSize="9.5" fontWeight="bold" fontFamily="'JetBrains Mono', monospace">CORP-DC01 (AD DS)</text>
+                <text x="12" y="27" fill="#00d4ff" fontSize="8" fontFamily="'JetBrains Mono', monospace">192.168.50.10</text>
+                <rect x="12" y="33" width="60" height="12" rx="2" fill="#2d333b" stroke="#30363d" />
+                <text x="16" y="42" fill="#8b949e" fontSize="7" fontFamily="'JetBrains Mono', monospace">:389/:88/:53</text>
+                <circle cx="160" cy="14" r="3" fill="#00ff41" />
+                <text x="12" y="55" fill="#8b949e" fontSize="7" fontFamily="'JetBrains Mono', monospace">• Primary Identity Store (AD)</text>
+                <text x="12" y="64" fill="#00ff41" fontSize="7" fontFamily="'JetBrains Mono', monospace">✓ Windows Server 2022</text>
               </g>
 
               {/* Node: CORP-PC01 */}
               <g
                 id="node-pc01"
-                transform="translate(810, 165)"
+                transform="translate(810, 150)"
                 className={`transition-all duration-300 ${isNodeDimmed('pc01') ? 'opacity-20' : 'opacity-100'}`}
               >
-                <rect width="175" height="72" rx="6" fill="#21262d" stroke="#30363d" strokeWidth="1" />
-                <text x="12" y="17" fill="#ffb700" fontSize="10" fontWeight="bold" fontFamily="'JetBrains Mono', monospace">CORP-PC01 (Client)</text>
-                <text x="12" y="29" fill="#00d4ff" fontSize="8" fontFamily="'JetBrains Mono', monospace">192.168.20.100</text>
-                <rect x="12" y="36" width="60" height="12" rx="2" fill="#2d333b" stroke="#30363d" />
-                <text x="16" y="45" fill="#8b949e" fontSize="7" fontFamily="'JetBrains Mono', monospace">SYSMON v15</text>
-                <circle cx="160" cy="15" r="3" fill="#00ff41" />
-                <text x="12" y="60" fill="#8b949e" fontSize="7" fontFamily="'JetBrains Mono', monospace">• Finance Workstation</text>
-                <text x="12" y="69" fill="#00ff41" fontSize="7" fontFamily="'JetBrains Mono', monospace">✓ Protected Target Enclave</text>
+                <rect width="175" height="68" rx="6" fill="#21262d" stroke="#30363d" strokeWidth="1" />
+                <text x="12" y="16" fill="#ffb700" fontSize="9.5" fontWeight="bold" fontFamily="'JetBrains Mono', monospace">CORP-PC01 (Patient Zero)</text>
+                <text x="12" y="27" fill="#00d4ff" fontSize="8" fontFamily="'JetBrains Mono', monospace">192.168.50.100</text>
+                <rect x="12" y="33" width="60" height="12" rx="2" fill="#2d333b" stroke="#30363d" />
+                <text x="16" y="42" fill="#8b949e" fontSize="7" fontFamily="'JetBrains Mono', monospace">SYSMON v15</text>
+                <circle cx="160" cy="14" r="3" fill="#00ff41" />
+                <text x="12" y="55" fill="#8b949e" fontSize="7" fontFamily="'JetBrains Mono', monospace">• Win10 Domain Workstation</text>
+                <text x="12" y="64" fill="#00ff41" fontSize="7" fontFamily="'JetBrains Mono', monospace">✓ Wazuh EDR Target</text>
               </g>
 
-              {/* Node: Database Vault */}
+              {/* Node: CORP-WEB01 */}
               <g
-                id="node-dbvault"
-                transform="translate(810, 255)"
-                className={`transition-all duration-300 ${isNodeDimmed('dbvault') ? 'opacity-20' : 'opacity-100'}`}
+                id="node-corp-web01"
+                transform="translate(810, 225)"
+                className={`transition-all duration-300 ${isNodeDimmed('corp-web01') ? 'opacity-20' : 'opacity-100'}`}
               >
-                <rect width="175" height="72" rx="6" fill="#21262d" stroke="#30363d" strokeWidth="1" />
-                <text x="12" y="17" fill="#ffb700" fontSize="10" fontWeight="bold" fontFamily="'JetBrains Mono', monospace">CORP-DB01 (Crown Jewel)</text>
-                <text x="12" y="29" fill="#00d4ff" fontSize="8" fontFamily="'JetBrains Mono', monospace">192.168.20.50</text>
-                <rect x="12" y="36" width="60" height="12" rx="2" fill="rgba(255,51,102,0.08)" stroke="rgba(255,51,102,0.3)" />
-                <text x="16" y="45" fill="#ff3366" fontSize="7" fontFamily="'JetBrains Mono', monospace">:5432 NO EXT</text>
-                <circle cx="160" cy="15" r="3" fill="#00ff41" />
-                <text x="12" y="60" fill="#8b949e" fontSize="7" fontFamily="'JetBrains Mono', monospace">• Customer PII Database</text>
-                <text x="12" y="69" fill="#00ff41" fontSize="7" fontFamily="'JetBrains Mono', monospace">✓ Zero Ingress / No Breach</text>
+                <rect width="175" height="68" rx="6" fill="#21262d" stroke="#30363d" strokeWidth="1" />
+                <text x="12" y="16" fill="#ffb700" fontSize="9.5" fontWeight="bold" fontFamily="'JetBrains Mono', monospace">CORP-WEB01 (Juice Shop)</text>
+                <text x="12" y="27" fill="#00d4ff" fontSize="8" fontFamily="'JetBrains Mono', monospace">192.168.50.20</text>
+                <rect x="12" y="33" width="60" height="12" rx="2" fill="#2d333b" stroke="#30363d" />
+                <text x="16" y="42" fill="#8b949e" fontSize="7" fontFamily="'JetBrains Mono', monospace">:3000 Web · WAF</text>
+                <circle cx="160" cy="14" r="3" fill="#00ff41" />
+                <text x="12" y="55" fill="#8b949e" fontSize="7" fontFamily="'JetBrains Mono', monospace">• Micro-segmented VMnet3</text>
+                <text x="12" y="64" fill="#00ff41" fontSize="7" fontFamily="'JetBrains Mono', monospace">✓ Coraza WAF Shielded</text>
+              </g>
+
+              {/* Node: Keycloak <-> Active Directory Federation */}
+              <g
+                id="node-keycloak-ad"
+                transform="translate(810, 300)"
+                className={`transition-all duration-300 ${isNodeDimmed('keycloak') ? 'opacity-20' : 'opacity-100'}`}
+              >
+                <rect width="175" height="68" rx="6" fill="#21262d" stroke="#30363d" strokeWidth="1" />
+                <text x="12" y="16" fill="#ffb700" fontSize="9.5" fontWeight="bold" fontFamily="'JetBrains Mono', monospace">Keycloak ↔ AD Bridge</text>
+                <text x="12" y="27" fill="#00d4ff" fontSize="8" fontFamily="'JetBrains Mono', monospace">Identity Federation</text>
+                <rect x="12" y="33" width="70" height="12" rx="2" fill="rgba(0,212,255,0.08)" stroke="rgba(0,212,255,0.3)" />
+                <text x="16" y="42" fill="#00d4ff" fontSize="7" fontFamily="'JetBrains Mono', monospace">LDAP/OIDC SYNC</text>
+                <circle cx="160" cy="14" r="3" fill="#00ff41" />
+                <text x="12" y="55" fill="#8b949e" fontSize="7" fontFamily="'JetBrains Mono', monospace">• AD Primary Authority</text>
+                <text x="12" y="64" fill="#00ff41" fontSize="7" fontFamily="'JetBrains Mono', monospace">✓ Cross-Enclave Identity Sync</text>
               </g>
             </g>
 

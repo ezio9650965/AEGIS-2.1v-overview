@@ -1423,7 +1423,7 @@ olcAccess: {0}to * by dn.exact="cn=authelia-bind,dc=zerotrust,dc=lan" read by * 
         \`
     }
 
-    # Proxy clean inspected requests to Zone 2 Juice Shop VM origin (migrated from 192.168.19.175)
+    # Proxy clean inspected requests to Zone 2 CORP-WEB01 origin (migrated from 192.168.19.175)
     reverse_proxy 192.168.50.20:3000
 }`,
                       'coraza-caddyfile'

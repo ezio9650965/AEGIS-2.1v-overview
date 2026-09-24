@@ -241,7 +241,7 @@ default via 192.168.19.2 dev ens33 proto dhcp src 192.168.19.173 metric 100
                 {/* OWASP Juice Shop Storefront / Client Access */}
                 <g transform="translate(35, 220)">
                   <rect width="295" height="70" rx="6" fill="#21262d" stroke="#FBBF24" strokeWidth="1" />
-                  <text x="12" y="17" fill="#FBBF24" fontSize="9" fontWeight="bold">OWASP Juice Shop Client Traffic</text>
+                  <text x="12" y="17" fill="#FBBF24" fontSize="9" fontWeight="bold">CORP-WEB01 Client Traffic (Juice Shop)</text>
                   <text x="12" y="29" fill="#F1F5F9" fontSize="8">Destination: shop.zerotrust.lan:443</text>
                   <rect x="12" y="36" width="80" height="13" rx="2" fill="rgba(251, 191, 36, 0.1)" stroke="rgba(251, 191, 36, 0.3)" />
                   <text x="16" y="46" fill="#FBBF24" fontSize="7">FLAT INGRESS</text>
@@ -375,7 +375,7 @@ default via 192.168.19.2 dev ens33 proto dhcp src 192.168.19.173 metric 100
 
                 <g transform="translate(738, 145)">
                   <rect width="170" height="60" rx="5" fill="#21262d" stroke="#475569" strokeWidth="1" strokeDasharray="3 3" />
-                  <text x="10" y="18" fill="#94A3B8" fontSize="8" fontWeight="bold">Intended: Juice Shop App</text>
+                  <text x="10" y="18" fill="#94A3B8" fontSize="8" fontWeight="bold">Intended: CORP-WEB01 (Juice Shop)</text>
                   <text x="10" y="30" fill="#64748B" fontSize="7.5">Target IP: 192.168.50.20</text>
                   <text x="10" y="44" fill="#F87171" fontSize="7" fontWeight="bold">NOT HERE (Served via .19.x)</text>
                 </g>
@@ -607,23 +607,23 @@ default via 192.168.19.2 dev ens33 proto dhcp src 192.168.19.173 metric 100
                   <text x="14" y="58" fill="#4ADE80" fontSize="7" fontWeight="bold">L3 ENFORCED ISOLATION</text>
                 </g>
 
-                {/* Isolated OWASP Juice Shop */}
+                {/* Isolated CORP-WEB01 (OWASP Juice Shop) */}
                 <g transform="translate(725, 145)">
                   <rect width="185" height="70" rx="5" fill="#21262d" stroke="#FBBF24" strokeWidth="1" />
-                  <text x="10" y="17" fill="#FBBF24" fontSize="8.5" fontWeight="bold">OWASP Juice Shop (App)</text>
-                  <text x="10" y="29" fill="#F1F5F9" fontSize="8">IP: 192.168.50.20/24</text>
+                  <text x="10" y="17" fill="#FBBF24" fontSize="8.5" fontWeight="bold">CORP-WEB01 (Juice Shop)</text>
+                  <text x="10" y="29" fill="#F1F5F9" fontSize="8">IP: 192.168.50.20/24:3000</text>
                   <text x="10" y="42" fill="#94A3B8" fontSize="7.5">Shielded behind Traefik & WAF</text>
                   <rect x="10" y="48" width="85" height="13" rx="2" fill="rgba(251, 191, 36, 0.15)" stroke="rgba(251, 191, 36, 0.4)" />
                   <text x="14" y="58" fill="#FBBF24" fontSize="7">NO DIRECT WAN PATH</text>
                 </g>
 
-                {/* Active Directory Domain Grid */}
+                {/* Active Directory Domain Grid & Federation */}
                 <g transform="translate(725, 225)">
                   <rect width="185" height="105" rx="5" fill="#1E293B" stroke="#334155" strokeWidth="1" />
-                  <text x="10" y="17" fill="#A855F7" fontSize="8.5" fontWeight="bold">Zone 2 AD Enterprise Grid</text>
-                  <text x="10" y="31" fill="#F1F5F9" fontSize="7.5">• CORP-DC01 (192.168.50.2)</text>
-                  <text x="10" y="44" fill="#F1F5F9" fontSize="7.5">• CORP-DB01 (192.168.50.3)</text>
-                  <text x="10" y="57" fill="#94A3B8" fontSize="7">• Wazuh Agents reporting via proxy</text>
+                  <text x="10" y="17" fill="#A855F7" fontSize="8.5" fontWeight="bold">Zone 2 Target Grid & Federation</text>
+                  <text x="10" y="31" fill="#F1F5F9" fontSize="7.5">• CORP-DC01 (AD DS aegis.corp)</text>
+                  <text x="10" y="44" fill="#F1F5F9" fontSize="7.5">• Keycloak ↔ AD Federation (LDAP/OIDC)</text>
+                  <text x="10" y="57" fill="#94A3B8" fontSize="7">• Primary Identity Store + Agent Sync</text>
                   <rect x="10" y="70" width="165" height="22" rx="3" fill="rgba(74, 222, 128, 0.1)" stroke="#4ADE80" strokeWidth="0.8" />
                   <text x="16" y="85" fill="#4ADE80" fontSize="7" fontWeight="bold">
                     ✓ ZERO LATERAL HOP FROM WAN
@@ -647,7 +647,7 @@ default via 192.168.19.2 dev ens33 proto dhcp src 192.168.19.173 metric 100
               </span>
             </div>
             <p className="text-xs text-amber-100/90 leading-relaxed font-sans">
-              Layer 3 physical micro-segmentation is active: gateway interface <code className="text-amber-300 font-mono">ens34</code> (<code className="text-amber-300 font-mono">192.168.50.1/24</code>) connects to Zone 2 (<code className="text-amber-300 font-mono">VMnet3</code>). DC01 (<code className="text-amber-300 font-mono">192.168.50.10</code>), PC01 (<code className="text-amber-300 font-mono">192.168.50.100</code>), and Juice Shop VM (<code className="text-amber-300 font-mono">192.168.50.20</code>) are all deployed on the <code className="text-amber-300 font-mono">192.168.50.0/24</code> subnet with verified routing to Zone 3. Docker-bridge iptables FORWARD rules (<code className="text-amber-300 font-mono">br_proxy &lt;-&gt; ens34</code>, <code className="text-amber-300 font-mono">br_auth &lt;-&gt; ens34</code>) are persisted via <code className="text-amber-300 font-mono">netfilter-persistent</code>. Ingress path (<code className="text-amber-300 font-mono">browser -&gt; Traefik -&gt; Coraza -&gt; Juice Shop@192.168.50.20</code>) returns HTTP/2 200 with Coraza WAF security headers.
+              Layer 3 physical micro-segmentation is active: gateway interface <code className="text-amber-300 font-mono">ens34</code> (<code className="text-amber-300 font-mono">192.168.50.1/24</code>) connects to Zone 2 (<code className="text-amber-300 font-mono">VMnet3</code>). DC01 (<code className="text-amber-300 font-mono">192.168.50.10</code>), PC01 (<code className="text-amber-300 font-mono">192.168.50.100</code>), and CORP-WEB01 (<code className="text-amber-300 font-mono">192.168.50.20</code>) are all deployed on the <code className="text-amber-300 font-mono">192.168.50.0/24</code> subnet with verified routing to Zone 3. Docker-bridge iptables FORWARD rules (<code className="text-amber-300 font-mono">br_proxy &lt;-&gt; ens34</code>, <code className="text-amber-300 font-mono">br_auth &lt;-&gt; ens34</code>) are persisted via <code className="text-amber-300 font-mono">netfilter-persistent</code>. Ingress path (<code className="text-amber-300 font-mono">browser -&gt; Traefik -&gt; Coraza -&gt; CORP-WEB01@192.168.50.20</code>) returns HTTP/2 200 with Coraza WAF security headers.
             </p>
           </div>
         </div>

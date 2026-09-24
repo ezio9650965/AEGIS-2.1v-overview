@@ -31,8 +31,8 @@ boundary that request originates from.
 ## Architecture: Four Zones
 
 ```
-Zone 1 — Threatscape        Red-team emulation environment
-Zone 2 — Enterprise Grid    Simulated corporate network (AD, endpoints, DB)
+Zone 1 — Threatscape        Red-team emulation & attack surface (Atomic Red Team, Web Exploits, Fuzzing, Credential Spraying)
+Zone 2 — Target Grid        Target enterprise network (CORP-DC01 AD DS, CORP-PC01, CORP-WEB01 Juice Shop, Keycloak ↔ AD Federation)
 Zone 3 — ZTA Gateway        The access gateway itself (this is the core product)
 Zone 4 — MSSP SOC           Remote SIEM/SOAR cluster
 ```
@@ -126,26 +126,29 @@ migrated to LDAP backend with MFA verified, Keycloak federated as relying party 
 Keycloak session revocation: cross-zone route to Gateway (192.168.19.173) confirmed unreachable
 from minisoc3; dropped from automated Shuffle workflow, designated as a manual step in demo playbook.
 
-### Zone 2 — Enterprise Grid *(not built)*
+### Zone 2 — Target Grid *(Active Subnet / In-Progress)*
 
-Planned: a 4-node simulated corporate network (`aegis.corp`) — Windows
-Server domain controller, a domain-joined Windows 10 workstation
-("Patient Zero"), a Linux database host, and the web target (OWASP Juice
-Shop). Juice Shop and Patient Zero are confirmed live on the Zone 3 LAN
-segment already; the rest of Zone 2 (AD domain, additional endpoints) is
-not yet deployed.
+Target enterprise infrastructure (`aegis.corp` on `192.168.50.0/24` via `ens34`):
+- **CORP-DC01** (`192.168.50.10`): Windows Server 2022 Active Directory Domain Controller serving as the **primary enterprise identity store** for corporate credentials and security groups.
+- **CORP-PC01** (`192.168.50.100`): Domain-joined Windows 10 workstation ("Patient Zero") instrumented with Sysmon v15 and Wazuh Agent 002 (Active Response target).
+- **CORP-WEB01** (`192.168.50.20`): Target web host running OWASP Juice Shop on port 3000, micro-segmented on `VMnet3`, shielded inline by Coraza WAF (CRS v4) and decoupled from Authelia for public e-commerce access.
+- **Keycloak ↔ Active Directory Federation**: Core identity bridging resource federating AD DS (`CORP-DC01`) with Keycloak via scheduled LDAP/OIDC sync to eliminate siloed credential databases.
+- *Note*: Standalone PostgreSQL server `CORP-DB01` has been removed from the topology in favor of enterprise AD identity federation and WAF-shielded web services.
 
-### Zone 1 — Threatscape *(not built)*
+### Zone 1 — Threatscape *(Attack Surface & Red Team Engine)*
 
-Planned red-team emulation environment (Kali Linux, C2 framework, malware
-analysis sandbox) for generating reproducible attack scenarios against the
-rest of the environment. Not started.
+Red-team adversary station and automated execution framework designed to simulate realistic adversary behaviors:
+- **Atomic Red Team**: Automated execution framework triggering mapped MITRE ATT&CK technique batteries against target hosts (tactics: Execution, Persistence, Privilege Escalation, Defense Evasion, Credential Spraying).
+- **Web Application Exploitation**: SQL Injection (SQLi) & Cross-Site Scripting (XSS) via automated tools (sqlmap) and manual crafting targeting `CORP-WEB01` endpoints.
+- **Directory Fuzzing & Path Traversal**: Wordlist probing via `gobuster`, `ffuf`, and `dirbuster` against edge proxy routing and internal API paths.
+- **Credential Attacks**: Brute force authentication attacks and password spraying against edge login portals and Active Directory accounts.
+- **C2 & Binary Detonation**: Sliver C2 server (mTLS/DNS listeners), Mimikatz memory credential harvesting, and airgapped REMnux malware analysis sandbox.
 
 #### Attack Testing Methodology: Kali vs. Atomic Red Team
 
 Two complementary attack-testing methodologies validate AEGIS detection and response:
 
-- **Kali Linux (Manual Kill-Chain):** Demonstrates one full, realistic, narrative attack chain end-to-end for the live jury demo (SQLi initial access via Juice Shop → LSASS memory dump via Mimikatz on Patient Zero → Sliver C2 beaconing and exfiltration).
+- **Kali Linux (Manual Kill-Chain):** Demonstrates one full, realistic, narrative attack chain end-to-end for the live jury demo (SQLi initial access via CORP-WEB01 Juice Shop → LSASS memory dump via Mimikatz on Patient Zero → Sliver C2 beaconing and exfiltration).
 - **Atomic Red Team (ATT&CK Coverage Matrix):** Provides breadth across MITRE ATT&CK techniques by executing discrete, highly focused test cases individually via `invoke-atomicredteam` (Windows) and the Linux/bash runner. Grouped by tactic (Execution, Persistence, Privilege Escalation, Defense Evasion, Exfiltration), each test produces a per-technique pass/fail coverage matrix (technique ID → detected by Wazuh/Sysmon/Zeek/Suricata), directly extending the MITRE ATT&CK tagging already proven in `local_rules.xml` `mitre.id` fields (e.g. rule 100100 / T1190).
 
 ---
@@ -233,6 +236,10 @@ Highlights:
 - **Per-Source Alert Index Split & Kibana Security Dashboards — RESOLVED**:
   - *Root Cause*: Aggregating Authelia authentication events, Coraza WAF blocks, and Keycloak OIDC logs into a single generic index caused high ingestion latency and field clashes.
   - *Real Fix*: Implemented per-source split on minisoc2/minisoc1 (`wazuh-alerts-authelia-*`, `wazuh-alerts-coraza-*`, `wazuh-alerts-keycloak-*`), generated encryption keys in `kibana.yml`, and deployed two dedicated production dashboards: "Identity & Access Security Overview" and "Edge WAF Security Overview".
+- **F-025: Shuffle Built-in MISP App Forces GET — RESOLVED**: Replaced Shuffle's buggy MISP node with a generic HTTP node issuing POST to `https://misp-core/attributes/restSearch` with raw API key authorization.
+- **F-026: Wazuh Active Response API Parameter Evolution — RESOLVED**: Removed deprecated `custom` boolean field for Wazuh API 4.7+ and identified mandatory `agents_list` query parameter for targeted execution.
+- **F-027: Nginx Reverse Proxy for Zone 4 Dashboards — RESOLVED**: Configured Nginx reverse proxy on minisoc3 for `shuffle.dz`, `misp.dz`, and `kibana.dz`, aligning service base-URLs and eliminating unstable SSH tunnels.
+- **F-028: minisoc3 Partial Outage After Docker Restart — RESOLVED**: Host sshd and Nginx recovered following high-memory container recreation; all `.dz` proxy domains and SSH access operational.
 
 ---
 
@@ -242,11 +249,15 @@ Highlights:
 |---|---|
 | Zone 3 (Gateway) | Built, hardened, sensors verified, Coraza WAF verified inline, group-based access control active |
 | Zone 4 minisoc1/2 | Pre-existing, operational |
-| Zone 4 minisoc3 | Infrastructure deployed and verified (5-container Shuffle with shuffle-opensearch, 4-container MISP, Logstash webhook wired, Nginx .dz HTTPS proxy); SOAR workflow in progress (misp_enrichment trigger & MISP node verified) |
-| Zone 4 detection rules on minisoc2 | Verified operational: Rule 100100 confirmed firing with T1190 via wazuh-logtest; mitre.id fields validated in local_rules.xml |
+| Zone 4 minisoc3 | Infrastructure deployed and verified (5-container Shuffle with shuffle-opensearch, 4-container MISP, Logstash webhook wired, Nginx .dz HTTPS proxy) |
+| Zone 4 | Detection rules (7 active) | Deployed and firing on real attack data |
+| Zone 4 | SOAR workflow (webhook→MISP→Discord) | Built and verified end-to-end |
+| Zone 4 | Nginx reverse proxy | Deployed and operational (shuffle.dz / misp.dz / kibana.dz) |
+| Zone 4 | Wazuh Active Response | API reachable, agent-side execution pending |
+| Zone 4 | Keycloak↔AD federation | Blocked — auth_net internal Docker network requires a dual-homed bridge or proxy to route to Zone 2 subnet |
 | Zone 4 Zeek/Suricata Ingestion & Dashboards | Operational: Dedicated Filebeat ECS data streams (.ds-filebeat-8.19.13-*) and 4 verified Kibana dashboards |
 | Zone 4 OpenLDAP & Identity/WAF Telemetry | Completed: Stages 1-3 (OpenLDAP + Authelia LDAP + Keycloak OIDC via oidc-proxy) + Per-source index split + 2 dedicated Kibana dashboards |
-| Zone 2 (Enterprise Grid) | Not built |
+| Zone 2 (Target Grid) | Active Subnet: CORP-DC01 (AD DS), CORP-PC01, and CORP-WEB01 (Juice Shop) active on 192.168.50.0/24 with cross-zone routing verified; Keycloak ↔ AD federation integrated |
 | Zone 1 (Threatscape) | Not built |
 | Atomic Red Team coverage testing | Not started |
 

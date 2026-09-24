@@ -1,5 +1,6 @@
 import React from 'react';
 import { InteractiveTopologyDiagram } from './InteractiveTopologyDiagram';
+import { LiveThreatIntelGrid } from './LiveThreatIntelGrid';
 import { Network, ShieldCheck } from 'lucide-react';
 
 export const MasterTopologyView: React.FC = () => {
@@ -32,6 +33,9 @@ export const MasterTopologyView: React.FC = () => {
           showTraceControls={true}
         />
       </div>
+
+      {/* Dynamic Live Threat Intelligence Feeds (MISP & Suricata ET Open Data-Grid) */}
+      <LiveThreatIntelGrid />
     </div>
   );
 };

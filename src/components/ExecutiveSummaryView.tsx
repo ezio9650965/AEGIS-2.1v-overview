@@ -452,7 +452,7 @@ export const ExecutiveSummaryView: React.FC = () => {
                 <span className="font-bold text-white">Active Edge Defenses:</span> Coraza WAF (Caddy + OWASP CRS) + Suricata IDS + Host Zeek NTA.
               </li>
               <li>
-                <span className="font-bold text-white">Zone 2 Small Enterprise Grid:</span> `CORP-DC01` Active Directory + `CORP-PC01` Sysmon + `CORP-DB01` PostgreSQL PII.
+                <span className="font-bold text-white">Zone 2 Target Grid:</span> `CORP-DC01` Active Directory (Primary Identity Store) + `CORP-PC01` Sysmon + `CORP-WEB01` (OWASP Juice Shop) + `Keycloak ↔ AD Federation`.
               </li>
               <li>
                 <span className="font-bold text-white">Shuffle SOAR ("Mahoraga v2.1"):</span> Logstash + MISP Threat Intel + Wazuh Active Response.

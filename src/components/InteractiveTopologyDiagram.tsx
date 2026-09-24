@@ -996,7 +996,7 @@ export const InteractiveTopologyDiagram: React.FC<TopologyProps> = ({
 
                 <div className="flex items-center gap-3 self-end md:self-center shrink-0 font-mono">
                   <span className="text-[10px] px-2 py-1 rounded bg-[#21262d] border border-[#30363d] text-[#8b949e]">
-                    2 Appliances · 4 C2 & Exploit Tools
+                    Atomic Red Team · Web Exploits · Fuzzing · Credential Spraying
                   </span>
                   <div className="p-1 rounded bg-[#21262d] border border-[#30363d] text-[#8b949e] hover:text-[#c9d1d9]">
                     {expandedZones.z1 ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -1017,10 +1017,10 @@ export const InteractiveTopologyDiagram: React.FC<TopologyProps> = ({
                       portBadges={[{ port: ':443/80', isExposed: true }]}
                       statusBadge={{ label: 'ACTIVE THREAT', isHealthy: false }}
                       facts={[
-                        'Sliver C2: Go-based C2 with mTLS/DNS listeners',
-                        'sqlmap: Automated SQLi exploit engine',
-                        'mimikatz: LSASS memory credential dump',
-                        'Burp Suite: Layer 7 HTTP payload crafting',
+                        'Atomic Red Team: Automated execution framework',
+                        'Web Exploitation: SQL Injection (SQLi) & XSS',
+                        'Directory Fuzzing & Path Traversal (gobuster, ffuf)',
+                        'Credential Attacks: Brute Force & Password Spraying',
                       ]}
                       isActiveInTrace={isNodeActive('kali')}
                       isDimmed={isTraceMode && !isNodeActive('kali')}
@@ -1036,8 +1036,8 @@ export const InteractiveTopologyDiagram: React.FC<TopologyProps> = ({
                       statusBadge={{ label: 'ISOLATED LAB', isHealthy: true }}
                       facts={[
                         'YARA Analysis: Pattern matching on dropped binaries',
+                        'Payload Detonation: Verify before controlled replay',
                         'NetworkMiner: Passive traffic artifact extraction',
-                        'exiftool & strings: Static header metadata inspection',
                         'Zero external egress allowed by hypervisor',
                       ]}
                       isActiveInTrace={isNodeActive('remnux')}
@@ -1344,7 +1344,7 @@ export const InteractiveTopologyDiagram: React.FC<TopologyProps> = ({
 
                 <div className="flex items-center gap-3 self-end md:self-center shrink-0 font-mono">
                   <span className="text-[10px] px-2 py-1 rounded bg-[#21262d] border border-[#30363d] text-[#ffb700]">
-                    CORP-DC01 · CORP-PC01 · CORP-DB01 · CORP-WEB01
+                    CORP-DC01 · CORP-PC01 · CORP-WEB01 · Keycloak ↔ AD Federation
                   </span>
                   <div className="p-1 rounded bg-[#21262d] border border-[#30363d] text-[#8b949e] hover:text-[#c9d1d9]">
                     {expandedZones.z2 ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -1361,16 +1361,16 @@ export const InteractiveTopologyDiagram: React.FC<TopologyProps> = ({
                       name="CORP-DC01 (AD DS)"
                       categoryColor="am"
                       icon={<Server className="w-4 h-4" />}
-                      ipAddress="192.168.20.10"
+                      ipAddress="192.168.50.10"
                       portBadges={[
                         { port: ':389 LDAP', isExposed: false },
                         { port: ':88 KRB', isExposed: false },
                       ]}
-                      statusBadge={{ label: 'PROTECTED', isHealthy: true }}
+                      statusBadge={{ label: 'PRIMARY ID STORE', isHealthy: true }}
                       facts={[
                         'Windows Server 2022 AD DS',
                         'Domain Controller for aegis.corp',
-                        'Zero internet route / No public IP',
+                        'Primary enterprise identity authority',
                       ]}
                       isActiveInTrace={isNodeActive('dc01')}
                       isDimmed={isTraceMode && !isNodeActive('dc01')}
@@ -1378,14 +1378,14 @@ export const InteractiveTopologyDiagram: React.FC<TopologyProps> = ({
 
                     {/* PC01 */}
                     <AegisNodeCard
-                      name="CORP-PC01 (Workstation)"
+                      name="CORP-PC01 (Patient Zero)"
                       categoryColor="am"
                       icon={<Cpu className="w-4 h-4" />}
-                      ipAddress="192.168.20.100"
+                      ipAddress="192.168.50.100"
                       portBadges={[{ port: 'Sysmon v15', isExposed: false }]}
                       statusBadge={{ label: 'EDR ARMED', isHealthy: true }}
                       facts={[
-                        'Windows 10 Finance Client (ezio)',
+                        'Windows 10 Workstation (ezio)',
                         'Domain joined to aegis.corp',
                         'Wazuh Agent 002 Active Response target',
                       ]}
@@ -1393,38 +1393,41 @@ export const InteractiveTopologyDiagram: React.FC<TopologyProps> = ({
                       isDimmed={isTraceMode && !isNodeActive('corp-pc01')}
                     />
 
-                    {/* DB01 */}
+                    {/* CORP-WEB01 */}
                     <AegisNodeCard
-                      name="CORP-DB01 (Database)"
-                      categoryColor="am"
-                      icon={<Database className="w-4 h-4" />}
-                      ipAddress="192.168.20.50"
-                      portBadges={[{ port: ':5432 NO EXT', isExposed: false }]}
-                      statusBadge={{ label: 'CROWN JEWEL', isHealthy: true }}
-                      facts={[
-                        'PostgreSQL 14 Customer PII Vault',
-                        'auditd FIM & Query Logging active',
-                        '100% Shielded by Zero-Trust Edge',
-                      ]}
-                      isActiveInTrace={isNodeActive('dbvault')}
-                      isDimmed={isTraceMode && !isNodeActive('dbvault')}
-                    />
-
-                    {/* WEB01 */}
-                    <AegisNodeCard
-                      name="CORP-WEB01 (Intranet)"
+                      name="CORP-WEB01 (Juice Shop)"
                       categoryColor="am"
                       icon={<Globe className="w-4 h-4" />}
-                      ipAddress="192.168.20.175"
-                      portBadges={[{ port: ':80/:443 INT', isExposed: false }]}
-                      statusBadge={{ label: 'MFA REQUIRED', isHealthy: true }}
+                      ipAddress="192.168.50.20"
+                      portBadges={[{ port: ':3000 Web', isExposed: false }, { port: 'WAF Shielded', isExposed: false }]}
+                      statusBadge={{ label: 'CORAZA WAF', isHealthy: true }}
                       facts={[
-                        'Departmental HR & Wiki portal',
-                        'Protected by Authelia Forward-Auth',
-                        'Wazuh Agent telemetry streaming',
+                        'Target web application (Juice Shop)',
+                        'Layer 3 micro-segmented on Zone 2 (VMnet3)',
+                        'Shielded inline by Coraza WAF (CRS 942100)',
                       ]}
                       isActiveInTrace={isNodeActive('corp-web01')}
                       isDimmed={isTraceMode && !isNodeActive('corp-web01')}
+                    />
+
+                    {/* Keycloak <-> AD Federation */}
+                    <AegisNodeCard
+                      name="Keycloak ↔ AD Federation"
+                      categoryColor="am"
+                      icon={<ShieldAlert className="w-4 h-4" />}
+                      ipAddress="Identity Bridge"
+                      portBadges={[
+                        { port: 'LDAP/OIDC', isExposed: false },
+                        { port: 'Sync Enclave', isExposed: false },
+                      ]}
+                      statusBadge={{ label: 'FEDERATED', isHealthy: true }}
+                      facts={[
+                        'AD (CORP-DC01) primary identity store',
+                        'Federated with Keycloak via LDAP/OIDC sync',
+                        'Zone 2 / Zone 3 core identity bridge',
+                      ]}
+                      isActiveInTrace={isNodeActive('keycloak') || isNodeActive('dc01')}
+                      isDimmed={isTraceMode && !isNodeActive('keycloak') && !isNodeActive('dc01')}
                     />
                   </div>
 

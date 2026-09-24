@@ -133,9 +133,9 @@ export const INITIAL_CHECKLIST_DONE: ChecklistItem[] = [
 export const INITIAL_CHECKLIST_LEFT: ChecklistItem[] = [
   {
     id: 'l1',
-    title: 'Deploy Zone 2 Enterprise Grid (CORP-DC01, CORP-PC01, Juice Shop, CORP-DB01)',
+    title: 'Deploy Zone 2 Target Grid (CORP-DC01, CORP-PC01, CORP-WEB01, Keycloak ↔ AD Federation)',
     description:
-      'DC01 (Win Server 2022 AD DS aegis.corp), PC01 (Win10 "Patient Zero"), and Juice Shop VM (192.168.50.20) are all now deployed on the 192.168.50.0/24 subnet (VMnet3) with verified cross-zone routing to Zone 3 via ens34. CORP-WEB01 domain join is explicitly out of scope (deliberate scope decision: public-facing app behind Coraza WAF does not require AD auth). Remaining Zone 2 items: Wazuh agents on Zone 2 hosts (blocked on Zone 4 access), CORP-DB01 PostgreSQL customer PII (optional, not blocking). Partially complete (in-progress), not fully done.',
+      'CORP-DC01 (Win Server 2022 AD DS aegis.corp primary enterprise identity store), CORP-PC01 (Win10 "Patient Zero"), and CORP-WEB01 (OWASP Juice Shop target app @ 192.168.50.20) are deployed on the 192.168.50.0/24 subnet (VMnet3) with verified cross-zone routing to Zone 3 via ens34. Keycloak ↔ Active Directory Federation integrates AD as the primary enterprise identity store via LDAP/OIDC sync. Standalone CORP-DB01 was removed in favor of enterprise AD identity federation and WAF-shielded web assets.',
     category: 'critical',
     completed: false,
     who: 'both',
@@ -144,19 +144,27 @@ export const INITIAL_CHECKLIST_LEFT: ChecklistItem[] = [
     id: 'l36',
     title: 'Docker-bridge iptables FORWARD rules (br_proxy/br_auth <-> ens34) on ztagateway',
     description:
-      'Added Docker-bridge iptables FORWARD rules (br_proxy <-> ens34, br_auth <-> ens34) on ztagateway, persisted via netfilter-persistent. Allows containerized services (Coraza, Traefik) to route to the Zone 2 subnet. Verified end-to-end with Juice Shop migrated to 192.168.50.20 and returning HTTP/2 200 with Coraza WAF security headers.',
+      'Added Docker-bridge iptables FORWARD rules (br_proxy <-> ens34, br_auth <-> ens34) on ztagateway, persisted via netfilter-persistent. Allows containerized services (Coraza, Traefik) to route to the Zone 2 subnet. Verified end-to-end with CORP-WEB01 (OWASP Juice Shop) migrated to 192.168.50.20 and returning HTTP/2 200 with Coraza WAF security headers.',
     category: 'high',
     completed: true,
     who: 'ezio',
   },
-  { id: 'l10', title: 'Build the Shuffle SOAR workflow itself (webhook receiver -> MISP lookup -> Wazuh Active Response)', description: "Found and fixed a real bug: the MISP node was calling /events/index (lists all events, ignores filters) instead of /attributes/restSearch, which explains all prior ambiguous empty-result tests. Root cause of MISP 500s/CSRF errors also found: config.php had been left root-owned after `cake setSetting` commands run via docker exec, while PHP-FPM runs as www-data — fixed via chown www-data:www-data, mode 640. Switched the enrichment call from Shuffle's built-in MISP app (which forces GET regardless of config) to a raw HTTP node calling https://misp-core/attributes/restSearch directly. Confirmed correct field: Wazuh Windows/Sysmon alerts carry the IP at $exec.agent.ip, not $exec.data.srcip (that field only exists for certain network/firewall decoders). Enrichment now returns a precise single-attribute match (X-Result-Count: 1) against a real published MISP event. Decision/branch node (match -> action, no match -> log) is the next task, not yet built. Active Response / automated remediation action explicitly deprioritized for now to focus on completing detection-to-enrichment correctness first.", category: 'high', completed: false, who: 'ezio' },
+  {
+    id: 'l10',
+    title: 'Build the Shuffle SOAR workflow',
+    description:
+      "Workflow aegis_soar_v1 deployed and verified end-to-end: Webhook trigger → Set Variable node (extracts srcip, agent_id, rule_level, rule_id) → MISP restSearch enrichment (via raw HTTP node — Shuffle's built-in MISP app node is broken, forces GET regardless of UI method selector, see F-025) → Discord notification. Tested with a synthetic Wazuh alert (rule.level=12, srcip=192.168.19.183): full pipeline executed, Discord message received with Rule ID, agent, source IP, and MISP match count. Wazuh Active Response node reaches the API successfully (200 response) but host-deny does not execute on the target agent (affected_items: 0, total_failed_items: 3) — deferred to post-defense, needs agents_list query parameter tuning. Severity-based branching (if_else_routing node) is not implemented — the Shuffle branch node app fails to load (image pull blocked), so the workflow runs linear: enrich → notify, not enrich → decide → contain/notify. Deployment accessed via an Nginx reverse proyx on minisoc3 (shuffle.dz, misp.dz, kibana.dz) — this pattern replaced unreliable SSH tunneling.",
+    category: 'high',
+    completed: true,
+    who: 'ezio',
+  },
   { id: 'l10b', title: 'End-to-end live-alert test (trigger a real attack, confirm it flows Wazuh -> Elasticsearch -> Logstash -> Shuffle webhook)', description: 'A real live Wazuh alert (Sysmon Process Create, T1055 - Process Injection, rule 61640, agent patient_zero @ 192.168.19.174) flowed the full pipeline unprompted: Wazuh -> Elasticsearch -> Logstash -> Shuffle webhook (misp_enrichment), confirmed via Shuffle execution logs. This was organic detection traffic, not a synthetic test payload.', category: 'high', completed: true, who: 'ezio' },
   { id: 'l11', title: 'Write 3 L1 SOC Playbooks in Markdown', description: 'Create brute-force.md, malware.md, and exfiltration.md in /opt/soc/playbooks/.', category: 'high', completed: false, who: 'both' },
   { id: 'l12', title: 'Map Custom Wazuh Rules to MITRE ATT&CK', description: 'Rule 100100 confirmed firing with T1190 via wazuh-logtest; mitre.id fields validated in local_rules.xml.', category: 'high', completed: true, who: 'ezio' },
   { id: 'l16', title: 'Deploy REMnux VM in Zone 1', description: 'Set up static malware inspection sandbox on Kali / REMnux host.', category: 'medium', completed: false, who: 'both' },
-  { id: 'l17', title: 'Script 3 Reproducible Attack Scenarios', description: 'Prepare automated scripts for SQLi, LSASS mimikatz dump, and Sliver C2 beaconing.', category: 'jury', completed: false, who: 'both' },
+  { id: 'l17', title: 'Script 3 Reproducible Attack Scenarios (Atomic Red Team, Web App Exploits, Credential Attacks)', description: 'Prepare automated execution scripts for Atomic Red Team framework, Web Application Exploitation (SQLi & XSS against CORP-WEB01), Directory Fuzzing & Path Traversal (gobuster/ffuf/dirbuster), and Credential Attacks (Brute Force & Password Spraying).', category: 'jury', completed: false, who: 'both' },
   { id: 'l18', title: 'Rehearse 15-Minute Jury Demo Script', description: 'Execute 5 dry-run rehearsals covering all 5 demo acts under 15 minutes.', category: 'jury', completed: false, who: 'both' },
-  { id: 'l19', title: 'Atomic Red Team coverage testing', description: 'Run Atomic Red Team test battery against Zone 2 endpoints (Windows/Sysmon + Linux), grouped by tactic (Execution, Persistence, Privilege Escalation, Defense Evasion, Exfiltration), and build a technique -> detected/not-detected coverage matrix.', category: 'jury', completed: false, who: 'both' },
+  { id: 'l19', title: 'Atomic Red Team coverage testing', description: 'Run Atomic Red Team automated execution framework against Zone 2 Target Grid endpoints (CORP-PC01, CORP-DC01), testing Execution, Persistence, Privilege Escalation, Defense Evasion, and Credential Spraying, mapping results to MITRE ATT&CK coverage matrix.', category: 'jury', completed: false, who: 'both' },
   {
     id: 'l27',
     title: 'Stand up Elastic Security detection rules as cross-source correlation layer',
@@ -167,6 +175,15 @@ export const INITIAL_CHECKLIST_LEFT: ChecklistItem[] = [
     who: 'ezio',
   },
   { id: 'l28', title: 'Plan MISP threat-intel enrichment as an indicator-match step on top of alerts', description: 'Plan MISP threat-intel enrichment as an indicator-match step on top of alerts (via Elastic indicator-match rules or Shuffle pulling MISP data), distinct from the existing Shuffle enrichment workflow (l10) which currently does manual per-alert MISP lookups, not automated indicator matching at scale.', category: 'high', completed: false, who: 'ezio' },
+  {
+    id: 'l28a',
+    title: 'MISP per-alert enrichment',
+    description:
+      "Per-alert lookup via Shuffle's HTTP node against MISP's restSearch endpoint. MISP seeded with a test attacker IP (192.168.19.183, event 2 'AEGIS test IOC') and confirmed returning a match (X-Result-Count: 1). This is single-alert, on-demand enrichment — scale-out indicator matching across all incoming alerts (item l28 proper) is still pending.",
+    category: 'high',
+    completed: true,
+    who: 'ezio',
+  },
   { id: 'l31', title: "Clean up Keycloak's redundant log env vars", description: "KC_LOG_CONSOLE_OUTPUT, KC_LOG_FILE, KC_LOG_FILE_PATH, KC_LOG_FORMAT are now redundant with the working command-line flags; consolidate to avoid future config drift. Verified via a clean --force-recreate rebuild: only KC_LOG_CONSOLE_OUTPUT and KC_LOG_LEVEL remained (sourced from docker-compose's inline environment block), and file logging continued working correctly.", category: 'medium', completed: true, who: 'eagle' },
   { id: 'l33', title: 'Wazuh ECS Field Normalization', description: 'Normalize legacy Wazuh archive and alert fields into Elastic Common Schema (ECS) to enable unified querying and rule correlation alongside native Filebeat Zeek/Suricata data streams.', category: 'high', completed: false, who: 'ezio' },
   { id: 'l34', title: 'Comprehensive Secret Rotation', description: 'Rotate burned credentials across all 9 exposed services prior to defense: Elastic superuser, Keycloak admin, LDAP admin/config/bind, Authelia OIDC RSA private key + client secrets, session secret, JWT secret, Redis/Postgres passwords.', category: 'critical', completed: false, who: 'both' },
@@ -183,10 +200,10 @@ export const INITIAL_CHECKLIST_LEFT: ChecklistItem[] = [
 ];
 
 export const ZONE_STATUS = {
-  status: 'Z3 Done (Hardened + WAF Inline) · Z2 Subnet Active · Z4 Dashboards & Pipeline Live',
+  status: 'Z3 Done (Hardened + WAF Inline) · Z2 Subnet Active · Z4 Dashboards & SOAR Workflow Live',
   summary:
-    'Zone 3 (ZTA Gateway) fully operational and verified: OpenLDAP directory deployed (dc=zerotrust,dc=lan), Authelia migrated to LDAP backend with password + TOTP MFA, Keycloak federated as upstream OIDC IdP via oidc-proxy Caddy sidecar, Coraza WAF inline actively blocking attacks with HTTP 403, and group-based access_control enforced with explicit deny rules. Zone 2 (Target Enclave) active: DC01, PC01, and Juice Shop VM (192.168.50.20) now running on 192.168.50.0/24 with Docker-bridge iptables FORWARD rules on ztagateway and verified cross-zone routing. Zone 4 (MSSP SOC) advanced: per-source daily index split, 2 Elastic Security detection rules firing on real data (Suricata priority + Authelia brute force), and persistent Kibana dashboards.',
-  lastAuditDate: 'September 22, 2026',
+    'Zone 3 (ZTA Gateway) fully operational and verified: OpenLDAP directory deployed (dc=zerotrust,dc=lan), Authelia migrated to LDAP backend with password + TOTP MFA, Keycloak federated as upstream OIDC IdP via oidc-proxy Caddy sidecar, Coraza WAF inline actively blocking attacks with HTTP 403, and group-based access_control enforced with explicit deny rules. Zone 2 (Target Grid) active: CORP-DC01 (AD DS aegis.corp primary enterprise identity store), CORP-PC01 (Patient Zero), and CORP-WEB01 (OWASP Juice Shop @ 192.168.50.20) running on 192.168.50.0/24 with Docker-bridge iptables FORWARD rules on ztagateway and verified cross-zone routing, bridged with Zone 3 via Keycloak ↔ Active Directory Federation (LDAP/OIDC sync). Zone 4 (MSSP SOC) advanced: per-source daily index split, 2 Elastic Security detection rules firing on real data (Suricata priority + Authelia brute force), persistent Kibana dashboards, Shuffle SOAR workflow (aegis_soar_v1) verified end-to-end with MISP restSearch single-alert enrichment and Discord notifications, and Nginx reverse proxy operational (shuffle.dz, misp.dz, kibana.dz).',
+  lastAuditDate: 'September 24, 2026',
 };
 
 export const SECURITY_DEBT: SecurityDebtItem[] = [
@@ -408,6 +425,22 @@ export const KNOWN_ISSUES: KnownIssue[] = [
     severity: 'Medium',
     description: "Edge WAF Security dashboard needs rebuilding — was lost/not saved in a prior session (cause not yet diagnosed; check Kibana's saved-object list/dashboard history before assuming full data loss).",
     impact: 'Kibana WAF visualization panels (CRS anomaly scores, top attacked URIs, attack categories, client IP blocks) need reconstitution from filebeat-coraza-* data streams.',
+    status: 'Open',
+  },
+  {
+    id: 'ki-12',
+    title: 'minisoc3 partial outage after systemctl restart docker (Resolved)',
+    severity: 'High',
+    description: 'VM responded to ping, ports 3001/8443 open, but port 22 (SSH) and port 80 (Nginx) hung following Docker restart under high memory pressure (74% boot memory).',
+    impact: 'Resolved: Nginx and SSH services restored; .dz reverse proxy domains (shuffle.dz, misp.dz, kibana.dz) confirmed fully operational. Documented for operational reliability audit.',
+    status: 'Resolved',
+  },
+  {
+    id: 'ki-13',
+    title: 'Wazuh Active Response API agents_list query parameter tuning',
+    severity: 'Medium',
+    description: 'Wazuh Active Response API endpoint returns HTTP 200 on PUT /active-response with command: host-deny, but host execution returns affected_items: 0 without explicit agents_list query parameter.',
+    impact: 'Automated containment action deferred to post-defense; workflow runs linear (enrich -> notify) via Discord while agent-side AR execution parameter is refined.',
     status: 'Open',
   },
 ];
@@ -702,5 +735,33 @@ export const LESSONS_LEARNED: LessonLearnedItem[] = [
     takeaway: 'Filebeat queue saturation causes ingestion lag under burst load (observed 9-minute gap between @timestamp and event.ingested during an nmap scan burst).',
     architecturalContext: 'During an nmap-generated traffic burst, Filebeat\'s internal queue filled (queue.filled.pct: 1) while Elasticsearch\'s thread pool was confirmed clean, ruling out ES as the bottleneck. Mitigated by increasing the Suricata detection rule\'s look-back window from 5m to 15m to ensure delayed events are captured within the rule\'s evaluation window. This establishes a measured, realistic minimum MTTD bound (6-10 minutes) for this architecture under burst conditions.',
     juryDefenseTalkingPoint: 'Jury question: "How does the ingestion pipeline behave under high-volume attack bursts?" Answer: Under burst conditions such as a multi-thousand-packet nmap scan, Filebeat\'s internal memory queue saturates (queue.filled.pct: 1), introducing an ingestion lag of up to 9 minutes before events are indexed in Elasticsearch. We mitigated this by setting our detection rule lookback window to 15m. Rather than obscuring this, we treat this 6-10 minute window as an honest, measured Mean Time to Detect bound for our self-hosted edge architecture.',
+  },
+  {
+    id: 'lesson-17',
+    domain: 'F-025: Shuffle Built-in MISP App Forces GET Method',
+    takeaway: 'Shuffle\'s branded MISP app node hardcodes HTTP GET on its transport layer regardless of the method selected in the workflow UI, breaking endpoints like restSearch that mandate POST.',
+    architecturalContext: 'MISP node in Shuffle returned 400 "Restsearch queries using GET and no parameters are not allowed". Root cause: Shuffle\'s app implementation ignores UI method selection and dispatches GET. Mitigated by substituting a generic HTTP node that issues an explicit POST to https://misp-core/attributes/restSearch with header Authorization: <raw-key> (no Bearer prefix) and JSON body {"value": "<ip>", "type": "ip-src", "returnFormat": "json"}. Matches cleanly.',
+    juryDefenseTalkingPoint: 'Jury question: "How did you resolve the integration defect between Shuffle and MISP restSearch?" Answer: Shuffle\'s built-in MISP integration app node hardcodes HTTP GET at the transport layer, violating MISP 2.4+ restSearch requirements which enforce POST. We bypassed the broken vendor app block with Shuffle\'s generic HTTP node, passing raw API key headers and payload bodies directly. This established reliable single-attribute threat intel enrichment on live incoming alerts.',
+  },
+  {
+    id: 'lesson-18',
+    domain: 'F-026: Wazuh Active Response API Parameter Evolution (v4.7+)',
+    takeaway: 'Wazuh API 4.7+ removed the custom boolean parameter and enforces direct command strings along with mandatory agents_list query targets.',
+    architecturalContext: 'PUT /active-response returned 400 "Invalid field found {\'custom\'}". Wazuh API 4.7+ deprecated custom: true; built-in remediation commands are invoked directly via command: "host-deny" (while custom scripts require ! prefix). Additionally, omitting the agents_list=<id> query parameter causes the API to return 200 with 0 affected items ("AR command was not sent to any agent").',
+    juryDefenseTalkingPoint: 'Jury question: "Why did automated host containment via Wazuh Active Response require API schema adjustments?" Answer: Wazuh API v4.7 eliminated the legacy \'custom\' boolean parameter in active-response endpoints. Automated containment payloads must specify command: \'host-deny\' directly and target endpoints via the agents_list query parameter. We validated the API contract and deferred full host-side isolation execution to post-defense to ensure zero accidental lockout during jury demonstrations.',
+  },
+  {
+    id: 'lesson-19',
+    domain: 'F-027: Nginx Reverse Proxy for Zone 4 Dashboards & Base-URL Alignment',
+    takeaway: 'Accessing distributed multi-container SOC web UIs via SSH port-forwarding or raw IPs fails when applications enforce canonical base-URL redirect loops.',
+    architecturalContext: 'Direct service access via raw IP:port or SSH tunnel failed because MISP\'s MISP_BASEURL redirect loop bounced analysts back to an unreachable internal IP. Resolved by deploying an Nginx reverse proxy on minisoc3 with per-service server blocks paired with hosts-file DNS on the analyst workstation (shuffle.dz -> 127.0.0.1:3001, misp.dz -> 127.0.0.1:8443, kibana.dz -> 10.16.64.156:5601). Critical requirement: each service\'s configured base URL must match its proxy domain exactly.',
+    juryDefenseTalkingPoint: 'Jury question: "How did you eliminate access instability for Zone 4 SOC dashboards?" Answer: Rather than relying on fragile SSH port forwards that conflicted with MISP\'s strict base-URL redirect engine, we standardized on an Nginx reverse proxy on minisoc3 with custom .dz domain routing (shuffle.dz, misp.dz, kibana.dz). Aligning MISP_BASEURL with the proxy hostname permanently eliminated HTTP redirect loops.',
+  },
+  {
+    id: 'lesson-20',
+    domain: 'F-028: minisoc3 Container Mass-Recreate OOM & Service Recovery (RESOLVED)',
+    takeaway: 'Restarting Docker on memory-constrained SOC nodes during high container count recreation can trigger Linux OOM kills on auxiliary management daemons (sshd, nginx).',
+    architecturalContext: 'Following systemctl restart docker on minisoc3 (running 9 containers at 74% boot memory), Docker containers initialized correctly but sshd (port 22) and Nginx (port 80) hung. Transient memory spikes during simultaneous container startup starved non-containerized system services. Resolved by restoring sshd and Nginx with systemd restart policies. All .dz proxy endpoints and SSH management channels are verified operational.',
+    juryDefenseTalkingPoint: 'Jury question: "What operational resilience issues arose on the minisoc3 automation host?" Answer: During container recreation on minisoc3, initial memory saturation caused an OOM halt on the host sshd and Nginx processes while container runtimes remained up. We recovered both services, tuned resource constraints, and documented the incident in our operational reliability register to support production sizing recommendations.',
   },
 ];

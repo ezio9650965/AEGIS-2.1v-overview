@@ -168,7 +168,7 @@ export const CustomerVsEmployeeFlow: React.FC = () => {
                     <span>2. Direct Storefront Access</span>
                   </div>
                   <p className="text-[11px] text-[#94A3B8]">
-                    Customer reaches Juice Shop natively. Authentication uses application's local user table. Conversion and shopping cart UX remain fast and friction-free.
+                    Customer reaches CORP-WEB01 (Juice Shop) natively. Authentication uses application's local user table. Conversion and shopping cart UX remain fast and friction-free.
                   </p>
                 </div>
               </div>

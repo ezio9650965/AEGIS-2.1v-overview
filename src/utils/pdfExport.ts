@@ -413,8 +413,8 @@ export async function exportAegisPdf(options: PdfExportOptions = {}): Promise<vo
   drawSectionHeading('4', 'Four-Zone Hybrid Architecture Specification');
 
   const zoneTable = [
-    { zone: 'Zone 1: Threatscape', ip: '192.168.1.0/24', role: 'Kali Linux (APT / Sliver C2 / sqlmap), REMnux Malware Sandbox', status: 'Ready' },
-    { zone: 'Zone 2: Enterprise Grid', ip: '192.168.20.0/24', role: 'CORP-DC01 (Win Server AD DS), CORP-PC01 (Sysmon), CORP-DB01 (PII DB)', status: 'Pending' },
+    { zone: 'Zone 1: Threatscape', ip: '192.168.1.0/24', role: 'Atomic Red Team, Web App Exploitation (SQLi & XSS), Directory Fuzzing, Credential Brute Force', status: 'Ready' },
+    { zone: 'Zone 2: Target Grid', ip: '192.168.50.0/24', role: 'CORP-DC01 (AD DS), CORP-PC01 (Sysmon), CORP-WEB01 (Juice Shop), Keycloak ↔ AD Federation', status: 'Active Subnet' },
     { zone: 'Zone 3: ZTA Gateway', ip: '192.168.19.173', role: 'Traefik v3.6, Authelia, Keycloak, Postgres, Redis, Coraza WAF, Suricata, Zeek', status: 'Operational' },
     { zone: 'Zone 4: MSSP SOC', ip: '10.16.64.0/24', role: 'minisoc1 (ES 8.19), minisoc2 (Wazuh 4.7/Kibana), minisoc3 (Shuffle SOAR/MISP)', status: 'Verified' },
   ];

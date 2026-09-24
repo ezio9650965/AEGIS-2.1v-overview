@@ -26,15 +26,15 @@ AEGIS v2.1 represents a tactical restructuring of the project to eliminate fragi
    - Applied safe SQL script password rotations across PostgreSQL accounts and purged orphaned `.env` files.
     - Switched Keycloak from `start-dev` to `start` (plain production mode — `--optimized` was attempted but requires a pre-built image via `kc.sh build`, which this deployment does not use).
 4. **Active Edge Defenses Added**: Integrated **Coraza WAF** (Caddy plugin with OWASP Core Rule Set) inline to protect target web applications, **Suricata IDS** container on `proxy_net` with Emerging Threats Open rules, and host-level **Zeek NTA** (5-node cluster on `br_proxy`, `ens34`, and `ens33`).
-5. **Zone 2 Enterprise Grid Expanded**: Introduced a complete 3-node corporate domain (`aegis.corp`) featuring a Windows Server 2022 Active Directory Domain Controller (`CORP-DC01`), a Windows 10 domain workstation (`CORP-PC01` "Patient Zero") instrumented with Sysmon v15 and Wazuh Agent, and an Ubuntu PostgreSQL customer database server (`CORP-DB01`).
+5. **Zone 2 Target Grid Architecture**: Restructured the corporate target enclave (`aegis.corp` on `192.168.50.0/24`) around core enterprise identity and segmented target workloads: Windows Server 2022 Active Directory Domain Controller (`CORP-DC01` as primary enterprise identity store), Windows 10 domain workstation (`CORP-PC01` "Patient Zero") instrumented with Sysmon v15 and Wazuh Agent, target web application host (`CORP-WEB01` hosting Juice Shop), and **Keycloak ↔ Active Directory Federation** via LDAP/OIDC sync. Standalone `CORP-DB01` was removed in favor of enterprise AD identity federation and WAF-shielded web assets.
 
 ### 1.3 Honest Per-Zone Implementation Status & Regression Notice
 > **⚠️ Regression Risk Notice**: Gateway hardening (Argon2id parameters, session policy, Keycloak mode, orphaned secret files) has previously regressed silently between work sessions on this project — likely due to config files being reverted from an older snapshot. Status in this report reflects the most recent live verification (September 8, 2026), not a permanent guarantee. Recommend periodic live re-audits rather than trusting checklist state alone.
 
-- **Zone 3 Gateway Sensors & Hardening**: **Done (Fully Operational & Verified)** — Verified via live audits (September 19–21, 2026). All 9 core containers healthy, dual bridge isolation (`proxy_net` DMZ + `auth_net` `internal: true`) active, Forward-Auth MFA enforced with group-based restrictions and explicit deny rules, and Suricata IDS operational. Coraza WAF routing bypass has been fully resolved: Traefik dynamic routing repointed to `http://coraza:8080`, inline blocking verified against SQLi/UNION/XSS with HTTP 403, and Juice Shop decoupled from Authelia for public WAF-only protection.
-- **Zone 2 AD Enterprise Grid**: **Not Started (Pending deployment)** — Domain controller promotion (`CORP-DC01`), workstation enrollment (`CORP-PC01`), database server setup (`CORP-DB01`), and Wazuh agent deployments pending.
+- **Zone 3 Gateway Sensors & Hardening**: **Done (Fully Operational & Verified)** — Verified via live audits (September 19–21, 2026). All 9 core containers healthy, dual bridge isolation (`proxy_net` DMZ + `auth_net` `internal: true`) active, Forward-Auth MFA enforced with group-based restrictions and explicit deny rules, and Suricata IDS operational. Coraza WAF routing bypass has been fully resolved: Traefik dynamic routing repointed to `http://coraza:8080`, inline blocking verified against SQLi/UNION/XSS with HTTP 403, and CORP-WEB01 decoupled from Authelia for public WAF-only protection.
+- **Zone 2 Target Grid**: **Active Subnet / In-Progress** — Subnet `192.168.50.0/24` (`VMnet3`) configured with cross-zone routing via `ens34`. `CORP-DC01` (primary enterprise identity store), `CORP-PC01` ("Patient Zero"), `CORP-WEB01` (target web host), and Keycloak ↔ Active Directory Federation integrated (standalone `CORP-DB01` removed).
 - **Zone 4 Detection Pipeline & SOC Automation**: **Telemetry Pipeline Verified & SOAR In Progress (Operational\*)** — Zone 4 detection pipeline (Zeek/Suricata/Authelia/Coraza/Keycloak → Wazuh agent → MITRE-tagged rules on minisoc2) verified end-to-end. Centralized identity migration (OpenLDAP + Authelia LDAP backend + Keycloak OIDC federation via oidc-proxy) completed across Stages 1-3. Per-source index split (`wazuh-alerts-authelia-*`, `wazuh-alerts-coraza-*`, `wazuh-alerts-keycloak-*`) active with 2 dedicated Kibana dashboards. `minisoc3` automation stack (5-container Shuffle with shuffle-opensearch + Logstash webhook wired + MISP TLS port 443 + Nginx .dz reverse proxy) healthy. Shuffle SOAR workflow `misp_enrichment` verified with real live Wazuh alert (T1055) and matching MISP restSearch lookup. Outstanding: decision/branch node and full multi-stage attack flow.
-- **Zone 1 Threatscape & Red Team Engine**: **Configured & Ready** — Kali Linux APT station with Sliver C2, sqlmap, mimikatz, and REMnux sandbox environment prepared.
+- **Zone 1 Threatscape & Red Team Engine**: **Configured & Ready** — Red team attack surface and adversary station featuring Atomic Red Team (automated execution framework), Web Application Exploitation (SQLi & XSS), Directory Fuzzing & Path Traversal (gobuster, ffuf, dirbuster), and Credential Attacks (Brute Force & Password Spraying), supplemented by Sliver C2 and REMnux malware analysis sandbox.
 
 ### 1.4 What AEGIS Does and How It Enforces Zero Trust
 
@@ -56,15 +56,16 @@ Continuous verification: Sessions expire in 72 hours, not a year — the "always
 
 ```mermaid
 graph TB
-    subgraph Zone1["🔴 Zone 1: Threatscape (Internet & Red Team)"]
-        KALI["Kali Linux APT (192.168.1.50)<br/>Sliver C2 / sqlmap / mimikatz"]
-        REMNUX["REMnux Malware Analysis VM<br/>Static/Dynamic Analysis"]
+    subgraph Zone1["🔴 Zone 1: Threatscape (Attack Surface & Red Team)"]
+        KALI["Kali Linux APT (192.168.1.50)<br/>Atomic Red Team / SQLi & XSS<br/>Directory Fuzzing / Password Spraying"]
+        REMNUX["REMnux Malware Analysis VM<br/>Static/Dynamic Analysis & YARA"]
     end
 
-    subgraph Zone2["🟡 Zone 2: The Small Enterprise (aegis.corp - 192.168.20.0/24)"]
-        DC01["CORP-DC01 (192.168.20.10)<br/>Win Server 2022 AD / DNS / DHCP<br/>Wazuh Agent"]
-        PC01["CORP-PC01 (192.168.20.100)<br/>Win10 Workstation 'Patient Zero'<br/>Sysmon v15 + Wazuh Agent"]
-        DB01["CORP-DB01 (192.168.20.50)<br/>Ubuntu 22.04 PostgreSQL (Customer PII)<br/>Wazuh Agent + auditd"]
+    subgraph Zone2["🟡 Zone 2: The Target Grid (aegis.corp - 192.168.50.0/24)"]
+        DC01["CORP-DC01 (192.168.50.10)<br/>Win Server 2022 AD DS / Primary ID Store<br/>Wazuh Agent"]
+        PC01["CORP-PC01 (192.168.50.100)<br/>Win10 Workstation 'Patient Zero'<br/>Sysmon v15 + Wazuh Agent"]
+        WEB01["CORP-WEB01 (192.168.50.20:3000)<br/>Target Web Host (Juice Shop)<br/>Coraza WAF Shielded"]
+        KEYCLOAK_AD["Keycloak ↔ Active Directory Federation<br/>LDAP / OIDC Identity Sync Bridge"]
     end
 
     subgraph Zone3["🔵 Zone 3: ZTA Gateway (192.168.19.173 - Ubuntu 24.04 LTS)"]
@@ -84,7 +85,6 @@ graph TB
             PORTAINER["Portainer CE v2.39.2<br/>Management UI"]
         end
         ZEEK["Zeek NTA (5-Node Cluster)<br/>Sniffing br_proxy, ens34 & ens33"]
-        JUICESHOP["OWASP Juice Shop (192.168.19.175:3000)<br/>Vulnerable Target App"]
     end
 
     subgraph Zone4["🟣 Zone 4: MSSP SOC (10.16.64.0/24 - AlmaLinux 9.3 Cluster)"]
@@ -97,7 +97,7 @@ graph TB
     end
 
     %% Flow Connections
-    KALI -->|"1. HTTPS Attack / C2 / SQLi"| TRAEFIK
+    KALI -->|"1. HTTPS Attack / Atomic / SQLi"| TRAEFIK
     TRAEFIK -->|"2. Forward Auth Request (:9091)"| AUTHELIA
     AUTHELIA -->|"3. Check Sessions / Auth"| REDIS
     AUTHELIA -->|"4. User Credential Query"| OPENLDAP
@@ -105,22 +105,24 @@ graph TB
     KEYCLOAK -->|"6. Internal Token Exchange / Discovery"| OIDC_PROXY
     OIDC_PROXY -->|"7. Plain HTTP Relay (:9091)"| AUTHELIA
     TRAEFIK -->|"8. Ingress Route (:8080)"| CORAZA
-    CORAZA -->|"9. Inspected Clean Web Traffic"| JUICESHOP
+    CORAZA -->|"9. Inspected Clean Web Traffic"| WEB01
 
-    PC01 -->|"8. Sysmon / Security Logs (TCP 1514 mTLS)"| TRAEFIK
-    DC01 -->|"9. AD Event Logs (TCP 1514 mTLS)"| TRAEFIK
-    DB01 -->|"10. auditd / DB Logs (TCP 1514 mTLS)"| TRAEFIK
-    TRAEFIK -->|"11. Blind Proxy Pass-through"| SOC2
+    KEYCLOAK <-->|"Identity Federation (LDAP/OIDC Sync)"| KEYCLOAK_AD
+    KEYCLOAK_AD <-->|"Primary Identity Authority"| DC01
 
-    TRAEFIK -->|"12. JSON Access Logs (Filebeat)"| SOC1
-    ZEEK -->|"13. Network Traffic Logs (Filebeat)"| SOC1
-    SURICATA -->|"14. EVE JSON Alerts"| SOC2
+    PC01 -->|"10. Sysmon / Security Logs (TCP 1514 mTLS)"| TRAEFIK
+    DC01 -->|"11. AD Event Logs (TCP 1514 mTLS)"| TRAEFIK
+    TRAEFIK -->|"12. Blind Proxy Pass-through"| SOC2
 
-    SOC2 -->|"15. Index Alerts"| SOC1
-    SOC1 -->|"16. Alert Feed"| SOC3_SHUFFLE
-    SOC3_SHUFFLE -->|"17. Threat Intel Lookup"| SOC3_MISP
-    SOC3_SHUFFLE -->|"18. Active Response / Session Revocation"| SOC2
-    SOC2 -->|"19. Host Isolation Trigger"| PC01
+    TRAEFIK -->|"13. JSON Access Logs (Filebeat)"| SOC1
+    ZEEK -->|"14. Network Traffic Logs (Filebeat)"| SOC1
+    SURICATA -->|"15. EVE JSON Alerts"| SOC2
+
+    SOC2 -->|"16. Index Alerts"| SOC1
+    SOC1 -->|"17. Alert Feed"| SOC3_SHUFFLE
+    SOC3_SHUFFLE -->|"18. Threat Intel Lookup"| SOC3_MISP
+    SOC3_SHUFFLE -->|"19. Active Response / Session Revocation"| SOC2
+    SOC2 -->|"20. Host Isolation Trigger"| PC01
 ```
 
 ### 2.2 Detailed High-Density ASCII Architecture Map
@@ -130,15 +132,19 @@ graph TB
                                            AEGIS v2.1 MASTER TOPOLOGY MAP
 ========================================================================================================================
 
- [ ZONE 1: THREATSCAPE ]                     [ ZONE 2: THE SMALL ENTERPRISE (aegis.corp - 192.168.20.0/24) ]
+ [ ZONE 1: THREATSCAPE ]                     [ ZONE 2: THE TARGET GRID (aegis.corp - 192.168.50.0/24) ]
  +----------------------------------+        +-------------------------------------------------------------------------+
- | Kali Linux APT (192.168.1.50)   |        | CORP-DC01 (192.168.20.10) - Win Server 2022 AD DS / DNS / DHCP         |
- | - Sliver C2 / sqlmap / mimikatz  |        | - Wazuh Agent (Win Events: 4625, 4768, 4769)                          |
- | REMnux Malware Sandbox           |        | CORP-PC01 (192.168.20.100) - Win10 Pro "Patient Zero"                   |
- +----------------------------------+        | - Sysmon v15 + Wazuh Agent (Event IDs 1, 3, 7, 10, 11, 22)              |
-                  |                          | CORP-DB01 (192.168.20.50) - Ubuntu 22.04 PostgreSQL (Customer PII)       |
-                  | Attack Vectors           | - Wazuh Agent + auditd FIM                                              |
-                  v                          +-------------------------------------------------------------------------+
+ | Kali Linux APT (192.168.1.50)   |        | CORP-DC01 (192.168.50.10) - Win Server 2022 AD DS (Primary ID Store)    |
+ | - Atomic Red Team Framework      |        | - Active Directory Domain Services / Kerberos KDC / DNS                |
+ | - Web Exploitation: SQLi & XSS   |        | - Wazuh Agent (Win Events: 4625, 4768, 4769)                          |
+ | - Directory Fuzzing & Traversal  |        | CORP-PC01 (192.168.50.100) - Win10 Pro "Patient Zero"                  |
+ | - Brute Force / Password Spray   |        | - Sysmon v15 + Wazuh Agent (Event IDs 1, 3, 7, 10, 11, 22)              |
+ | - Sliver C2 & Burp Suite Pro     |        | CORP-WEB01 (192.168.50.20) - Target Web Host (OWASP Juice Shop)        |
+ | REMnux Malware Sandbox           |        | - Micro-segmented Subnet / Shielded inline by Coraza WAF (OWASP CRS)   |
+ +----------------------------------+        | Keycloak ↔ Active Directory Federation (LDAP/OIDC Identity Sync Bridge) |
+                  |                          +-------------------------------------------------------------------------+
+                  | Attack Vectors                                          ^
+                  v                                                         | (LDAP/OIDC Sync)
  +---------------------------------------------------------------------------------------------------------------------+
  | ZONE 3: ZTA GATEWAY (192.168.19.173 - Ubuntu 24.04 LTS Host)                                                        |
  |                                                                                                                     |
@@ -155,7 +161,7 @@ graph TB
  |  | Mailpit Sinkhole (Port 8025)    | Portainer CE v2.39.2 (Port 9000)                                             |  |
  |  +---------------------------------------------------------------------------------------------------------------+  |
  |                                                                                                                     |
- |  Host Extensions: Zeek NTA 5-Node (sniffing br_proxy, ens34, ens33) | Target: OWASP Juice Shop (192.168.19.175:3000) |
+ |  Host Extensions: Zeek NTA 5-Node (sniffing br_proxy, ens34, ens33) | Target Route: CORP-WEB01 (192.168.50.20:3000) |
  +---------------------------------------------------------------------------------------------------------------------+
                   |                                                  |
                   | Telemetry (TCP:1514 mTLS)                        | Filebeat Log Shipping (TCP:9200 TLS)
@@ -182,10 +188,11 @@ graph TB
   |                                                                               |
   |  +-----------------------------------+     +-------------------------------+  |
   |  | Kali Linux (192.168.1.50)         |     | REMnux Malware Analysis VM    |  |
-  |  | - Sliver C2 Server (mTLS / DNS)   |     | - Static analysis (yara, pe)  |  |
-  |  | - sqlmap (Automated SQLi)         |     | - Dynamic sandbox isolation   |  |
-  |  | - mimikatz (LSASS Dump)           |     +-------------------------------+  |
-  |  | - Burp Suite Pro (L7 Intercept)   |                                        |
+  |  | - Atomic Red Team Framework       |     | - Static analysis (yara, pe)  |  |
+  |  | - Web Exploits (SQLi & XSS)       |     | - Dynamic sandbox isolation   |  |
+  |  | - Directory Fuzzing & Path Trav   |     | - Payload detonation verify   |  |
+  |  | - Brute Force / Password Spray    |     +-------------------------------+  |
+  |  | - Sliver C2 & Burp Suite Pro      |                                        |
   |  +-----------------------------------+                                        |
   +-------------------------------------------------------------------------------+
             |                     |                     |
@@ -194,33 +201,43 @@ graph TB
             v                     v                     v
     [ Gateway Port 443 ]  [ Gateway Port 443 ]   [ Gateway Port 53 ]
 ```
-- **Components & Tools**: Kali Linux VM, REMnux VM, Sliver C2 framework, sqlmap, mimikatz, Burp Suite, Wireshark, NetworkMiner.
-- **Vectors**: OWASP Top 10 web exploits against Juice Shop, HTTPS/DNS beaconing, credential harvesting, malware payload delivery.
+- **Components & Tools**: Kali Linux VM, REMnux VM, Atomic Red Team (automated execution framework), sqlmap, Burp Suite Pro, gobuster, ffuf, dirbuster, hydra/spray tooling, Sliver C2 framework, mimikatz, Wireshark, NetworkMiner.
+- **Vectors**:
+  - **Atomic Red Team**: Automated execution framework triggering mapped MITRE ATT&CK technique batteries against target hosts.
+  - **Web Application Exploitation**: SQL Injection (SQLi) & Cross-Site Scripting (XSS) targeting web applications and API routes.
+  - **Directory Fuzzing & Path Traversal**: gobuster, ffuf, dirbuster wordlists probing edge routing, hidden admin panels, and traversal flaws.
+  - **Credential Attacks**: Brute force authentication attacks and password spraying targeting edge portals and Active Directory accounts.
+  - **C2 & Post-Exploitation**: Sliver C2 HTTPS/DNS beaconing, LSASS memory credential harvesting (Mimikatz), and lateral movement.
 
-### 3.2 Zone 2 Sub-Topology (The Small Enterprise — `aegis.corp`)
+### 3.2 Zone 2 Sub-Topology (The Target Grid — `aegis.corp` 192.168.50.0/24)
 ```
-  +-----------------------------------------------------------------------------------+
-  | ZONE 2: THE SMALL ENTERPRISE (192.168.20.0/24 - aegis.corp)                       |
-  |                                                                                   |
-  |  +---------------------------+  +---------------------------+  +----------------+ |
-  |  | CORP-DC01 (192.168.20.10) |  | CORP-PC01 (192.168.20.100)|  | CORP-DB01      | |
-  |  | Win Server 2022           |  | Win10 "Patient Zero"      |  | (192.168.20.50)| |
-  |  | AD DS / DNS / DHCP        |  | Domain Workstation        |  | Ubuntu 22.04   | |
-  |  | Wazuh Agent               |  | Sysmon v15 + Wazuh Agent  |  | Customer PII DB| |
-  |  +---------------------------+  +---------------------------+  +----------------+ |
-  |                |                              |                        |          |
-  +----------------|------------------------------|------------------------|----------+
-                   | (Security Events)            | (Sysmon IDs 1,3,10,22) | (auditd)
-                   +------------------------------+------------------------+
-                                                  |
-                                                  v (Wazuh Agent Protocol TCP:1514 mTLS)
+  +-----------------------------------------------------------------------------------------------+
+  | ZONE 2: THE TARGET GRID (192.168.50.0/24 - aegis.corp)                                        |
+  |                                                                                               |
+  |  +---------------------------+  +---------------------------+  +---------------------------+  |
+  |  | CORP-DC01 (192.168.50.10) |  | CORP-PC01 (192.168.50.100)|  | CORP-WEB01 (192.168.50.20)|  |
+  |  | Win Server 2022           |  | Win10 "Patient Zero"      |  | Target Web Host (Juice)   |  |
+  |  | Primary ID Store (AD DS)  |  | Domain Workstation        |  | Shielded by Coraza WAF    |  |
+  |  | Kerberos KDC / DNS / DHCP |  | Sysmon v15 + Wazuh Agent  |  | Decoupled from Authelia   |  |
+  |  +---------------------------+  +---------------------------+  +---------------------------+  |
+  |                ^                              |                                |              |
+  |                | (LDAP / OIDC Sync)           | (Sysmon IDs 1,3,10,22)         | (CRS Logs)   |
+  |  +-------------v------------------------------v--------------------------------v-----------+  |
+  |  | Keycloak ↔ Active Directory Federation (Zone 2 / Zone 3 Enterprise Identity Sync Bridge)|  |
+  |  +-----------------------------------------------------------------------------------------+  |
+  +-----------------------------------------------|-----------------------------------------------+
+                                                  | (Wazuh Agent Protocol TCP:1514 mTLS)
+                                                  v
                                       [ Gateway Traefik Proxy ]
 ```
-- **Domain Structure**: Active Directory Forest `aegis.corp` with `OU=Servers` and `OU=Workstations`.
-- **Telemetry Configuration**:
-  - `CORP-DC01`: Event IDs 4625 (failed login), 4768 (TGT request), 4769 (TGS request), 4672 (special privileges).
-  - `CORP-PC01`: Sysmon v15 (SwiftOnSecurity rules) tracking process creation (ID 1), network connections (ID 3), image loads (ID 7), LSASS access (ID 10), file creation (ID 11), registry changes (ID 12/13), DNS queries (ID 22).
-  - `CORP-DB01`: `auditd` rules monitoring execution of system binaries, `/etc/shadow` modifications, and PostgreSQL query execution logs.
+- **Enterprise Identity Authority & Bridging**:
+  - `CORP-DC01`: Windows Server 2022 Active Directory Domain Controller acts as the **primary enterprise identity store** for the entire organization (`aegis.corp`), hosting all authoritative corporate user accounts and security groups.
+  - **Keycloak ↔ Active Directory Federation**: Core identity bridging resource connecting Zone 2 and Zone 3 via scheduled LDAP user/group synchronization and OIDC federated realm identity provider. This guarantees that corporate accounts authenticated at the edge correspond directly to Active Directory groups, eliminating siloed credential stores.
+  - Standalone `CORP-DB01` (PostgreSQL server) has been removed from the architecture in favor of enterprise AD identity federation and WAF-shielded web services.
+- **Target Grid Nodes & Telemetry Configuration**:
+  - `CORP-DC01`: Event IDs 4625 (failed login), 4768 (TGT request), 4769 (TGS request), 4672 (special privileges), and directory service change auditing.
+  - `CORP-PC01`: Windows 10 client ("Patient Zero") with Sysmon v15 (SwiftOnSecurity configuration) tracking process creation (Event ID 1), network connections (Event ID 3), image loads (Event ID 7), LSASS memory handles (Event ID 10), file creation (Event ID 11), registry changes (Event IDs 12/13), and DNS queries (Event ID 22); primary Wazuh Agent Active Response target.
+  - `CORP-WEB01`: Target web host hosting OWASP Juice Shop on `192.168.50.20:3000`. Layer 3 micro-segmented on `VMnet3` via gateway interface `ens34`, shielded inline by Coraza WAF (OWASP CRS v4) with live HTTP 403 enforcement, decoupled from Authelia for public storefront simulation.
 
 #### 3.2.1 Role-Based Access Mapping (Zone 2 — Active Directory)
 | AD Security Group | Example Role | Session Length | MFA Re-check Interval | Enforced Scope |
@@ -426,11 +443,12 @@ access_control:
 ## Section 5: Remaining Work Checklist — "What Is Left"
 
 ### 5.1 Critical Priority (Immediate Infrastructure Execution)
-- [ ] **Deploy Zone 2 Enterprise Grid (Partially Complete / In-Progress)**:
-  - `CORP-DC01` (Windows Server 2022 AD DS `aegis.corp`), `CORP-PC01` (Win10 "Patient Zero"), and Juice Shop VM (`192.168.50.20`) are all now deployed on the `192.168.50.0/24` subnet (`VMnet3`) with verified cross-zone routing to Zone 3 via `ens34`.
+- [ ] **Deploy Zone 2 Target Grid (Partially Complete / In-Progress)**:
+  - `CORP-DC01` (Windows Server 2022 AD DS `aegis.corp`), `CORP-PC01` (Win10 "Patient Zero"), and `CORP-WEB01` (target web host @ `192.168.50.20`) are all now deployed on the `192.168.50.0/24` subnet (`VMnet3`) with verified cross-zone routing to Zone 3 via `ens34`.
   - Docker-bridge iptables FORWARD rules (`br_proxy <-> ens34`, `br_auth <-> ens34`) applied on `ztagateway` and persisted via `netfilter-persistent`.
-  - Joining Juice Shop VM as `CORP-WEB01` to Active Directory is explicitly out of scope (deliberate scope decision: public-facing e-commerce application behind Coraza WAF does not require AD authentication).
-  - Remaining Zone 2 items: Install and register Wazuh Agents on Zone 2 hosts (blocked on Zone 4 access), deploy `CORP-DB01` (Ubuntu 22.04 PostgreSQL server with customer PII table — optional, non-blocking).
+  - Keycloak ↔ Active Directory Federation integrates AD (`CORP-DC01`) as the primary enterprise identity store via LDAP/OIDC sync.
+  - Joining the Juice Shop host (`CORP-WEB01`) to Active Directory is explicitly out of scope (deliberate scope decision: public-facing e-commerce application behind Coraza WAF does not require AD authentication).
+  - Standalone `CORP-DB01` was removed from the architecture in favor of enterprise AD identity federation and WAF-shielded web assets. Remaining Zone 2 items: Install and register Wazuh Agents on Zone 2 hosts (blocked on Zone 4 access) and complete federation bridge sync.
 
 ### 5.2 High Priority (SOC Telemetry & Automation)
 - [ ] **Stand Up Elastic Security Detection Rules (`l27` - Partially Complete / In-Progress)**:
@@ -438,7 +456,8 @@ access_control:
   - Rule 2 — Authelia Brute Force: index `authelia-*`, Threshold rule type, KQL `msg: "Unsuccessful 1FA authentication attempt*"`, grouped by `remote_ip.keyword`, threshold 5. Verified firing on a real repeated-failed-login test.
   - Rule 3 (Group ACL Denial) and Rule 4 (Traefik Directory Fuzzing) planned but not yet created (the latter needs field verification against `traefik-*`'s real schema `RequestPath`, not ECS `url.path`).
 - [ ] **Rebuild Edge WAF Security Kibana Dashboard (`l37` - Open)**: Edge WAF Security dashboard needs rebuilding — was lost/not saved in a prior session (cause not yet diagnosed; check Kibana's saved-object list/dashboard history before assuming full data loss).
-- [ ] **Build Shuffle SOAR Workflow (`misp_enrichment`)**: Workflow `misp_enrichment` created with live webhook trigger, reachable via reverse proxy and Docker network. MISP node added (`Search events / restSearch`), auth confirmed (200, success:true). Disambiguation test verified: alert T1055 flowed unprompted from Wazuh -> ES -> Logstash -> Shuffle, triggering a matching MISP search. Next: build decision/branch node (match -> action). Keycloak revocation dropped from automated workflow (cross-zone network path unreachable), designated as manual step in demo playbook.
+- [x] **Build Shuffle SOAR Workflow (`l10` - Completed & Verified End-to-End)**: Workflow `aegis_soar_v1` deployed and verified end-to-end: Webhook trigger → Set Variable node (extracts `srcip`, `agent_id`, `rule_level`, `rule_id`) → MISP `restSearch` enrichment (via raw HTTP node — Shuffle's built-in MISP app node is broken, forces GET regardless of UI method selector, see F-025) → Discord notification. Tested with a synthetic Wazuh alert (`rule.level=12`, `srcip=192.168.19.183`): full pipeline executed, Discord message received with Rule ID, agent, source IP, and MISP match count. Wazuh Active Response node reaches the API successfully (200 response) but host-deny does not execute on the target agent (`affected_items: 0, total_failed_items: 3`) — deferred to post-defense, needs `agents_list` query parameter tuning. Severity-based branching (`if_else_routing` node) is not implemented — the Shuffle branch node app fails to load (image pull blocked), so the workflow runs linear: enrich → notify, not enrich → decide → contain/notify. Deployment accessed via an Nginx reverse proxy on minisoc3 (`shuffle.dz`, `misp.dz`, `kibana.dz`) — this pattern replaced unreliable SSH tunneling.
+- [x] **MISP Per-Alert Threat Intel Enrichment (`l28a` - Completed)**: Per-alert lookup via Shuffle's HTTP node against MISP's `restSearch` endpoint. MISP seeded with a test attacker IP (`192.168.19.183`, event 2 "AEGIS test IOC") and confirmed returning a match (`X-Result-Count: 1`). This is single-alert, on-demand enrichment — scale-out indicator matching across all incoming alerts (`l28` proper) is still pending.
 - [ ] **End-to-End Live Attack Validation**: Trigger multi-stage attack, confirm telemetry flow across full pipeline to Shuffle SOAR webhook.
 - [ ] **Write L1 SOC Playbooks**: Complete Markdown documentation for `brute-force.md`, `malware.md`, and `exfiltration.md`.
 - [ ] **Construct Kibana Dashboards**: Finalize SOC Morning, Network Traffic, Phishing Analysis, and MITRE Matrix dashboards (Coraza, Authelia, Traefik, Keycloak).
@@ -455,7 +474,7 @@ access_control:
 
 | Week | Theme | Zone | Deliverable | Success Criteria |
 | :--- | :--- | :--- | :--- | :--- |
-| **Week 1** | Build Zone 2 | Zone 2 | 3-Node AD Domain (`aegis.corp`) | `CORP-DC01` promoted; `PC01` joined; `DB01` serving data; all Wazuh agents green. |
+| **Week 1** | Build Zone 2 | Zone 2 | Target Grid Architecture (`aegis.corp`) | `CORP-DC01` promoted; `CORP-PC01` joined; `CORP-WEB01` active behind WAF; Keycloak ↔ AD federated. |
 | **Week 2** | Harden Zone 3 | Zone 3 | Hardened ZTA Gateway + Active Edge Defenses | All security debt fixed; Coraza WAF + Suricata + Zeek active; 100% container health. |
 | **Week 3** | Deploy Zone 4 | Zone 4 | 3-Node MSSP SOC Cluster | `minisoc1/2/3` communicating; ES 8.19, Wazuh 4.7, Kibana, and Shuffle UI accessible. |
 | **Week 4** | Telemetry Pipeline | Zone 3 → 4 | Unified Log Ingestion | Wazuh agent shipping Zeek/Suricata/Authelia logs to minisoc2; events indexed in Kibana. |
@@ -541,6 +560,10 @@ During Stage 3, connecting Keycloak to Authelia over `auth_net` triggered a chai
 - **Signature-Based IDS vs Port Scan Behavioral Detection:** Signature-based IDS (Suricata/ET Open) does not inherently detect port scans as a category. A full nmap -p- scan (65,535 ports) produced roughly 100 alerts, not one per port scanned — because ET Open's rules match specific traffic patterns and protocol anomalies, not scan behavior itself. Dedicated port-scan detection requires either Suricata's stream-anomaly rules tuned for it, or a purpose-built detection rule (e.g., many distinct destination.port values from one source.ip within a short window) — this is planned as a future rule addition, not yet built.
 - **F-021 (Authelia Debug vs Info Authentication Logging):** Authelia logs successful authentications only at `debug` level, not `info`. At the default `info` level, only failures and warnings are visible (`"Unsuccessful 1FA authentication attempt..."`, `"requires 2FA, cannot be redirected yet"`). Successful logins (`"Successful 1FA authentication attempt made by user 'X'"`, `"Successful TOTP authentication attempt made by user 'X'"`) only appear once log level is raised to `debug`. Debug logging was enabled to make success events visible for dashboarding. This is an explicit lab-only trade-off (more verbose logs, more disk/noise) that should not be presented as a general production recommendation without that caveat.
 - **F-022 (Filebeat Ingestion Lag Under Burst Load):** Ingestion lag (9-minute gap between `@timestamp` and `event.ingested`) caused by Filebeat queue saturation (`queue.filled.pct: 1`) during an nmap burst. Elasticsearch's thread pool was confirmed clean, ruling out ES as the bottleneck. Mitigated by expanding the Suricata detection rule's look-back window from 5m to 15m to ensure delayed events are captured within the rule's search window. This establishes a measured, realistic minimum MTTD bound (6–10 minutes) for this architecture under burst conditions.
+- **F-025 (Shuffle Built-in MISP App Forces GET Method):** Shuffle's branded MISP app node hardcodes HTTP GET on its underlying transport layer regardless of the UI selection. Bypassed by deploying a generic HTTP node issuing POST to `https://misp-core/attributes/restSearch` with raw API authorization header, successfully returning single-attribute threat intel matches.
+- **F-026 (Wazuh Active Response API Parameter Evolution):** Wazuh API 4.7+ rejected payloads containing legacy `custom: true`. Remediated by specifying `command: "host-deny"` directly and targeting endpoints via `agents_list=<id>` query parameter.
+- **F-027 (Nginx Reverse Proxy for Zone 4 Dashboards):** Standardized on an Nginx reverse proxy on minisoc3 with per-service `.dz` domain routing (`shuffle.dz`, `misp.dz`, `kibana.dz`), eliminating brittle SSH tunneling and resolving MISP canonical base-URL redirect loops.
+- **F-028 (minisoc3 Partial Outage After Docker Restart — RESOLVED):** Transient memory pressure during container recreation caused host sshd and Nginx to hang. Services restored and hardened with systemd restart policies; all `.dz` proxy endpoints and SSH management channels confirmed operational.
 
 ---
 
@@ -561,9 +584,9 @@ During Stage 3, connecting Keycloak to Authelia over `auth_net` triggered a chai
 | **Network Traffic Analysis** | Zeek 5-node cluster (`conn.log`, `dns.log`, `http.log`) shipped to Elasticsearch | Zone 3 | `/opt/zeek/logs/` |
 | **Wireshark Analysis** | Analyst station on Kali VM with exported `.pcap` files from Zeek | Zone 1 | Kali VM `/home/kali/pcaps/` |
 | **Network Security Monitoring** | Suricata IDS container running Emerging Threats Open rules | Zone 3 | `gateway/suricata/` |
-| **Web Security Essentials** | Coraza WAF container with OWASP Core Rule Set protecting Juice Shop | Zone 3 | `gateway/coraza/Caddyfile` |
+| **Web Security Essentials** | Coraza WAF container with OWASP Core Rule Set protecting CORP-WEB01 (Juice Shop) | Zone 3 | `gateway/coraza/Caddyfile` |
 | **Windows Threat Detection** | Sysmon Event IDs 1, 3, 7, 10, 11, 12, 13, 22 forwarded to Wazuh | Zone 2 | Windows Event Log Pipeline |
-| **Linux Threat Detection** | `auditd` process execution & FIM rules on `CORP-DB01` | Zone 2 | `grid/corp-db01/audit.rules` |
+| **Identity & Access Threat Detection** | Active Directory security audits (4625, 4768) on `CORP-DC01` & Keycloak ↔ AD Sync | Zone 2 | Active Directory Event Pipeline |
 | **Malware Analysis** | REMnux VM in Zone 1 for static YARA/PE header inspection | Zone 1 | REMnux Sandbox |
 | **Threat Intelligence** | MISP threat intelligence instance on `minisoc3` with Abuse.ch feeds | Zone 4 | `http://10.16.64.157:8080` |
 | **Log Analysis** | Kibana Discover saved searches and structured query templates | Zone 4 | Kibana Saved Searches |
@@ -576,7 +599,7 @@ During Stage 3, connecting Keycloak to Authelia over `auth_net` triggered a chai
 - **Objective**: Establish the baseline operational corporate infrastructure.
 - **Action**:
   1. Display Active Directory Domain Services on `CORP-DC01` (`aegis.corp`).
-  2. Show domain-joined workstation `CORP-PC01` and customer database `CORP-DB01`.
+  2. Show domain-joined workstation `CORP-PC01`, target web host `CORP-WEB01`, and Keycloak ↔ Active Directory Federation.
 - **Narrative**: *"This represents a typical enterprise environment. Our objective is to secure access to its critical assets while maintaining full visibility over all host and network telemetry."*
 
 ### Act II — The Perimeter (3 Minutes)
@@ -738,11 +761,11 @@ Authelia `access_control` rules were hardened from basic user authentication to 
   2. **Edge WAF Security Overview**: CRS anomaly scores, top attacked URIs, attack categories (SQLi, XSS, RCE), and client IP block rates.
 - **Kibana Encryption Key Configured**: Configured `xpack.encryptedSavedObjects.encryptionKey` in `kibana.yml`, resolving ephemeral UI state loss and enabling persistent alert visualizations.
 
-### 11.7 Session Log (September 22, 2026): Zone 2 Juice Shop VM Migration & Physical Enclave Micro-Segmentation
+### 11.7 Session Log (September 22, 2026): Zone 2 CORP-WEB01 Migration & Physical Enclave Micro-Segmentation
 - **Docker-Bridge iptables FORWARD Rules on ztagateway**: Added Docker-bridge iptables FORWARD rules (`br_proxy <-> ens34`, `br_auth <-> ens34`) on `ztagateway`, persisted via `netfilter-persistent`, to allow containerized services (Traefik, Coraza) to route to the Zone 2 subnet.
-- **Juice Shop VM Migration to Zone 2 Subnet**: Moved the Juice Shop VM from Zone 3's flat LAN (`192.168.19.175`) to Zone 2 (`VMnet3`, `192.168.50.20`). Network configuration migrated from netplan's cloud-init-managed `50-cloud-init.yaml` to a static `99-static.yaml`, with cloud-init's network management disabled (`network: {config: disabled}`) — verified that the static IP persists across reboot.
+- **CORP-WEB01 Migration to Zone 2 Subnet**: Moved the target web host (CORP-WEB01 hosting Juice Shop) from Zone 3's flat LAN (`192.168.19.175`) to Zone 2 (`VMnet3`, `192.168.50.20`). Network configuration migrated from netplan's cloud-init-managed `50-cloud-init.yaml` to a static `99-static.yaml`, with cloud-init's network management disabled (`network: {config: disabled}`) — verified that the static IP persists across reboot.
 - **Coraza Reverse Proxy Target Updated**: Updated Coraza's Caddyfile `reverse_proxy` directive to target the new Zone 2 IP (`192.168.19.175:3000` -> `192.168.50.20:3000`), restarted the container, and verified container health.
-- **Full Path End-to-End Verification**: Confirmed full ingress path with live traffic evidence: `browser -> Traefik -> Coraza -> Juice Shop@Zone2` returns HTTP/2 200, with Coraza security headers actively injected (`x-frame-options: DENY`, `x-xss-protection`).
+- **Full Path End-to-End Verification**: Confirmed full ingress path with live traffic evidence: `browser -> Traefik -> Coraza -> CORP-WEB01@Zone2` returns HTTP/2 200, with Coraza security headers actively injected (`x-frame-options: DENY`, `x-xss-protection`).
 - **Domain-Joining CORP-WEB01 Scoped Out**: Domain-joining the VM as `CORP-WEB01` was attempted and deferred — package installation failed due to lack of internet access on the VM at the time, and continuing was judged not worth the effort. This is documented explicitly as a deliberate scope decision, not an unresolved bug: Juice Shop is an external, public-facing application already protected by the Coraza WAF and does not require Active Directory-integrated authentication to fulfill its purpose in the architecture.
 
 ### 11.8 Engineering Findings Register: F-021 & F-022
@@ -755,6 +778,28 @@ Authelia `access_control` rules were hardened from basic user authentication to 
   - *Root Cause Analysis*: Filebeat's internal memory queue filled completely (`queue.filled.pct: 1`) during the burst. Elasticsearch's own thread pool was confirmed clean and responsive, ruling out Elasticsearch as the ingestion bottleneck.
   - *Mitigation*: Increased the Suricata detection rule's look-back window from 5m to 15m to ensure burst-delayed events are still captured within the rule's evaluation window.
   - *Defensible Bound*: This sets a realistic, honestly-reportable minimum MTTD bound for this architecture under burst conditions (6–10 minutes) — documented as a measured real-world limitation rather than hidden.
+
+### 11.9 Engineering Findings Register: F-025 to F-028
+
+## F-025 — Shuffle built-in MISP app forces GET method
+**Symptom:** MISP node in Shuffle returns 400 "Restsearch queries using GET and no parameters are not allowed" despite the UI showing POST configured.
+**Root cause:** Shuffle's MISP-branded app node hardcodes GET on its underlying HTTP transport regardless of the method selected in the UI.
+**Fix:** Replace the MISP-branded node with a generic HTTP node. POST to `https://misp-core/attributes/restSearch`, Verify: False (self-signed cert), header `Authorization: <raw-key>` (no Bearer prefix), body `{"value": "<ip>", "type": "ip-src", "returnFormat": "json"}`. Matches cleanly.
+
+## F-026 — Wazuh Active Response API rejects `custom` field
+**Symptom:** PUT /active-response returns 400 `Invalid field found {'custom'}`.
+**Root cause:** Wazuh API 4.7+ removed the `custom` boolean field. Built-in commands are invoked via `command: "host-deny"` directly; custom scripts use a `!` prefix (`command: "!my-script"`).
+**Fix:** Drop `custom` from the request body. Also requires an `agents_list=<id>` query parameter, or the API returns 0 affected items ("AR command was not sent to any agent").
+
+## F-027 — Nginx reverse proxy for Zone 4 dashboards
+**Context:** Direct service access via raw IP:port or SSH tunnel was unreliable — MISP's `MISP_BASEURL` redirect loop kept sending users back to a Fortinet-blocked IP even through the tunnel.
+**Fix:** Nginx reverse proxy on minisoc3 with a per-service `server{}` block, paired with hosts-file DNS entries on the analyst PC: `shuffle.dz` → `http://127.0.0.1:3001`, `misp.dz` → `https://127.0.0.1:8443` (with `proxy_ssl_verify off` to skip a redirect bug), `kibana.dz` → `http://10.16.64.156:5601` (cross-node).
+**Critical dependency:** each proxied service's own base-URL configuration must match the proxy domain (e.g. `MISP_BASEURL=http://misp.dz`), or its redirects will escape the proxy and break the flow.
+
+## F-028 — minisoc3 partial outage after `systemctl restart docker` (RESOLVED)
+**Symptom (at the time):** VM responded to ping, ports 3001/8443 open, but port 22 (SSH) and port 80 (Nginx) hung; Docker containers were reachable directly by IP.
+**Root cause:** Suspected OOM during a container mass-recreate (VM was at 74% memory on boot), which killed sshd and Nginx without an auto-restart.
+**Resolution:** Nginx and SSH have since been restored; the `.dz` proxy domains (shuffle.dz, misp.dz, kibana.dz) are working normally again. No longer blocking or open — kept as a documented incident for the report's operational-reliability section, not as an outstanding task.
 
 ---
 *AEGIS v2.1 Master Report & Blueprint — Generated for Academic PFE Defense 2026.*
