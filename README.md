@@ -1,31 +1,242 @@
-# AEGIS v2.1
+# AEGIS
 
-**Sovereign Zero-Trust Access Gateway & Hybrid MSSP SOC Architecture**
-
-PFE 2026 final-year project — Network Security Architecture
-Author: Taibi Mohamed Anis ("Ezio") · Built with [Eagle]
+**A Zero Trust Identity Gateway — continuous verification at every trust boundary.**
 
 ---
 
-## What AEGIS Is
+## The perimeter is dead
 
-AEGIS is a Zero-Trust access architecture built on the "never trust, always
-verify" model. It combines two things that are usually sold as separate
-products:
+For three decades, enterprise security rested on a single, brittle assumption:
+*if a request originates from inside the trusted network, it is trustworthy*.
+Firewalls drew a line. VPN concentrators extended it. Everything behind the
+line — databases, internal APIs, admin panels — was implicitly trusted because
+of *where* the packet came from, not *who* sent it.
 
-1. **An identity-aware access gateway** — sits in front of every internal
-   service. No request, internal or external, is trusted based on where it
-   came from. Every request is verified against identity and MFA before it
-   reaches anything.
-2. **A Security Operations Center (SOC)** — continuous behavioral telemetry
-   (network + endpoint), MITRE ATT&CK-mapped detection, threat intelligence
-   enrichment, and automated response.
+That model is broken. Not in theory — in production, at nation-state scale.
 
-This is not a firewall replacement. A perimeter firewall decides what gets
-*near* the network. AEGIS decides, per request, whether a specific identity
-should reach a specific resource — regardless of which side of the network
-boundary that request originates from.
+The perimeter does not exist anymore. Users are on personal devices, in cafés,
+on cellular networks, behind CGNAT. Services live in three clouds and two
+on-prem clusters. Admin consoles are one leaked credential away from the
+public internet. "Inside the network" stopped being a meaningful security
+boundary years ago, and IP-based trust became the single largest structural
+vulnerability in modern enterprise security.
 
+Attackers have known this longer than most defenders.
+
+---
+
+## The AI-accelerated threat
+
+The threat landscape of the last five years is qualitatively different:
+
+**Reconnaissance is automated.** What used to take a skilled operator a week
+now takes a script an hour. Attack-surface enumeration, credential stuffing,
+API fuzzing — all run at machine speed.
+
+**Social engineering is generated.** Deepfaked voice, deepfaked video,
+spear-phishing emails written by language models in the target's own voice.
+The "human firewall" that perimeter security relied on as a fallback is
+actively degraded.
+
+**Exploits are chained.** A single leaked credential becomes the entry point
+for a full kill chain: initial access, privilege escalation, lateral movement,
+persistence, exfiltration — often without any malware touching disk.
+Endpoint detection sees nothing because nothing needs to be installed.
+
+**Dwell time is compressed.** Nation-state actors used to stay inside a
+network for months. AI-assisted operators move from initial access to domain
+admin in hours.
+
+When the attacker has better tooling than the defender, adding more firewalls
+is not a strategy. Removing the trust assumptions they were built on is.
+
+---
+
+## Enter AEGIS
+
+**AEGIS** is a Zero Trust Identity Gateway. Named for the mythological shield
+that protected its bearer not by standing between them and the threat, but by
+making the bearer their own defense — AEGIS authenticates and authorizes every
+request, regardless of its origin, its network position, or the identity of
+the person behind it.
+
+The core premise:
+
+> No request is trusted because of *where* it comes from. Every request is
+> verified — continuously — against *who* is making it and *what* they are
+> allowed to do.
+
+This is not a new idea. It is the formalized conclusion of a decade of
+industry consensus, most famously articulated by Google in their
+**BeyondCorp** papers (2014–2016) and codified by NIST SP 800-207
+(*Zero Trust Architecture*, 2020).
+
+---
+
+## BeyondCorp heritage — continuous verification via reverse identity proxy
+
+BeyondCorp's central architectural innovation was the **reverse identity
+proxy**: an enforcement point sitting between the user and every protected
+resource, terminating access at the application layer rather than the network
+layer. Every request is intercepted, identity is re-verified, and the response
+is authorized against policy — *before* the resource is ever contacted.
+
+AEGIS implements this pattern directly:
+
+```
+┌──────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+│  Client  │──►│   Traefik    │──►│   Authelia   │──►│   Service    │
+│ (any IP) │   │  (ingress)   │   │  (identity)  │   │ (protected)  │
+└──────────┘   └──────────────┘   └──────────────┘   └──────────────┘
+                       │                  │
+                       │                  ├─► LDAP bind to AD
+                       │                  ├─► MFA check (TOTP)
+                       │                  ├─► Group membership check
+                       │                  └─► Access policy evaluation
+                       │
+                       └─► Forward-auth: request only reaches the
+                           service if identity + policy permit
+```
+
+Two properties distinguish this from a traditional reverse proxy with
+authentication bolted on:
+
+1. **No backend is directly reachable.** The `auth_net` enclave has no route
+   to the outside. The only path to a protected service is through the
+   enforcement point.
+2. **Identity is re-verified on every request, not just at login.** Sessions
+   exist, but group membership that governs authorization is resolved from
+   the directory on each access decision — not cached at login and trusted
+   forever.
+
+The result: revoking a user's access is a single operation in the directory.
+It takes effect on the next request. No logout propagation, no token
+revocation list, no sync delay.
+
+---
+
+## What AEGIS actually implements
+
+| Zero Trust principle | AEGIS implementation |
+|---|---|
+| **Never trust, always verify** | Traefik forward-auth on every protected route; no backend exposed directly |
+| **Least privilege** | `default_policy: deny`; access granted only via explicit AD group match |
+| **Assume breach** | `auth_net` is `internal: true` — no egress from the enclave; segmented zones |
+| **Verify explicitly** | MFA (TOTP) enforced on every protected surface; session elevation for identity changes |
+| **Single source of truth** | Active Directory is the sole identity provider; Authelia and Keycloak are read-only consumers |
+| **Continuous audit** | Every auth decision, every request, every WAF hit — logged and shipped to the SOC |
+| **Group-based authorization** | No per-user policy anywhere; roles derive exclusively from AD group membership |
+
+---
+
+## Architecture at a glance
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Zone 1 — Public                                                    │
+│  Juice Shop  ·  WAF target                                          │
+└────────────────────────────────┬────────────────────────────────────┘
+                                 │
+┌────────────────────────────────▼────────────────────────────────────┐
+│  Zone 3 — Enforcement (this repo)                                   │
+│                                                                     │
+│   Traefik ──► Authelia ──► Keycloak ──► Postgres / Redis            │
+│   (ingress)   (identity)   (OIDC)                                   │
+│                                                                     │
+│   Coraza (WAF)  ·  Mailpit  ·  Portainer  ·  oidc-proxy             │
+└────────────────────────────────┬────────────────────────────────────┘
+                                 │  LDAP (read-only)
+┌────────────────────────────────▼────────────────────────────────────┐
+│  Zone 2 — Enterprise                                                │
+│  Active Directory  ·  aegis.corp  ·  Users + Groups + GPOs          │
+└────────────────────────────────┬────────────────────────────────────┘
+                                 │
+┌────────────────────────────────▼────────────────────────────────────┐
+│  Zone 4 — SOC (planned)                                             │
+│  Wazuh  ·  Elasticsearch  ·  Kibana  ·  Shuffle  ·  MISP            │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+Every request crosses the Zone 3 enforcement layer. Zone 2 holds the identity
+truth. Zone 4 observes everything. **No layer trusts another because of where
+it sits.**
+
+---
+
+## Repository map
+
+| Document | Contents |
+|---|---|
+| **[docs/gateway-setup/BUILD-PLAN.md](docs/gateway-setup/BUILD-PLAN.md)** | **Start here** — zero-to-AD-federation build plan, phase by phase |
+| [docs/gateway-setup/gateway-structure.md](docs/gateway-setup/gateway-structure.md) | File layout, network topology, volumes, container inventory |
+| [docs/gateway-setup/configuration.md](docs/gateway-setup/configuration.md) | Service-by-service configuration reference + federation deep dive |
+| [docs/gateway-setup/soc-integration.md](docs/gateway-setup/soc-integration.md) | Zone 4 integration (planned — blocked on network access) |
+
+### Reading order
+
+1. **New to AEGIS?** Read this README, then `gateway-structure.md` for the
+   big picture.
+2. **Building from scratch?** Go straight to `BUILD-PLAN.md`. Follow it top
+   to bottom.
+3. **Debugging a deployment?** `configuration.md` § 11 and `BUILD-PLAN.md`
+   Appendix A — every known failure mode with its fix.
+4. **Extending to a new service?** `configuration.md` § 6 has the Compose
+   pattern; § 8 covers access control rules.
+
+---
+
+## What this repository is — and is not
+
+**Is:**
+
+- A reference implementation of Zero Trust identity federation on a
+  segmented lab deployment
+- A verifiable build plan — every step in `BUILD-PLAN.md` has been executed
+  end-to-end on the reference deployment
+- A documented example of BeyondCorp-style architecture using
+  production-grade open-source components
+- A teaching artifact — every design decision is justified, every failure
+  mode is recorded
+
+**Is not:**
+
+- A production deployment. Several hardening items are deferred and
+  documented in `configuration.md` Appendix C: LDAPS on the AD bind, secret
+  rotation, permanent admin replacement, ECS normalization.
+- A complete SOC. Zone 4 is designed but not integrated — the lab is on a
+  separate network segment.
+
+---
+
+## Key results (verified end-to-end)
+
+- A user created in Active Directory can authenticate to every protected
+  gateway service with **zero configuration changes** to Authelia, Traefik,
+  or Keycloak.
+- Disabling an AD account revokes gateway access **on the next request** —
+  no cache, no propagation delay.
+- AD group membership flows into both Authelia's ACL engine (via LDAP) and
+  Keycloak's OIDC tokens (via the `groups` claim).
+- The gateway's local identity state is fully disposable — every identity
+  decision derives from the directory.
+
+This is the Zero Trust property being demonstrated: **a single policy decision
+point per trust boundary, enforced continuously, with full auditability.**
+
+---
+
+## Credits and heritage
+
+- **BeyondCorp** — Google's 2014–2016 papers on replacing perimeter security
+  with identity-based access control. The architectural model AEGIS follows.
+- **NIST SP 800-207** — *Zero Trust Architecture* (2020). The formal
+  specification of the principles implemented here.
+- **Open-source stack** — Traefik, Authelia, Keycloak, Coraza, PostgreSQL,
+  Redis, Mailpit, Portainer, Wazuh.
+
+---
+
+*The perimeter is a memory. The identity is the boundary.*
 ---
 
 ## Architecture: Four Zones
