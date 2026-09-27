@@ -1,0 +1,204 @@
+# SOC Integration — Zone 4 (Coming Soon)
+
+**Status:** Blocked — Zone 4 is currently on the ministry network with no remote access from the gateway lab environment.
+
+This document is a **placeholder** that captures the intended SOC integration
+architecture and the deployment steps that will be executed once access is
+restored. It exists so the design intent is preserved in the repository and
+can be referenced from the main project report.
+
+---
+
+## 1. Target Architecture
+
+```
+                    Zone 1 (Public)         Zone 2 (Enterprise)      Zone 3 (Enforcement)
+                    ┌──────────────┐        ┌──────────────────┐    ┌──────────────────────┐
+                    │  Juice Shop  │        │  CORP-DC01       │    │  ztagateway          │
+                    │              │        │  AD DS           │    │  Authelia, Keycloak, │
+                    └──────┬───────┘        │  192.168.50.10   │    │  Traefik, Coraza,    │
+                           │                └────────┬─────────┘    │  Zeek, Suricata      │
+                           │                         │              └──────────┬───────────┘
+                           │                         │                         │
+                           │                         │ Wazuh agent (planned)   │ Filebeat
+                           │                         │                         │
+                           └─────────────┬───────────┴─────────────────────────┘
+                                         │
+                                         ▼
+                          ┌────────────────────────────────┐
+                          │  Zone 4 — SOC (minisoc2)       │
+                          │  10.16.64.156                  │
+                          │                                │
+                          │  Wazuh manager  :1514 / :1515  │
+                          │  Elasticsearch  :9200          │
+                          │  Kibana         :5601          │
+                          │  Shuffle        (SOAR)         │
+                          │  MISP           (threat intel) │
+                          └────────────────────────────────┘
+```
+
+---
+
+## 2. Log Source Contract
+
+The index naming is a **contract** — changing it breaks detection rules.
+
+| Source | Index | Content | Status |
+|---|---|---|---|
+| Authelia | `authelia-*` | Login attempts, MFA pass/fail, ACL denials | ✅ Ingested |
+| Keycloak | `keycloak-*` | Token issuance, admin console access, session events | ✅ Ingested |
+| Traefik | `traefik-*` | Every HTTP request, forward-auth result | ✅ Ingested |
+| Coraza | `coraza-*` | WAF blocks, anomaly scores | ✅ Ingested |
+| Zeek / Suricata | `filebeat-*` | Network layer | ✅ Ingested |
+| **Active Directory (DC01)** | **`wazuh-*`** | **User/group changes, Kerberos, lockouts** | ❌ **Not ingested** |
+
+The only remaining blind spot is **AD identity events**. Every other layer is
+already flowing to Zone 4.
+
+---
+
+## 3. Why AD Events Matter
+
+Without a Wazuh agent on DC01, the SOC cannot see:
+
+- A user being added to `GRP_IT_Admin` → potential privilege escalation
+- A group being modified → authorization model change
+- A disabled account being re-enabled → revocation bypass
+- Kerberos anomalies → Kerberoasting, pass-the-ticket
+- Account lockouts → brute force attempts against the identity plane
+
+For the Zero Trust story to be complete ("every identity decision reaches the
+SOC"), this gap must be closed.
+
+---
+
+## 4. Planned Deployment Steps
+
+### 4.1 Zone 2 → Zone 4 reachability
+
+DC01 must reach the Wazuh manager at `10.16.64.156:1514` (agent events) and
+`:1515` (enrollment). Between the two networks there must be a route with an
+explicit allow rule for both TCP ports.
+
+**Verify from DC01 (PowerShell):**
+
+```powershell
+Test-NetConnection -ComputerName 10.16.64.156 -Port 1514
+Test-NetConnection -ComputerName 10.16.64.156 -Port 1515
+```
+
+Both must return `TcpTestSucceeded : True`.
+
+### 4.2 Install the Wazuh agent on DC01
+
+```powershell
+# Download the MSI from the Wazuh manager (hosted by the Wazuh API)
+Invoke-WebRequest -Uri "https://packages.wazuh.com/4.x/windows/wazuh-agent-4.x.x-1.msi" `
+  -OutFile "$env:TEMP\wazuh-agent.msi"
+
+# Install, pointing at the manager
+msiexec.exe /i "$env:TEMP\wazuh-agent.msi" /q `
+  WAZUH_MANAGER="10.16.64.156" `
+  WAZUH_AGENT_NAME="CORP-DC01" `
+  WAZUH_REGISTRATION_SERVER="10.16.64.156"
+```
+
+### 4.3 Configure event collection
+
+Edit `C:\Program Files (x86)\ossec-agent\ossec.conf`:
+
+```xml
+<localfile>
+  <location>Security</location>
+  <log_format>eventchannel</log_format>
+</localfile>
+```
+
+### 4.4 Key Event IDs to Capture
+
+| Event ID | Meaning | Threat signal |
+|---|---|---|
+| `4720` | User account created | Rogue account creation |
+| `4726` | User account deleted | Cover-up / cleanup |
+| `4732` | Member added to security-enabled group | Privilege escalation |
+| `4733` | Member removed from group | Authorization change |
+| `4740` | Account locked out | Brute force |
+| `4625` | Failed logon | Credential attack |
+
+### 4.5 Start the agent
+
+```powershell
+Start-Service -Name WazuhSvc
+Get-Service -Name WazuhSvc
+```
+
+### 4.6 Verify on the manager
+
+```bash
+# On Zone 4 (minisoc2)
+/var/ossec/bin/agent_control -l
+# Expected: ID 001, Name CORP-DC01, Status Active
+```
+
+### 4.7 Verify in Kibana
+
+```
+event.code: 4732
+```
+
+Should return hits when a group is modified in AD.
+
+---
+
+## 5. ECS Normalization
+
+Wazuh's default event schema does not map cleanly to Elastic Common Schema.
+For EQL `sequence by` queries to work across indices, the following fields
+must be normalized:
+
+| Wazuh field | ECS target |
+|---|---|
+| `data.win.eventdata.ipAddress` | `source.ip` |
+| `data.win.eventdata.targetUserName` | `user.name` |
+| `data.win.eventdata.subjectUserName` | `user.target.name` |
+| `data.win.system.eventID` | `event.code` |
+| `rule.level` | `event.severity` |
+| `rule.description` | `event.action` |
+
+Normalization is applied via an Elasticsearch ingest pipeline or a Filebeat
+processor chain.
+
+---
+
+## 6. Cross-Source Correlation Rules (planned)
+
+Once AD events land in `wazuh-*`, these EQL sequences become possible:
+
+| Rule | Detection |
+|---|---|
+| AD group change + Keycloak admin login | Privilege escalation via compromised AD |
+| Authelia brute force + Suricata scan from same IP | Coordinated credential attack |
+| Coraza WAF block + Authelia auth failure + Keycloak token request | Exploitation followed by lateral pivot |
+| AD account disabled + continued Authelia auth attempts | Stale session / hijack |
+| Kerberos failure across multiple hosts | Kerberoasting / pass-the-ticket |
+
+---
+
+## 7. Status
+
+| Item | Status |
+|---|---|
+| Zone 4 access from lab | ❌ Blocked — network separation |
+| Wazuh agent on DC01 | ⏳ Planned |
+| ECS normalization | ⏳ Blocked on agent |
+| Correlation rules | ⏳ Blocked on ECS |
+| SOC dashboards | ⏳ Blocked on agent |
+
+**Blocker:** Zone 4 (`minisoc2`, `10.16.64.156`) is deployed on the ministry
+network and is not reachable from the lab environment where the gateway stack
+runs. Deployment will resume once network access is restored or the SOC
+components are redeployed to a reachable segment.
+
+---
+
+*Placeholder — to be completed when Zone 4 access is restored.*
