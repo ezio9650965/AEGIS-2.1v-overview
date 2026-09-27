@@ -113,6 +113,9 @@ All automation and threat intelligence workloads run containerized on `minisoc3`
 - [x] **Item l28a**: MISP single-alert on-demand threat intel enrichment via restSearch.
 - [ ] **Item l28**: Scale-out indicator matching across all incoming alert streams (Elastic Indicator Match rules or scheduled pull).
 - [ ] **Item l37**: Rebuild lost Edge WAF Security Kibana Dashboard (`filebeat-coraza-*`).
+- [ ] **Item l38**: Migrate Authelia authentication backend from OpenLDAP to Active Directory (`completed: false` — configuration drafted, not yet applied; single source of truth target).
+- [ ] **Item l33**: Wazuh ECS Field Normalization (Normalize legacy archive/alert fields to enable cross-source EQL sequence correlation).
+- [ ] **CORP-DC01 Wazuh Agent**: **[CRITICAL VISIBILITY GAP]** Install Wazuh agent on Active Directory Domain Controller pointed to `minisoc2:1514` to collect Windows Security event channel (Event IDs 4720, 4726, 4732, 4733, 4740, 4625).
 - [ ] **Wazuh AR Agent Tuning**: Refine `agents_list` query parameter for live host network disconnection.
 - [ ] **Keycloak Session Revocation**: Automated token invalidation via admin REST API (requires cross-zone route from Zone 4 to Zone 3 `auth_net`).
 

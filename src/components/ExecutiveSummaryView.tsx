@@ -379,7 +379,24 @@ export const ExecutiveSummaryView: React.FC = () => {
         <p className="text-[#F1F5F9]/80 leading-relaxed font-sans text-sm mb-4">
           AEGIS implements a sovereign BeyondCorp-style zero-trust reverse-proxy architecture protecting corporate resources and isolating telemetry pipelines.
         </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="bg-[#0F172A] border border-red-500/30 p-3 rounded glow-red-hover">
+            <div className="font-bold text-red-400 mb-1 flex items-center justify-between">
+              <span>0. Zone 1: Threatscape</span>
+              <span className="text-[9px] text-red-400">[RED_TEAM]</span>
+            </div>
+            <p className="text-[11px] text-[#94A3B8] font-sans mb-1.5">
+              Simulated adversary surface with Kali Linux and automated detonation frameworks:
+            </p>
+            <ul className="text-[10px] text-[#F1F5F9]/80 space-y-0.5 list-disc list-inside">
+              <li>Atomic Red Team</li>
+              <li>SQL Injection</li>
+              <li>XSS</li>
+              <li>Directory Fuzzing</li>
+              <li>Path Traversal</li>
+              <li>Brute Force / Password Spraying</li>
+            </ul>
+          </div>
           <div className="bg-[#0F172A] border border-[#334155] p-3 rounded glow-cyan-hover">
             <div className="font-bold text-[#38BDF8] mb-1 flex items-center justify-between">
               <span>1. User Ingress & MFA</span>
@@ -445,6 +462,9 @@ export const ExecutiveSummaryView: React.FC = () => {
               <span>Implemented & Hardened (v2.1 State)</span>
             </div>
             <ul className="text-xs text-[#F1F5F9]/80 space-y-2 list-disc list-inside">
+              <li>
+                <span className="font-bold text-white">Zone 1 Threatscape (Attack Surface):</span> Atomic Red Team, SQL Injection, XSS, Directory Fuzzing, Path Traversal, and Brute Force / Password Spraying.
+              </li>
               <li>
                 <span className="font-bold text-white">Kernel Dual-Bridge Isolation:</span> `proxy_net` (DMZ) + `auth_net` (`internal: true`).
               </li>

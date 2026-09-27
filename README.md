@@ -31,7 +31,7 @@ boundary that request originates from.
 ## Architecture: Four Zones
 
 ```
-Zone 1 — Threatscape        Red-team emulation & attack surface (Atomic Red Team, Web Exploits, Fuzzing, Credential Spraying)
+Zone 1 — Threatscape        Red-team emulation & attack surface (Atomic Red Team, SQL Injection, XSS, Directory Fuzzing, Path Traversal, Brute Force/Password Spraying)
 Zone 2 — Target Grid        Target enterprise network (CORP-DC01 AD DS, CORP-PC01, CORP-WEB01 Juice Shop, Keycloak ↔ AD Federation)
 Zone 3 — ZTA Gateway        The access gateway itself (this is the core product)
 Zone 4 — MSSP SOC           Remote SIEM/SOAR cluster
@@ -170,6 +170,46 @@ The live policy enforces strict structural and group-based controls:
 
 See `src/components/GovernancePolicyView.tsx` and `src/components/zones/` for interactive policy simulations and live configuration inspections.
 
+### Zero Trust Governance Model
+
+The AEGIS Zero-Trust governance architecture maps classical perimeter trust models to explicit identity verification, micro-segmentation, and dynamic authorization propagation:
+
+#### 1. Core Principle Mapping
+- **Never trust / always verify**: Forward-Auth enforced on every single inbound HTTP request at the Traefik reverse proxy via Authelia (`/api/authz/forward-auth`). Direct network access to backend application ports or databases is eliminated.
+- **Least privilege**: `default_policy: deny` with explicit group-match grants only. Access is strictly scoped to authorized business functions; non-matching identities are rejected before falling through to permissive wildcards.
+- **Assume breach**: Multi-zone network isolation. Sensitive identity services reside on the `auth_net` Docker bridge marked `internal: true` with zero external routing and no host port exposure.
+- **Verify explicitly**: Step-up MFA/TOTP enforced across all enclaves except the self-authentication portal infrastructure itself.
+- **Single source of truth**: Active Directory (`CORP-DC01`, `aegis.corp`) serves as the central identity authority; Authelia and Keycloak function strictly as enforcement-only layers.
+- **Continuous audit**: Every authentication and authorization decision is logged out-of-band to dedicated indices (`wazuh-alerts-authelia-*`, `wazuh-alerts-keycloak-*`) and shipped to Zone 4 for SIEM ingestion and SOAR triage.
+
+#### 2. Group-Based Administration Model
+Authorization propagation follows a clean architectural pipeline:
+```
+Active Directory Group (Business Authorization Unit)
+        │
+        ▼
+Keycloak Realm Role (Application-Facing IdP Role)
+        │
+        ▼
+Authelia Access Rule (Gateway Policy Enforcement)
+        │
+        ▼
+Target Application (OIDC Token Claims / Header Ingestion)
+```
+**Propagation Guarantee**: Granting or revoking administrative access is executed strictly via a **single Active Directory group membership change** (e.g., adding or removing an operator from `GRP_IT_Admin`). This change propagates dynamically across all relying parties without touching Authelia configuration files, without modifying roles inside Keycloak UI, and without requiring a gateway restart.
+
+#### 3. Access Control Policy Matrix
+
+| Resource | Domain / Path | Policy | Authorized Group / Identity | Governance Note |
+|---|---|---|---|---|
+| **Authelia Portal** | `authelia.zerotrust.lan` | `bypass` | Any | Self-authentication gateway layer itself (cannot gate its own login flow) |
+| **Mailpit UI** | `mailpit.zerotrust.lan` | `bypass` | Any | Development & testing SMTP sinkhole (non-production, see Security Notes) |
+| **Keycloak Admin Console** | `keycloak.zerotrust.lan` | `two_factor` | `GRP_IT_Admin` | Identity provider configuration; explicit deny rule immediately follows |
+| **Traefik Dashboard** | `traefik.zerotrust.lan` | `two_factor` | `GRP_IT_Admin` | Edge routing management; explicit deny rule immediately follows |
+| **Portainer CE** | `portainer.zerotrust.lan` | `two_factor` | `GRP_IT_Admin` | Root-equivalent Docker management; explicit deny immediately follows |
+| **Internal Workloads** | `*.zerotrust.lan` | `two_factor` | Any Authenticated | Default catch-all for authenticated enterprise personnel |
+| **CORP-WEB01 (Juice Shop)** | `juiceshop.zerotrust.lan` | Public (No Authelia) | Public / Customers | Decoupled from Authelia; inspected inline exclusively by Coraza WAF (CRS v4) |
+
 ---
 
 ## MSSP Service Model (Zone 4)
@@ -202,6 +242,22 @@ Highlights:
   the full before/after with verification evidence for each.
 
 ### Known Issues & Active Security Debt (Unresolved / Under Active Investigation)
+- **CRITICAL SOC VISIBILITY GAP — No Wazuh Agent on CORP-DC01 (Active Directory) [HIGHEST PRIORITY GAP]**:
+  Critical SOC visibility gap — no Wazuh agent on CORP-DC01 (Active Directory). Five of six planned identity/network log sources are ingested and confirmed working (Authelia, Keycloak, Traefik, Coraza, Zeek/Suricata), but Active Directory itself is not. This means: a user added to GRP_IT_Admin, a security group modified, a disabled account re-enabled, or Kerberos authentication anomalies currently produce zero SOC visibility. Given the project's core thesis is closing exactly this kind of institutional blind spot, this is ranked as the highest-priority remaining gap — higher than completing the Authelia->AD migration itself. Planned remediation: install a Wazuh agent on CORP-DC01 pointed at minisoc2 (10.16.64.156:1514), configure ossec.conf to collect the Windows Security event log channel, with priority on event IDs 4720 (user created), 4726 (user deleted), 4732 (member added to security-enabled group), 4733 (member removed), 4740 (account locked out), and 4625 (failed logon).
+
+#### Cross-Source Correlation Value (Why Closing the AD Visibility Gap Matters)
+Closing the AD-visibility gap matters beyond just "one more log source" — it is the architectural prerequisite for multi-stage threat detection across the sovereign Zero-Trust estate. Once all six sources (Authelia, Keycloak, Traefik, Coraza, Zeek/Suricata, and Active Directory) are ECS-normalized and flowing, the following cross-source correlations become possible:
+1. **AD Group Change Followed Immediately by Keycloak Admin Login**: An AD group change (e.g. user added to `GRP_IT_Admin`, Event ID 4732) followed immediately by a Keycloak admin login (`wazuh-alerts-keycloak-*`). Indicates potential AD compromise resulting in immediate privilege escalation into the identity provider.
+2. **Authelia Brute-Force Pattern + Suricata Scan from Same Source IP**: An Authelia brute-force pattern (`wazuh-alerts-authelia-*`, 5+ failed 1FA attempts) combined with a Suricata network port/vulnerability scan (`filebeat-suricata-*`) originating from the exact same source IP, indicating a coordinated credential attack.
+3. **Coraza WAF Block Followed by Authelia Failure and Keycloak Token Request**: A Coraza WAF block on `juiceshop` (`filebeat-coraza-*`, HTTP 403) followed by an Authelia auth failure, followed by a Keycloak token request from the same source IP — revealing active exploitation attempting a lateral pivot from external web applications to enterprise identity layers.
+4. **AD Account Disabled while Authelia Auth Attempts Continue**: An Active Directory account disabled (Event ID 4725 / UAC bitmask flag 2) while Authelia authentication attempts continue at the gateway under that username — a key indicator of a stale session or session hijack.
+5. **New Admin Group Addition Followed Immediately by Admin Console Access**: A new member added to `GRP_IT_Admin` followed immediately by administrative console access (Keycloak, Portainer, or Traefik) — a primary indicator of suspicious privilege escalation.
+6. **Kerberos Authentication Failures Across Multiple Hosts**: Multiple Kerberos authentication failures and abnormal ticket requests (Event IDs 4768, 4769, 4771) across multiple endpoints — signaling Kerberoasting or pass-the-ticket adversary tradecraft.
+
+*Prerequisite Technical Requirement*: This correlation capability fundamentally requires Wazuh's own event fields to be ECS-normalized (`source.ip`, `user.name`, `event.outcome`) for EQL "sequence by" queries to work across indices — already identified as the project's largest remaining technical gap (existing item `l33`).
+
+- **Bind credential (`svc-keycloak`) stored in plaintext**: Bind credential (`svc-keycloak`) stored in Keycloak's provider configuration and in Authelia's plaintext YAML, not a secret manager. Acceptable for this lab environment given the isolated `ext_net` bridge with no LAN exposure, but must not be presented as production-ready without this caveat. Production remediation: HashiCorp Vault, CyberArk, or Keycloak's own secret SPI.
+- **AD LDAP bind currently uses plaintext `ldap://` (no LDAPS/TLS)**: Acceptable given network isolation on `ext_net`, flagged as a pre-production hardening item, not a currently exploitable gap given the topology.
 - **Scoping distinction — Ingress vs. Bidirectional Egress Enforcement**: Ingress Zero-Trust enforcement (Traefik edge reverse proxy + Authelia Forward-Auth MFA + Coraza WAF request inspection) is currently distinct from full bidirectional egress traffic enforcement. In the current implementation, ingress policy enforces authentication and filtering on inbound requests to protected internal workloads; however, outbound egress traffic originating from internal workloads, containers, or hosts is not yet routed through a mandatory egress proxy or transparent Zero-Trust egress gateway filter.
 - **"Too many fields for JSON decoder" flood on minisoc2**: Root cause unresolved; observed during alert ingestion. May be silently dropping Wazuh alerts.
 - **logstash.conf TLS still disabled**: Elasticsearch CA certificate was never copied from minisoc1 to minisoc3; transport currently runs with `ssl_certificate_verification => false`.
@@ -254,12 +310,25 @@ Highlights:
 | Zone 4 | SOAR workflow (webhook→MISP→Discord) | Built and verified end-to-end |
 | Zone 4 | Nginx reverse proxy | Deployed and operational (shuffle.dz / misp.dz / kibana.dz) |
 | Zone 4 | Wazuh Active Response | API reachable, agent-side execution pending |
-| Zone 4 | Keycloak↔AD federation | Blocked — auth_net internal Docker network requires a dual-homed bridge or proxy to route to Zone 2 subnet |
+| Zone 4 | Keycloak↔AD federation | Operational (verified: 6 users, 3 groups synced, read-only LDAP federation on ext_net bridge) |
+| Zone 3 | Authelia→AD migration (l38) | Proposed / Drafted (not yet applied; config drafted, single source of truth target) |
+| Zone 2 | CORP-DC01 Wazuh Agent | CRITICAL GAP (highest priority remaining: 0 visibility on AD group/account events) |
 | Zone 4 Zeek/Suricata Ingestion & Dashboards | Operational: Dedicated Filebeat ECS data streams (.ds-filebeat-8.19.13-*) and 4 verified Kibana dashboards |
 | Zone 4 OpenLDAP & Identity/WAF Telemetry | Completed: Stages 1-3 (OpenLDAP + Authelia LDAP + Keycloak OIDC via oidc-proxy) + Per-source index split + 2 dedicated Kibana dashboards |
 | Zone 2 (Target Grid) | Active Subnet: CORP-DC01 (AD DS), CORP-PC01, and CORP-WEB01 (Juice Shop) active on 192.168.50.0/24 with cross-zone routing verified; Keycloak ↔ AD federation integrated |
-| Zone 1 (Threatscape) | Not built |
-| Atomic Red Team coverage testing | Not started |
+| Zone 1 (Threatscape) | Configured & Ready (Atomic Red Team, SQLi/XSS, Directory Fuzzing, Path Traversal, Brute Force / Password Spraying) |
+| Atomic Red Team coverage testing | Scheduled / In-Progress |
+
+### Key Migration Checklist Items & Active Work Streams
+
+- [ ] **Item l38 — Migrate Authelia authentication backend from OpenLDAP to Active Directory**
+  - **Category**: High
+  - **Completed**: `false` (Proposed / Drafted, not yet applied)
+  - **Notes**: Configuration drafted, not yet applied. Target: single source of truth for identity across Zone 3 (gateway) — currently Authelia authenticates against OpenLDAP (`dc=zerotrust,dc=lan`) while Keycloak is already federated to Active Directory, meaning two directories independently hold user identity and an AD-disabled user would remain authenticated at the gateway. Planned config: `authentication_backend.ldap.implementation: activedirectory`, bind DN `CN=svc-keycloak,OU=Departments,DC=aegis,DC=corp`, `users_filter` includes `(!(userAccountControl:1.2.840.113556.1.4.803:=2))` to exclude disabled AD accounts in real time (no cache/sync delay). Requires rewriting `access_control` to use AD group names (`GRP_IT_Admin`, `GRP_Finance`, `GRP_Web_Ops`) instead of OpenLDAP's (`admins`, `it_ops`) — the explicit-deny-after-group-match pattern (documented lesson from the earlier fallthrough bug) is carried forward as a mandatory pattern, not optional. OpenLDAP is retained post-migration as a documented break-glass path only (small set of recovery accounts), not the primary identity source.
+- [ ] **Item l33 — Wazuh ECS Field Normalization**
+  - **Category**: High
+  - **Completed**: `false` (Prerequisite for cross-source sequence correlation)
+  - **Notes**: Normalize legacy Wazuh archive and alert fields into Elastic Common Schema (ECS) to enable unified querying and rule correlation alongside native Filebeat Zeek/Suricata data streams.
 
 This project intentionally documents what is *not* done alongside what is —
 an inflated completion claim would not survive a jury's first technical

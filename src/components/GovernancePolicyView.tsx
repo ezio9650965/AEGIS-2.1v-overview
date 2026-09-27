@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { CustomerVsEmployeeFlow } from './CustomerVsEmployeeFlow';
+import { ZERO_TRUST_GOVERNANCE_MODEL } from '../data/reportData';
 import {
   ShieldCheck,
   Users,
@@ -782,6 +783,118 @@ export const GovernancePolicyView: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* 0. ZERO TRUST GOVERNANCE MODEL */}
+      <section className="space-y-4">
+        <div className="terminal-panel-header flex items-center justify-between pb-2">
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-[#38BDF8]" />
+            <h3 className="pro-title text-white">
+              Zero Trust Governance Model & Architecture Mapping
+            </h3>
+          </div>
+          <span className="status-badge-accent">
+            NIST SP 800-207 Aligned
+          </span>
+        </div>
+
+        {/* Core Principle Mapping Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {ZERO_TRUST_GOVERNANCE_MODEL.principles.map((p, idx) => (
+            <div key={idx} className="pro-card p-4 space-y-1.5 glow-cyan-hover border-[#334155]">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-[#38BDF8] font-mono flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#38BDF8]"></span>
+                  {p.principle}
+                </span>
+                <span className="text-[9px] text-[#94A3B8] font-mono bg-[#0F172A] px-1.5 py-0.5 rounded border border-[#334155]">
+                  CORE_P{idx + 1}
+                </span>
+              </div>
+              <p className="text-[11px] text-[#F1F5F9]/80 font-sans leading-relaxed">
+                {p.enforcement}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {/* Group-based admin model & propagation chain */}
+        <div className="pro-card p-5 space-y-4 border-[#38BDF8]/40 shadow-lg">
+          <div className="terminal-panel-header flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-[#334155]">
+            <div className="flex items-center gap-2">
+              <GitBranch className="w-4 h-4 text-[#38BDF8]" />
+              <h4 className="text-sm font-bold text-white font-mono">
+                Group-Based Administration & Propagation Architecture
+              </h4>
+            </div>
+            <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+              ZERO-DOWNTIME PROPAGATION
+            </span>
+          </div>
+
+          <div className="bg-[#0B1120] p-4 rounded border border-[#334155] font-mono text-xs text-[#38BDF8] flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-1 bg-blue-500/10 text-blue-300 border border-blue-500/30 rounded font-bold">
+                AD Group (aegis.corp)
+              </span>
+              <ArrowRight className="w-4 h-4 text-[#94A3B8]" />
+              <span className="px-2.5 py-1 bg-purple-500/10 text-purple-300 border border-purple-500/30 rounded font-bold">
+                Keycloak Realm Role
+              </span>
+              <ArrowRight className="w-4 h-4 text-[#94A3B8]" />
+              <span className="px-2.5 py-1 bg-amber-500/10 text-amber-300 border border-amber-500/30 rounded font-bold">
+                Authelia Access Rule
+              </span>
+              <ArrowRight className="w-4 h-4 text-[#94A3B8]" />
+              <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 rounded font-bold">
+                Target Application
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded text-xs text-[#F1F5F9]/90 font-sans flex items-start gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-[#4ADE80] shrink-0 mt-0.5" />
+            <div>
+              <strong className="text-[#4ADE80] font-mono">[SINGLE_MEMBERSHIP_RULE] Zero-Restart Privilege Lifecycle: </strong>
+              {ZERO_TRUST_GOVERNANCE_MODEL.groupModel.propagationRule}
+            </div>
+          </div>
+
+          {/* Access Control Policy Matrix Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-mono border-collapse">
+              <thead>
+                <tr className="bg-[#0F172A] border-b border-[#334155] text-[#94A3B8]">
+                  <th className="py-2.5 px-3">Resource</th>
+                  <th className="py-2.5 px-3">Domain</th>
+                  <th className="py-2.5 px-3">Policy</th>
+                  <th className="py-2.5 px-3">Authorized Identity / Group</th>
+                  <th className="py-2.5 px-3">Governance Enforcement Note</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#334155]/60 text-[#F1F5F9]/90">
+                {ZERO_TRUST_GOVERNANCE_MODEL.accessMatrix.map((row, i) => (
+                  <tr key={i} className="hover:bg-[#1E293B]/80 transition-colors">
+                    <td className="py-2 px-3 font-bold text-white">{row.resource}</td>
+                    <td className="py-2 px-3 text-[#38BDF8]">{row.domain}</td>
+                    <td className="py-2 px-3">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        row.policy === 'bypass' ? 'bg-sky-500/10 text-sky-300 border border-sky-500/30' :
+                        row.policy === 'two_factor' ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30' :
+                        'bg-amber-500/10 text-amber-300 border border-amber-500/30'
+                      }`}>
+                        {row.policy}
+                      </span>
+                    </td>
+                    <td className="py-2 px-3 text-[#FBBF24]">{row.group}</td>
+                    <td className="py-2 px-3 text-[#94A3B8] font-sans text-[11px]">{row.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
       {/* 1. ACCESS CONTROL MODEL — CUSTOMERS VS. EMPLOYEES */}
       <section className="space-y-4">

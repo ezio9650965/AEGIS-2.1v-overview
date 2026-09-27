@@ -11,6 +11,7 @@ export interface ChecklistItem {
   id: string;
   title: string;
   description: string;
+  notes?: string;
   category: 'critical' | 'high' | 'medium' | 'jury';
   completed: boolean;
   who?: 'eagle' | 'ezio' | 'both';

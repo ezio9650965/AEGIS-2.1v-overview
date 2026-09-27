@@ -197,6 +197,17 @@ export const INITIAL_CHECKLIST_LEFT: ChecklistItem[] = [
     completed: false,
     who: 'ezio',
   },
+  {
+    id: 'l38',
+    title: 'Migrate Authelia authentication backend from OpenLDAP to Active Directory',
+    category: 'high',
+    completed: false,
+    who: 'both',
+    description:
+      'Configuration drafted, not yet applied. Target: single source of truth for identity across Zone 3 (gateway) — currently Authelia authenticates against OpenLDAP (dc=zerotrust,dc=lan) while Keycloak is already federated to Active Directory, meaning two directories independently hold user identity and an AD-disabled user would remain authenticated at the gateway. Planned config: authentication_backend.ldap.implementation: activedirectory, bind DN CN=svc-keycloak,OU=Departments,DC=aegis,DC=corp, users_filter includes (!(userAccountControl:1.2.840.113556.1.4.803:=2)) to exclude disabled AD accounts in real time (no cache/sync delay). Requires rewriting access_control to use AD group names (GRP_IT_Admin, GRP_Finance, GRP_Web_Ops) instead of OpenLDAP\'s (admins, it_ops) — the explicit-deny-after-group-match pattern (documented lesson from the earlier fallthrough bug) is carried forward as a mandatory pattern, not optional. OpenLDAP is retained post-migration as a documented break-glass path only (small set of recovery accounts), not the primary identity source.',
+    notes:
+      'Configuration drafted, not yet applied. Target: single source of truth for identity across Zone 3 (gateway) — currently Authelia authenticates against OpenLDAP (dc=zerotrust,dc=lan) while Keycloak is already federated to Active Directory, meaning two directories independently hold user identity and an AD-disabled user would remain authenticated at the gateway. Planned config: authentication_backend.ldap.implementation: activedirectory, bind DN CN=svc-keycloak,OU=Departments,DC=aegis,DC=corp, users_filter includes (!(userAccountControl:1.2.840.113556.1.4.803:=2)) to exclude disabled AD accounts in real time (no cache/sync delay). Requires rewriting access_control to use AD group names (GRP_IT_Admin, GRP_Finance, GRP_Web_Ops) instead of OpenLDAP\'s (admins, it_ops) — the explicit-deny-after-group-match pattern (documented lesson from the earlier fallthrough bug) is carried forward as a mandatory pattern, not optional. OpenLDAP is retained post-migration as a documented break-glass path only (small set of recovery accounts), not the primary identity source.',
+  },
 ];
 
 export const ZONE_STATUS = {
@@ -287,6 +298,18 @@ export const SECURITY_DEBT: SecurityDebtItem[] = [
     severity: 'Critical',
     fix: 'Perform a comprehensive, synchronized secret rotation across all 9 exposed services prior to defense: Elastic superuser password, Keycloak admin password, LDAP admin/config/bind credentials, Authelia OIDC RSA private key, Authelia client secret, session secret, JWT secret, Redis password, and Postgres password.',
     evidence: 'Exposed credentials inventory cataloged in Known Issues (ki-3, ki-5) and tracked under Remaining Work l34.',
+  },
+  {
+    flaw: 'Bind credential (svc-keycloak) stored in Keycloak provider config and Authelia YAML, not a secret manager',
+    severity: 'Medium',
+    fix: 'Acceptable for lab environment given isolated ext_net bridge with no LAN exposure; production requires HashiCorp Vault, CyberArk, or Keycloak secret SPI.',
+    evidence: 'authelia/configuration.yml and Keycloak ldap-provider JSON configuration audit.',
+  },
+  {
+    flaw: 'AD LDAP bind currently uses plaintext ldap:// without TLS/LDAPS',
+    severity: 'Medium',
+    fix: 'Acceptable given network isolation on internal ext_net bridge; flagged as pre-production hardening item, not a currently exploitable gap given topology.',
+    evidence: 'Network capture on ext_net interface and Keycloak User Federation connection URL.',
   },
 ];
 
@@ -442,6 +465,92 @@ export const KNOWN_ISSUES: KnownIssue[] = [
     description: 'Wazuh Active Response API endpoint returns HTTP 200 on PUT /active-response with command: host-deny, but host execution returns affected_items: 0 without explicit agents_list query parameter.',
     impact: 'Automated containment action deferred to post-defense; workflow runs linear (enrich -> notify) via Discord while agent-side AR execution parameter is refined.',
     status: 'Open',
+  },
+  {
+    id: 'ki-14',
+    title: 'Critical SOC visibility gap — no Wazuh agent on CORP-DC01 (Active Directory)',
+    severity: 'Critical',
+    description:
+      'Critical SOC visibility gap — no Wazuh agent on CORP-DC01 (Active Directory). Five of six planned identity/network log sources are ingested and confirmed working (Authelia, Keycloak, Traefik, Coraza, Zeek/Suricata), but Active Directory itself is not. This means: a user added to GRP_IT_Admin, a security group modified, a disabled account re-enabled, or Kerberos authentication anomalies currently produce zero SOC visibility. Given the project\'s core thesis is closing exactly this kind of institutional blind spot, this is ranked as the highest-priority remaining gap — higher than completing the Authelia->AD migration itself.',
+    impact:
+      'Leaves institutional directory events unmonitored at the SOC level. Planned remediation: install a Wazuh agent on CORP-DC01 pointed at minisoc2 (10.16.64.156:1514), configure ossec.conf to collect the Windows Security event log channel, with priority on event IDs 4720 (user created), 4726 (user deleted), 4732 (member added to security-enabled group), 4733 (member removed), 4740 (account locked out), and 4625 (failed logon).',
+    status: 'Open',
+  },
+];
+
+export const ZERO_TRUST_GOVERNANCE_MODEL = {
+  principles: [
+    {
+      principle: 'Never Trust / Always Verify',
+      enforcement: 'Forward-Auth on every inbound HTTP request; zero direct backend or target network access.',
+    },
+    {
+      principle: 'Least Privilege',
+      enforcement: 'default_policy: deny with explicit group-match grants only; no wildcard admin allowances.',
+    },
+    {
+      principle: 'Assume Breach',
+      enforcement: 'Multi-zone network isolation; auth_net kernel bridge internal: true with no external route.',
+    },
+    {
+      principle: 'Verify Explicitly',
+      enforcement: 'MFA/TOTP step-up enforced everywhere across enclaves except auth infrastructure itself.',
+    },
+    {
+      principle: 'Single Source of Truth',
+      enforcement: 'Active Directory (CORP-DC01) as authoritative identity source; Authelia/Keycloak as enforcement layers.',
+    },
+    {
+      principle: 'Continuous Audit',
+      enforcement: 'Every authorization decision logged to authelia-* / keycloak-* streams and shipped out-of-band to Zone 4 SOC.',
+    },
+  ],
+  groupModel: {
+    chain: 'AD Group (Business Authorization) → Keycloak Realm Role (Application-Facing) → Authelia Access Rule (Gateway Policy) → Target Application (OIDC Token Claims)',
+    propagationRule:
+      'Granting or revoking administrative access is executed strictly via a single Active Directory group membership modification, propagating dynamically without touching Authelia configuration, modifying Keycloak UI roles, or restarting gateway containers.',
+  },
+  accessMatrix: [
+    { resource: 'Authelia Portal', domain: 'authelia.zerotrust.lan', policy: 'bypass', group: 'Any', note: 'Self-authentication portal provider' },
+    { resource: 'Mailpit UI', domain: 'mailpit.zerotrust.lan', policy: 'bypass', group: 'Any', note: 'Development / testing sinkhole' },
+    { resource: 'Keycloak Admin Console', domain: 'keycloak.zerotrust.lan', policy: 'two_factor', group: 'GRP_IT_Admin', note: 'Explicit deny rule immediately follows' },
+    { resource: 'Traefik Dashboard', domain: 'traefik.zerotrust.lan', policy: 'two_factor', group: 'GRP_IT_Admin', note: 'Explicit deny rule immediately follows' },
+    { resource: 'Portainer CE', domain: 'portainer.zerotrust.lan', policy: 'two_factor', group: 'GRP_IT_Admin', note: 'Root-equivalent Docker management' },
+    { resource: 'Other Internal Apps', domain: '*.zerotrust.lan', policy: 'two_factor', group: 'Any Authenticated', note: 'Default wildcard catch-all' },
+    { resource: 'CORP-WEB01 (Juice Shop)', domain: 'juiceshop.zerotrust.lan', policy: 'public (WAF-only)', group: 'Public / Customers', note: 'Decoupled from Authelia; inspected inline by Coraza WAF' },
+  ],
+};
+
+export const CROSS_SOURCE_CORRELATIONS = [
+  {
+    name: 'AD Privilege Escalation',
+    flow: 'AD group change (Event ID 4732/4733) → Keycloak admin login within 60s',
+    detectionScenario: 'Potential Active Directory compromise followed by administrative portal hijacking.',
+  },
+  {
+    name: 'Coordinated Credential Attack',
+    flow: 'Authelia brute-force threshold alert (msg: "Unsuccessful 1FA") + Suricata network scan from matching source.ip',
+    detectionScenario: 'Multi-vector perimeter credential spray and port reconnaissance.',
+  },
+  {
+    name: 'Lateral Pivot Exploitation',
+    flow: 'Coraza WAF block (Rule 942100) → Authelia auth failure → Keycloak backchannel token request',
+    detectionScenario: 'Attacker probes public web host then attempts lateral credential pivot against gateway.',
+  },
+  {
+    name: 'Stale / Hijacked Session',
+    flow: 'AD account disabled (userAccountControl: 1.2.840.113556.1.4.803:=2) while Authelia auth/access continues',
+    detectionScenario: 'Stale identity session or active token hijack surviving employee offboarding.',
+  },
+  {
+    name: 'Suspicious Admin Escalation',
+    flow: 'New GRP_IT_Admin group assignment in AD → Immediate access attempt to Portainer / Traefik',
+    detectionScenario: 'Adversary establishes persistence via rogue domain admin addition.',
+  },
+  {
+    name: 'Kerberoasting / Pass-the-Ticket',
+    flow: 'Kerberos service ticket requests (Event ID 4769) with RC4 encryption across multiple hosts',
+    detectionScenario: 'Offline ticket cracking attempt targeting service accounts.',
   },
 ];
 
