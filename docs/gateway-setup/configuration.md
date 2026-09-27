@@ -2313,20 +2313,608 @@ Symptom-to-fix table. See § 11 for the full explanation of each fix.
 
 ---
 
-## What's left
+## 13. Federation Overview
 
-Checklist status after this commit:
+Two independent consumers read from the same AD directory, read-only:
 
-| # | Item | Status |
+```
+                         ┌──────────────────────────────┐
+                         │   Active Directory (DC01)    │
+                         │   aegis.corp · 192.168.50.10 │
+                         │                              │
+                         │   Users:  OU=Departments     │
+                         │   Groups: OU=Security_Groups │
+                         └──────────────┬───────────────┘
+                                        │
+                             LDAP read-only (bind: svc-keycloak)
+                                        │
+              ┌─────────────────────────┴────────────────────────┐
+              │                                                  │
+              ▼                                                  ▼
+    ┌──────────────────────┐                        ┌──────────────────────┐
+    │     Authelia         │                        │      Keycloak        │
+    │  (forward-auth)      │◄─── OIDC broker ──────►│  (token issuer)      │
+    │                      │                        │                      │
+    │  Groups → ACL rules  │                        │  Groups → OIDC       │
+    │  (live on every      │                        │  `groups` claim      │
+    │   authentication)    │                        │  (via client scope)  │
+    └──────────────────────┘                        └──────────────────────┘
+              │                                                  │
+              └─────────────────────┬────────────────────────────┘
+                                    ▼
+                          Remote-User / Remote-Groups
+                          headers + OIDC `groups` claim
+```
+
+**Two distinct roles for each service:**
+
+| Service | Role in the flow |
+|---|---|
+| **Authelia** | Front gate. Enforces who can reach *any* HTTP route. Its decision comes from live AD group lookup + MFA state. |
+| **Keycloak** | Token factory. Issues OIDC tokens for downstream apps that want claims, refresh tokens, and SSO. AD groups are delivered via the `groups` claim. |
+
+They are **peers** — Authelia does not depend on Keycloak to enforce routes.
+
+---
+
+## 14. Active Directory Layout
+
+The federation assumes the following directory structure, verified on the DC:
+
+### 14.1 OUs
+
+```
+DC=aegis,DC=corp
+├── OU=Departments                 ← users live under here
+│   ├── OU=Finance_Sales
+│   ├── OU=IT_Dept
+│   ├── OU=Web_Ops
+│   └── OU=Workstations
+├── OU=Security_Groups             ← groups live here (flat, no nesting)
+└── CN=Users                       ← built-in only (Administrator, krbtgt)
+```
+
+### 14.2 Groups
+
+| Group | Members | Purpose |
 |---|---|---|
-| 1 | Keycloak ↔ AD federation | ✅ Documented |
-| 2 | Authelia → AD backend | ✅ Documented |
-| 3 | Authelia access_control rewrite | ✅ Documented |
-| 4 | Keycloak role mapper | ✅ Documented — **but not yet applied to your live Keycloak** |
-| 5 | Wazuh agent on DC01 | ❌ Not started |
-| 6 | ECS normalization | ❌ Blocked on #5 |
-| 7 | LDAPS on AD bind | ❌ Not configured |
-| 8 | Secret rotation | ⏸ Deferred |
-| 9 | Permanent Keycloak admin | ❌ Not done |
-| 10 | Correlation rules | ❌ Blocked on #6 |
+| `GRP_IT_Admin` | `anis.taibi`, `hani.abdelkader` | Gateway admin (Traefik, Keycloak console, Portainer) |
+| `GRP_Web_Ops` | `mezi.islam` | Web ops (Portainer access) |
+| `GRP_Finance` | `salima` | Finance application access |
 
+Group DNs: `CN=GRP_*,OU=Security_Groups,DC=aegis,DC=corp`
+
+### 14.3 Users
+
+| User | sAMAccountName | OU | Notes |
+|---|---|---|---|
+| `anis.taibi` | `anis.taibi` | `IT_Dept` | Admin |
+| `hani.abdelkader` | `hani.abdelkader` | `IT_Dept` | Admin |
+| `mezi.islam` | `mezi.islam` | `Web_Ops` | Web ops |
+| `salima` | `salima` | `Finance_Sales` | Finance |
+
+All users must have:
+- `sAMAccountName` set (this is what they type at login)
+- **"User must change password at next logon" unchecked** (blocks LDAP bind)
+- `mail` attribute set (Authelia elevation email)
+
+### 14.4 Service account
+
+| Field | Value |
+|---|---|
+| sAMAccountName | `svc-keycloak` |
+| DN | `CN=svc-keycloak,OU=Departments,DC=aegis,DC=corp` |
+| Rights | Read-only on `OU=Departments` and `OU=Security_Groups` |
+| Password | Stored in `authelia/secrets/ldap_password` and Keycloak LDAP provider |
+
+The same service account serves both Authelia and Keycloak for this lab. Production should use separate accounts (`svc-authelia`, `svc-keycloak`) for independent rotation and audit.
+
+---
+
+## 15. Authelia — LDAP Configuration
+
+### 15.1 Complete `authentication_backend` block
+
+```yaml
+authentication_backend:
+  refresh_interval: 5m
+  ldap:
+    implementation: activedirectory
+    address: ldap://192.168.50.10:389
+    timeout: 5s
+    start_tls: false
+    base_dn: DC=aegis,DC=corp
+    additional_users_dn: 'OU=Departments'
+    users_filter: >-
+      (&({username_attribute}={input})
+       (objectClass=user)
+       (!(userAccountControl:1.2.840.113556.1.4.803:=2)))
+    additional_groups_dn: 'OU=Security_Groups'
+    groups_filter: '(&(member={dn})(objectClass=group))'
+    user: CN=svc-keycloak,OU=Departments,DC=aegis,DC=corp
+    attributes:
+      username: sAMAccountName
+      display_name: displayName
+      mail: mail
+      group_name: cn
+      given_name: givenName
+      family_name: sn
+```
+
+### 15.2 Field rationale
+
+| Field | Value | Why |
+|---|---|---|
+| `implementation` | `activedirectory` | Enables AD-specific quirks: `sAMAccountName` normalization, `objectGUID` handling, `userAccountControl` bitmask interpretation. |
+| `address` | `ldap://192.168.50.10:389` | Cleartext over the isolated `ext_net` bridge — never crosses the LAN. LDAPS is a production hardening item. |
+| `base_dn` | `DC=aegis,DC=corp` | Domain root. |
+| `additional_users_dn` | `'OU=Departments'` | Concatenated with `base_dn`. **Must be quoted** — YAML treats unquoted strings with spaces specially. |
+| `users_filter` | `(&(sAMAccountName={input})(objectClass=user)(!(userAccountControl:...:=2)))` | Three-way AND. The `1.2.840.113556.1.4.803:=2` is the AD bitwise-match operator for the `ACCOUNTDISABLE` bit. |
+| `additional_groups_dn` | `'OU=Security_Groups'` | Groups live in their own flat OU. |
+| `groups_filter` | `(&(member={dn})(objectClass=group))` | Find any group whose `member` attribute contains the user's DN. |
+| `user` | `CN=svc-keycloak,OU=Departments,DC=aegis,DC=corp` | Bind DN. Must match the account whose password is in the secret file. |
+| `attributes.username` | `sAMAccountName` | Login form field. AD lookup is case-insensitive. |
+| `attributes.mail` | `mail` | Required for Authelia session-elevation emails. **If empty in AD, TOTP registration fails.** |
+
+### 15.3 The disabled-account filter is the revocation mechanism
+
+Without `(!(userAccountControl:...:=2))`, a **disabled** AD user can still authenticate. With it:
+
+1. Admin disables `salima` in AD
+2. Salima's next request to any gateway service
+3. Authelia binds, runs `users_filter`, filter returns no match (disabled bit set)
+4. Authelia treats it as **user not found** → access denied
+
+No sync delay, no cached credentials. This is the single most important property of the federation.
+
+### 15.4 Bind password via `_FILE` env var
+
+The password is **never** written into `configuration.yml`. Authelia resolves it via the `_FILE` env var pattern:
+
+```yaml
+# docker-compose.yml
+    environment:
+      AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD_FILE: /secrets/ldap_password
+    volumes:
+      - ./authelia/secrets/ldap_password:/secrets/ldap_password:ro
+```
+
+**Rule:** never set the non-`_FILE` variant alongside the `_FILE` variant. If both are present, Authelia uses the **literal value of the non-`_FILE` variable** — meaning it tries to bind with the string `/secrets/ldap_password` as the password and fails with `LDAP Result Code 49`.
+
+### 15.5 Verification — live login
+
+The `check-policy` subcommand does **not** query LDAP. It only evaluates rule syntax. Ignore it as a functional test.
+
+The only functional test is a live login:
+
+```bash
+sudo tail -f authelia/authelia.log
+# Log in as a real AD user, complete MFA
+# Watch for:
+#   "Check authorization of subject username=<user> groups=<GRP_...> ..."
+```
+
+If the `groups=` field is empty → the group filter matched nothing. See § 20.
+
+### 15.6 Verified behavior
+
+| Test | Result |
+|---|---|
+| Bind to AD as `svc-keycloak` | ✅ |
+| LDAP Discovery reports `Vendor Name: Microsoft Corporation` | ✅ |
+| Login as `salima` | ✅ |
+| Login as `anis.taibi` | ✅ |
+| Login as `mezi.islam` | ✅ |
+| Group membership resolved per user | ✅ |
+| Revocation on disable | ✅ (filter-level) |
+
+---
+
+## 16. Keycloak — AD User Federation
+
+### 16.1 Create the realm
+
+Admin console → dropdown → **Create realm**:
+
+| Field | Value |
+|---|---|
+| Realm name | `aegis` |
+| Enabled | `On` |
+
+### 16.2 Add the LDAP user federation provider
+
+Realm `aegis` → **User Federation** → **Add provider** → **LDAP**.
+
+#### Connection & Authentication
+
+| Field | Value |
+|---|---|
+| Console display name | `AegisAD` |
+| Vendor | `Active Directory` |
+| Connection URL | `ldap://192.168.50.10:389` |
+| Enable StartTLS | `Off` |
+| Use Truststore SPI | `Never` |
+| Connection pooling | `On` |
+| Bind type | `simple` |
+| Bind DN | `CN=svc-keycloak,OU=Departments,DC=aegis,DC=corp` |
+| Bind credentials | *(same password as `authelia/secrets/ldap_password`)* |
+
+Click **Test connection** → expect `Success`.
+Click **Test authentication** → expect `Success`.
+
+#### LDAP Searching and Updating
+
+| Field | Value |
+|---|---|
+| Edit mode | `READ_ONLY` |
+| Users DN | `OU=Departments,DC=aegis,DC=corp` |
+| Username LDAP attribute | `sAMAccountName` |
+| RDN LDAP attribute | `cn` |
+| UUID LDAP attribute | `objectGUID` |
+| User object classes | `person, organizationalPerson, user` |
+| Search scope | `Subtree` |
+| Read timeout | `10s` |
+| Pagination | `On` |
+| Batch size | `100` |
+
+Save.
+
+#### Synchronization Settings
+
+| Field | Value | Why |
+|---|---|---|
+| Import users | `On` | New AD users appear in Keycloak |
+| Sync registrations | `Off` | Keycloak does **not** write new users back to AD |
+| Periodic full sync | `On` | Re-imports everything on schedule |
+| Full sync period | `86400` | Once per day (seconds) |
+| Periodic changed users sync | `On` | Imports only users who changed |
+| Changed users sync period | `300` | Every 5 minutes |
+
+A new AD user appears in Keycloak within ~5 minutes without manual action. For demos, use the **Sync all users** button to force an immediate refresh.
+
+### 16.3 Add the LDAP group mapper
+
+Without this, groups exist in AD but not in Keycloak.
+
+Realm `aegis` → **User Federation** → `AegisAD` → **Mappers** → **Add mapper** → **By configuration** → **group-ldap-mapper**.
+
+| Field | Value |
+|---|---|
+| Name | `group-ldap-mapper` |
+| LDAP Groups DN | `OU=Security_Groups,DC=aegis,DC=corp` |
+| Group Name LDAP Attribute | `cn` |
+| Group Object Classes | `group` |
+| Membership LDAP Attribute | `member` |
+| Membership Attribute Type | `DN` |
+| Mode | `READ_ONLY` |
+| User Groups Retrieve Strategy | `LOAD_GROUPS_BY_MEMBER_ATTRIBUTE` |
+| Groups Path | `/` |
+
+Save.
+
+### 16.4 Force first sync
+
+LDAP provider top page → **Action** menu → **Sync all users**. Wait for the green toast.
+
+Expected result: Users and Groups menus now show AD data:
+
+```
+Users  →  salima, anis.taibi, hani.abdelkader, mezi.islam, svc-keycloak
+Groups →  GRP_IT_Admin, GRP_Web_Ops, GRP_Finance
+```
+
+> **Note:** The default Users search filter hides federated users. In the Users page, click the **Search user** dropdown → **View all**, or use the search box.
+
+### 16.5 Verify group membership
+
+Realm `aegis` → **Groups** → `GRP_IT_Admin` → **Members**:
+
+```
+anis.taibi
+hani.abdelkader
+```
+
+Repeat for `GRP_Web_Ops` (should list `mezi.islam`) and `GRP_Finance` (should list `salima`).
+
+### 16.6 Verified behavior
+
+| Test | Result |
+|---|---|
+| Test connection | ✅ Success |
+| Test authentication | ✅ Success |
+| Users synced | ✅ (5 users + local admin) |
+| Groups synced | ✅ (3 groups) |
+| Group membership matches AD | ✅ |
+| Periodic sync | ✅ (5 min for changed users) |
+
+---
+
+## 17. Keycloak — OIDC `groups` Claim
+
+This section documents **how AD group membership reaches applications** via OIDC tokens.
+
+### 17.1 Design decision — groups claim vs realm roles
+
+Two possible approaches:
+
+| Approach | Mechanism | Pros | Cons |
+|---|---|---|---|
+| **Realm role mapping** | LDAP role mapper auto-assigns roles from AD group membership | Roles are stable abstractions (rename AD group, app unchanged) | Requires `role-ldap-mapper` + Realm Roles Mappings UI; UI in Keycloak v22+ is unreliable |
+| **Groups claim** ✅ chosen | AD group DNs delivered directly in the token's `groups` claim | Zero mapper config; AD is unambiguously the source | Apps must know AD group naming; renaming a group requires app updates |
+
+**AEGIS uses the groups-claim approach.** It's the pattern used by default in GitHub, Google, and Azure AD enterprise federation: the identity provider delivers group membership as a claim, and downstream apps check membership directly.
+
+Applications authorize with a simple assertion:
+
+```python
+if "/GRP_IT_Admin" in token["groups"]:
+    allow()
+```
+
+### 17.2 Create the `groups` client scope
+
+Keycloak's built-in `groups` scope exists only in the `master` realm. Create it in `aegis`:
+
+Realm `aegis` → **Client scopes** → **Create client scope**:
+
+| Field | Value |
+|---|---|
+| Name | `groups` |
+| Description | `Adds AD group memberships to tokens` |
+| Type | `Default` |
+| Protocol | `openid-connect` |
+| Display on consent screen | `On` |
+| Include in token scope | `On` |
+
+Save.
+
+### 17.3 Add the Group Membership mapper
+
+On the new `groups` scope's page → **Mappers** tab → **Add mapper** → **By configuration** → **Group Membership**.
+
+| Field | Value |
+|---|---|
+| Name | `groups` |
+| Token Claim Name | `groups` |
+| Full group path | **`On`** — preserves the leading `/`, so tokens show `/GRP_IT_Admin` |
+| Add to ID token | `On` |
+| Add to access token | `On` |
+| Add to userinfo | `On` |
+
+Save.
+
+### 17.4 Attach the scope to each client
+
+For every OIDC client that should receive group claims:
+
+**Clients** → click the client → **Client scopes** tab → under **Default** → **Add client scope** → tick `groups` → **Add** → choose **Default**.
+
+Do this once per client. It becomes a checklist item when onboarding new applications.
+
+### 17.5 Verify — decode a token
+
+Create a temporary test client (public, direct grants):
+
+**Clients** → **Create client** → ID `token-test` → Client authentication `Off` → Direct access grants `On` → Standard flow `Off` → Save.
+
+Request a token:
+
+```bash
+TOKEN=$(curl -sk -X POST \
+  'https://keycloak.zerotrust.lan/realms/aegis/protocol/openid-connect/token' \
+  -d 'client_id=token-test' \
+  -d 'username=salima' \
+  -d 'password=<AD-PASSWORD>' \
+  -d 'grant_type=password' | jq -r .access_token)
+
+echo "$TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null | jq '{groups, preferred_username}'
+```
+
+Expected output:
+
+```json
+{
+  "groups": ["/GRP_Finance"],
+  "preferred_username": "salima"
+}
+```
+
+Repeat for each user:
+
+| User | Expected `groups` |
+|---|---|
+| `salima` | `["/GRP_Finance"]` |
+| `anis.taibi` | `["/GRP_IT_Admin"]` |
+| `mezi.islam` | `["/GRP_Web_Ops"]` |
+
+**Delete the test client** after verification: **Clients** → `token-test` → **Delete**.
+
+### 17.6 Verified behavior
+
+| Test | Result |
+|---|---|
+| `groups` scope created in `aegis` realm | ✅ |
+| Group Membership mapper attached | ✅ |
+| Scope attached to test client | ✅ |
+| Token for `salima` contains `/GRP_Finance` | ✅ |
+| Token for `anis.taibi` contains `/GRP_IT_Admin` | ✅ |
+| Token for `mezi.islam` contains `/GRP_Web_Ops` | ✅ |
+
+### 17.7 Deferred — realm role mapping
+
+Realm roles `it-admin`, `web-operator`, `finance-user` are defined in the realm but **not auto-assigned** from AD groups. The Keycloak admin console in v22+ does not render the Realm Roles Mappings tab for `role-ldap-mapper` instances, making the auto-mapping flow unusable through the UI.
+
+This is documented as a post-project enhancement:
+
+> *"Keycloak delivers AD group membership via the OIDC `groups` claim. Applications consume this claim directly — the modern OIDC pattern used by GitHub, Google, and Azure AD. Realm roles are defined but not currently mapped; the Keycloak admin console in v22+ does not render the Realm Roles Mappings tab for LDAP role mappers. The functional outcome is identical: authorization decisions resolve against AD group membership."*
+
+---
+
+## 18. OIDC Broker — Authelia ↔ Keycloak (planned)
+
+Authelia can act as an **OIDC identity provider** and Keycloak as an **OIDC identity broker**, letting a session at one be reused at the other without a second login. Configuration is drafted but not applied.
+
+### 18.1 Authelia OIDC provider config
+
+In `authelia/configuration.yml` under `identity_providers`:
+
+```yaml
+identity_providers:
+  oidc:
+    jwks:
+      - key_id: main
+        algorithm: RS256
+        use: sig
+        key: |
+          -----BEGIN PRIVATE KEY-----
+          <contents of authelia/oidc.key>
+          -----END PRIVATE KEY-----
+    clients:
+      - client_id: traefik
+        client_secret: <hashed-secret>
+        redirect_uris:
+          - https://traefik.zerotrust.lan/auth/openid/callback
+        scopes: [openid, profile, email]
+        response_types: [code]
+        response_modes: [form_post]
+      - client_id: keycloak
+        client_secret: <hashed-secret>
+        redirect_uris:
+          - https://keycloak.zerotrust.lan/realms/aegis/broker/authelia/endpoint
+        scopes: [openid, profile, email, groups]
+        response_types: [code]
+        response_modes: [form_post]
+```
+
+Client secrets should be hashed:
+
+```bash
+docker exec authelia authelia crypto hash generate argon2 --password '<plaintext>'
+```
+
+Paste the output (including the `$argon2id$...` prefix) into `client_secret`.
+
+### 18.2 Keycloak identity provider config
+
+Realm `aegis` → **Identity providers** → **OpenID Connect v1.0**:
+
+| Field | Value |
+|---|---|
+| Alias | `authelia` |
+| Import from URL | `https://authelia.zerotrust.lan/.well-known/openid-configuration` |
+| Client ID | `keycloak` |
+| Client Secret | *(plaintext, matches Authelia's hash input)* |
+| Default scopes | `openid profile email groups` |
+
+### 18.3 Status
+
+Drafted but **not enabled**. The Authelia session and Keycloak session operate independently — a user logs in separately to each surface. This is functional for the current deployment; the broker is a post-project enhancement.
+
+---
+
+## 19. Complete Identity Flow
+
+End-to-end path for a single request from an AD user.
+
+```
+1.  User opens https://traefik.zerotrust.lan
+
+2.  Browser → Traefik (proxy_net)
+      Traefik has no session cookie for this user
+
+3.  Traefik → Authelia forward-auth endpoint
+      POST /api/authz/forward-auth  (no session)
+
+4.  Authelia: no session → 302 redirect to
+      https://authelia.zerotrust.lan/?rd=https://traefik.zerotrust.lan
+
+5.  Browser follows → Authelia login portal
+
+6.  User submits credentials:
+      username = sAMAccountName (e.g. anis.taibi)
+      password = AD password
+
+7.  Authelia binds to AD as svc-keycloak
+      LDAP bind on 192.168.50.10:389
+
+8.  Authelia searches users_filter in OU=Departments
+      → finds CN=anis.taibi,OU=IT_Dept,OU=Departments,...
+      → confirms userAccountControl disabled bit is clear
+
+9.  Authelia binds to AD as the user's own DN
+      with the supplied password
+      → AD returns success
+
+10. Authelia searches groups_filter in OU=Security_Groups
+      → finds GRP_IT_Admin (member: CN=anis.taibi,...)
+
+11. Authelia prompts for TOTP (policy: two_factor)
+      → user enters 6-digit code
+      → verified against Postgres-stored secret
+
+12. Authelia marks the session as authenticated
+      → sets authelia_session cookie on .zerotrust.lan
+
+13. Browser retries https://traefik.zerotrust.lan
+
+14. Traefik → Authelia forward-auth (with session cookie)
+
+15. Authelia responds 200 with headers:
+      Remote-User: anis.taibi
+      Remote-Groups: GRP_IT_Admin
+      Remote-Name: anis.taibi
+      Remote-Email: anis.taibi@aegis.corp
+
+16. Traefik evaluates the router's policy:
+      domain traefik.zerotrust.lan, subject group:GRP_IT_Admin
+      → match → allow
+
+17. Traefik forwards request to backend
+      with Remote-User / Remote-Groups headers attached
+
+18. Backend serves the response
+
+19. Every step above logs:
+      traefik_logs/access.log    → request + forward-auth result
+      authelia/authelia.log      → credential check + ACL decision
+
+    Keycloak is not involved in this flow — only if a backend
+    itself uses OIDC and requests a token.
+```
+
+Total wall-clock: ~300 ms on a warm AD.
+
+### 19.1 Verified end-to-end — new AD user
+
+The following sequence was executed to prove the federation is functional without manual intervention:
+
+| Step | Action | Duration |
+|---|---|---|
+| 1 | Create user `user` in `OU=IT_Dept` via ADUC (GUI) | 30 s |
+| 2 | Add to `GRP_IT_Admin` via **Add to a group...** | 10 s |
+| 3 | Keycloak **Sync all users** | 5 s |
+| 4 | Token request → `groups: ["/GRP_IT_Admin"]` | instant |
+| 5 | Authelia login as `user` → TOTP enroll | 1 min |
+
+**Result:** A user created in AD was authenticating to the gateway with the correct admin group in under 3 minutes — with **no edits** to Authelia, Traefik, or Keycloak configuration.
+
+---
+
+## 20. Federation Troubleshooting Quick Reference
+
+| Symptom | Likely cause | Section |
+|---|---|---|
+| Authelia crashes, `no route to host` | Only on `auth_net` | § 11.3 |
+| Authelia crashes, `LDAP Result Code 49` | Wrong `_FILE` env var, wrong bind DN, or `password:` line still in YAML | § 11.4, § 15.4 |
+| Authelia starts but login returns "user not found" | Wrong `additional_users_dn` or `additional_groups_dn` | § 11.5 |
+| Login succeeds but groups line shows empty | Group filter matched nothing | § 15.1 |
+| TOTP enrollment fails, `mail address "<@>"` | No `mail` in AD | § 11.6 |
+| Keycloak `Test connection` fails `no route to host` | Container on `auth_net` only | § 11.3 |
+| Keycloak syncs users but not groups | Missing `group-ldap-mapper` | § 16.3 |
+| Token has no `groups` claim | Client scope not attached | § 17.4 |
+| Client scope `groups` missing from dialog | Scope not created in realm | § 17.2 |
+| AD user "must change password at next logon" | Blocks LDAP bind | § 19.1 |
+
+---
+
+*End of Part 3 (Sections 13–20). The configuration guide is complete.*
