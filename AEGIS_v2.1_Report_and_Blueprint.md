@@ -34,7 +34,7 @@ AEGIS v2.1 represents a tactical restructuring of the project to eliminate fragi
 - **Zone 3 Gateway Sensors & Hardening**: **Done (Fully Operational & Verified)** — Verified via live audits (September 19–21, 2026). All 9 core containers healthy, dual bridge isolation (`proxy_net` DMZ + `auth_net` `internal: true`) active, Forward-Auth MFA enforced with group-based restrictions and explicit deny rules, and Suricata IDS operational. Coraza WAF routing bypass has been fully resolved: Traefik dynamic routing repointed to `http://coraza:8080`, inline blocking verified against SQLi/UNION/XSS with HTTP 403, and CORP-WEB01 decoupled from Authelia for public WAF-only protection.
 - **Zone 2 Target Grid**: **Active Subnet / In-Progress** — Subnet `192.168.50.0/24` (`VMnet3`) configured with cross-zone routing via `ens34`. `CORP-DC01` (primary enterprise identity store), `CORP-PC01` ("Patient Zero"), `CORP-WEB01` (target web host), and Keycloak ↔ Active Directory Federation integrated (standalone `CORP-DB01` removed).
 - **Zone 4 Detection Pipeline & SOC Automation**: **Telemetry Pipeline Verified & SOAR In Progress (Operational\*)** — Zone 4 detection pipeline (Zeek/Suricata/Authelia/Coraza/Keycloak → Wazuh agent → MITRE-tagged rules on minisoc2) verified end-to-end. Centralized identity migration (OpenLDAP + Authelia LDAP backend + Keycloak OIDC federation via oidc-proxy) completed across Stages 1-3. Per-source index split (`wazuh-alerts-authelia-*`, `wazuh-alerts-coraza-*`, `wazuh-alerts-keycloak-*`) active with 2 dedicated Kibana dashboards. `minisoc3` automation stack (5-container Shuffle with shuffle-opensearch + Logstash webhook wired + MISP TLS port 443 + Nginx .dz reverse proxy) healthy. Shuffle SOAR workflow `misp_enrichment` verified with real live Wazuh alert (T1055) and matching MISP restSearch lookup. Outstanding: decision/branch node and full multi-stage attack flow.
-- **Zone 1 Threatscape & Red Team Engine**: **Configured & Ready** — Red team attack surface and adversary station featuring Atomic Red Team (automated execution framework), Web Application Exploitation (SQLi & XSS), Directory Fuzzing & Path Traversal (gobuster, ffuf, dirbuster), and Credential Attacks (Brute Force & Password Spraying), supplemented by Sliver C2 and REMnux malware analysis sandbox.
+- **Zone 1 Threatscape & Red Team Engine**: **Configured & Ready** — Red team attack surface and adversary station strictly focused on Kali Linux and Atomic Red Team (automated execution framework), Web Application Exploitation (SQLi & XSS), Directory Fuzzing & Path Traversal (gobuster, ffuf, dirbuster), Credential Attacks (Brute Force & Password Spraying), and Sliver C2.
 
 ### 1.4 What AEGIS Does and How It Enforces Zero Trust
 
@@ -57,8 +57,8 @@ Continuous verification: Sessions expire in 72 hours, not a year — the "always
 ```mermaid
 graph TB
     subgraph Zone1["🔴 Zone 1: Threatscape (Attack Surface & Red Team)"]
-        KALI["Kali Linux APT (192.168.1.50)<br/>Atomic Red Team / SQLi & XSS<br/>Directory Fuzzing / Password Spraying"]
-        REMNUX["REMnux Malware Analysis VM<br/>Static/Dynamic Analysis & YARA"]
+        KALI["Kali Linux APT Station (192.168.1.50)<br/>Web Exploits (SQLi & XSS) / Gobuster / Ffuf<br/>Brute Force & Credential Spraying / Sliver C2"]
+        ATOMIC["Atomic Red Team Engine (192.168.1.50)<br/>Automated MITRE ATT&CK Execution Battery<br/>Deterministic SOC Detection Validation"]
     end
 
     subgraph Zone2["🟡 Zone 2: The Target Grid (aegis.corp - 192.168.50.0/24)"]
@@ -140,7 +140,7 @@ graph TB
  | - Directory Fuzzing & Traversal  |        | CORP-PC01 (192.168.50.100) - Win10 Pro "Patient Zero"                  |
  | - Brute Force / Password Spray   |        | - Sysmon v15 + Wazuh Agent (Event IDs 1, 3, 7, 10, 11, 22)              |
  | - Sliver C2 & Burp Suite Pro     |        | CORP-WEB01 (192.168.50.20) - Target Web Host (OWASP Juice Shop)        |
- | REMnux Malware Sandbox           |        | - Micro-segmented Subnet / Shielded inline by Coraza WAF (OWASP CRS)   |
+ | [Only Kali & Atomic Red Team]    |        | - Micro-segmented Subnet / Shielded inline by Coraza WAF (OWASP CRS)   |
  +----------------------------------+        | Keycloak ↔ Active Directory Federation (LDAP/OIDC Identity Sync Bridge) |
                   |                          +-------------------------------------------------------------------------+
                   | Attack Vectors                                          ^
@@ -184,16 +184,15 @@ graph TB
 ### 3.1 Zone 1 Sub-Topology (Threatscape & Red Team Engine)
 ```
   +-------------------------------------------------------------------------------+
-  | ZONE 1: THREATSCAPE                                                           |
+  | ZONE 1: THREATSCAPE (Strictly Kali Linux & Atomic Red Team)                   |
   |                                                                               |
   |  +-----------------------------------+     +-------------------------------+  |
-  |  | Kali Linux (192.168.1.50)         |     | REMnux Malware Analysis VM    |  |
-  |  | - Atomic Red Team Framework       |     | - Static analysis (yara, pe)  |  |
-  |  | - Web Exploits (SQLi & XSS)       |     | - Dynamic sandbox isolation   |  |
-  |  | - Directory Fuzzing & Path Trav   |     | - Payload detonation verify   |  |
-  |  | - Brute Force / Password Spray    |     +-------------------------------+  |
-  |  | - Sliver C2 & Burp Suite Pro      |                                        |
-  |  +-----------------------------------+                                        |
+  |  | Kali Linux (192.168.1.50)         |     | Atomic Red Team Engine        |  |
+  |  | - Web Exploits (SQLi & XSS)       |     | - Automated ATT&CK execution  |  |
+  |  | - Directory Fuzzing & Path Trav   |     | - T1190, T1055, T1110, T1059  |  |
+  |  | - Brute Force / Password Spray    |     | - Deterministic SOC validation|  |
+  |  | - Sliver C2 & Burp Suite Pro      |     | - Repeatable jury test runner |  |
+  |  +-----------------------------------+     +-------------------------------+  |
   +-------------------------------------------------------------------------------+
             |                     |                     |
    (SQLi / XSS Attack)   (Sliver HTTPS Beacon)   (DNS Tunneling)
@@ -201,7 +200,7 @@ graph TB
             v                     v                     v
     [ Gateway Port 443 ]  [ Gateway Port 443 ]   [ Gateway Port 53 ]
 ```
-- **Components & Tools**: Kali Linux VM, REMnux VM, Atomic Red Team (automated execution framework), sqlmap, Burp Suite Pro, gobuster, ffuf, dirbuster, hydra/spray tooling, Sliver C2 framework, mimikatz, Wireshark, NetworkMiner.
+- **Components & Tools**: Kali Linux VM, Atomic Red Team (automated execution framework), sqlmap, Burp Suite Pro, gobuster, ffuf, dirbuster, hydra/spray tooling, Sliver C2 framework, mimikatz, Wireshark, NetworkMiner.
 - **Vectors**:
   - **Atomic Red Team**: Automated execution framework triggering mapped MITRE ATT&CK technique batteries against target hosts.
   - **Web Application Exploitation**: SQL Injection (SQLi) & Cross-Site Scripting (XSS) targeting web applications and API routes.
@@ -508,7 +507,7 @@ Target Application (OIDC Token Claims / Header Ingestion)
 - [ ] **Construct Kibana Dashboards**: Finalize SOC Morning, Network Traffic, Phishing Analysis, and MITRE Matrix dashboards (Coraza, Authelia, Traefik, Keycloak).
 
 ### 5.3 Medium Priority & Jury Preparation
-- [ ] **Deploy REMnux VM in Zone 1**: Setup malware static analysis toolkit.
+- [x] **Deploy Atomic Red Team in Zone 1**: Configure automated MITRE ATT&CK execution framework on Kali adversary station (Zone 1 consists strictly of Kali Linux and Atomic Red Team).
 - [ ] **Build Kibana Investigation Cases**: Configure case templates and timelines for incident triage.
 - [ ] **Script 3 Reproducible Attack Scenarios**: Finalize automated scripts for SQLi, LSASS credential dumping, and Sliver C2 beaconing.
 - [ ] **Rehearse 15-Minute Jury Demo**: Perform 5 dry-run rehearsals covering all 5 demo acts.
@@ -646,7 +645,7 @@ During Stage 3, connecting Keycloak to Authelia over `auth_net` triggered a chai
 | **Web Security Essentials** | Coraza WAF container with OWASP Core Rule Set protecting CORP-WEB01 (Juice Shop) | Zone 3 | `gateway/coraza/Caddyfile` |
 | **Windows Threat Detection** | Sysmon Event IDs 1, 3, 7, 10, 11, 12, 13, 22 forwarded to Wazuh | Zone 2 | Windows Event Log Pipeline |
 | **Identity & Access Threat Detection** | Active Directory security audits (4625, 4768) on `CORP-DC01` & Keycloak ↔ AD Sync | Zone 2 | Active Directory Event Pipeline |
-| **Malware Analysis** | REMnux VM in Zone 1 for static YARA/PE header inspection | Zone 1 | REMnux Sandbox |
+| **Adversary Emulation** | Atomic Red Team automated execution framework on Kali Linux | Zone 1 | Atomic Red Team Engine |
 | **Threat Intelligence** | MISP threat intelligence instance on `minisoc3` with Abuse.ch feeds | Zone 4 | `http://10.16.64.157:8080` |
 | **Log Analysis** | Kibana Discover saved searches and structured query templates | Zone 4 | Kibana Saved Searches |
 

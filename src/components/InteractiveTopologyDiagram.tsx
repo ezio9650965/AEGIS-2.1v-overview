@@ -1026,22 +1026,22 @@ export const InteractiveTopologyDiagram: React.FC<TopologyProps> = ({
                       isDimmed={isTraceMode && !isNodeActive('kali')}
                     />
 
-                    {/* Node 2: REMnux Sandbox */}
+                    {/* Node 2: Atomic Red Team Engine */}
                     <AegisNodeCard
-                      name="REMnux Malware Sandbox"
-                      categoryColor="am"
-                      icon={<Cpu className="w-4 h-4" />}
-                      ipAddress="Airgapped Analysis"
-                      portBadges={[{ port: 'AIRGAPPED', isExposed: false }]}
-                      statusBadge={{ label: 'ISOLATED LAB', isHealthy: true }}
+                      name="Atomic Red Team Engine"
+                      categoryColor="rd"
+                      icon={<Zap className="w-4 h-4" />}
+                      ipAddress="192.168.1.50 (Adversary Orchestration)"
+                      portBadges={[{ port: 'ATT&CK TTPs', isExposed: true }]}
+                      statusBadge={{ label: 'EMULATION RUNNER', isHealthy: false }}
                       facts={[
-                        'YARA Analysis: Pattern matching on dropped binaries',
-                        'Payload Detonation: Verify before controlled replay',
-                        'NetworkMiner: Passive traffic artifact extraction',
-                        'Zero external egress allowed by hypervisor',
+                        'MITRE ATT&CK: Automated test battery execution',
+                        'Technique Coverage: T1190, T1055, T1110, T1059',
+                        'Deterministic SOC verification for Wazuh & Zeek',
+                        'Scripted adversary tests mapped to detection rules',
                       ]}
-                      isActiveInTrace={isNodeActive('remnux')}
-                      isDimmed={isTraceMode && !isNodeActive('remnux')}
+                      isActiveInTrace={isNodeActive('kali') || isNodeActive('atomic')}
+                      isDimmed={isTraceMode && !isNodeActive('kali') && !isNodeActive('atomic')}
                     />
                   </div>
 

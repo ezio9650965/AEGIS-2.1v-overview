@@ -418,20 +418,20 @@ export const SvgTopologyVisualizer: React.FC<SvgTopologyVisualizerProps> = ({
                 <text x="12" y="75" fill="#8b949e" fontSize="7.5" fontFamily="'JetBrains Mono', monospace">• Fuzzing & Credential Spraying</text>
               </g>
 
-              {/* Node 2: REMnux Sandbox */}
+              {/* Node 2: Atomic Red Team */}
               <g
-                id="node-remnux"
+                id="node-atomic"
                 transform="translate(35, 180)"
-                className={`transition-all duration-300 ${isNodeDimmed('remnux') ? 'opacity-20' : 'opacity-100'}`}
+                className={`transition-all duration-300 ${isNodeDimmed('kali') && isNodeDimmed('atomic') ? 'opacity-20' : 'opacity-100'}`}
               >
                 <rect width="160" height="74" rx="6" fill="#21262d" stroke="#30363d" strokeWidth="1" />
-                <circle cx="20" cy="19" r="7" fill="rgba(255,183,0,0.2)" stroke="#ffb700" />
-                <text x="20" y="22" fill="#ffb700" fontSize="8" textAnchor="middle" fontFamily="'JetBrains Mono', monospace">⚙</text>
-                <text x="34" y="19" fill="#c9d1d9" fontSize="10" fontWeight="bold" fontFamily="'JetBrains Mono', monospace">REMnux Sandbox</text>
-                <text x="34" y="30" fill="#ffb700" fontSize="8" fontFamily="'JetBrains Mono', monospace">Isolated Analysis</text>
+                <circle cx="20" cy="19" r="7" fill="rgba(255,51,102,0.2)" stroke="#ff3366" />
+                <text x="20" y="22" fill="#ff3366" fontSize="8" textAnchor="middle" fontFamily="'JetBrains Mono', monospace">⚡</text>
+                <text x="34" y="19" fill="#c9d1d9" fontSize="10" fontWeight="bold" fontFamily="'JetBrains Mono', monospace">Atomic Red Team</text>
+                <text x="34" y="30" fill="#ff3366" fontSize="8" fontFamily="'JetBrains Mono', monospace">Adversary Emulation</text>
                 <rect x="12" y="38" width="55" height="13" rx="2" fill="#2d333b" stroke="#30363d" />
-                <text x="16" y="47" fill="#8b949e" fontSize="7" fontFamily="'JetBrains Mono', monospace">AIRGAPPED</text>
-                <text x="12" y="64" fill="#8b949e" fontSize="7.5" fontFamily="'JetBrains Mono', monospace">• YARA & Payload Detonation</text>
+                <text x="16" y="47" fill="#8b949e" fontSize="7" fontFamily="'JetBrains Mono', monospace">MITRE TTPs</text>
+                <text x="12" y="64" fill="#8b949e" fontSize="7.5" fontFamily="'JetBrains Mono', monospace">• Automated Test Matrix</text>
               </g>
             </g>
 

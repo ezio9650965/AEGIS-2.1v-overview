@@ -216,14 +216,14 @@ export const SubTopologiesView: React.FC = () => {
 
                 <div className="bg-[#1E293B] p-4 rounded border border-[#334155]">
                   <div className="font-bold text-white mb-2 flex items-center gap-2">
-                    <Cpu className="w-4 h-4 text-[#FBBF24]" />
-                    <span>REMnux Static/Dynamic Malware Sandbox</span>
+                    <Zap className="w-4 h-4 text-red-400" />
+                    <span>Atomic Red Team (MITRE ATT&CK Automation)</span>
                   </div>
                   <ul className="text-[#94A3B8] space-y-1.5 text-[11px] list-disc list-inside">
-                    <li><strong className="text-white">YARA Analysis:</strong> Pattern matching rules for dropped executable payloads and Mimikatz binaries.</li>
-                    <li><strong className="text-white">exiftool & strings:</strong> Static header, metadata extraction, and binary artifact profiling.</li>
-                    <li><strong className="text-white">NetworkMiner:</strong> Passive network forensics and file extraction from Zeek pcaps.</li>
-                    <li><strong className="text-white">Exploit Verification:</strong> Confirming payload detonability prior to controlled replay against Zone 2.</li>
+                    <li><strong className="text-white">Automated TTP Execution:</strong> Scripted execution of MITRE ATT&CK techniques mapped to defense detection rules.</li>
+                    <li><strong className="text-white">Technique Battery:</strong> T1190 (Exploit Public-Facing App), T1055 (Process Injection), T1110 (Brute Force), T1059 (Command Execution).</li>
+                    <li><strong className="text-white">SOC Telemetry Validation:</strong> Deterministic trigger for Wazuh, Suricata, and Zeek detection pipelines.</li>
+                    <li><strong className="text-white">Jury Demonstration Replay:</strong> Automated reproducible attack scenarios executed across the external boundary.</li>
                   </ul>
                 </div>
               </div>

@@ -353,7 +353,7 @@ Red-team adversary station and automated execution framework designed to simulat
 - **Web Application Exploitation**: SQL Injection (SQLi) & Cross-Site Scripting (XSS) via automated tools (sqlmap) and manual crafting targeting `CORP-WEB01` endpoints.
 - **Directory Fuzzing & Path Traversal**: Wordlist probing via `gobuster`, `ffuf`, and `dirbuster` against edge proxy routing and internal API paths.
 - **Credential Attacks**: Brute force authentication attacks and password spraying against edge login portals and Active Directory accounts.
-- **C2 & Binary Detonation**: Sliver C2 server (mTLS/DNS listeners), Mimikatz memory credential harvesting, and airgapped REMnux malware analysis sandbox.
+- **C2 & Credential Operations**: Sliver C2 server (mTLS/DNS listeners) and credential harvesting tooling hosted directly on Kali Linux.
 
 #### Attack Testing Methodology: Kali vs. Atomic Red Team
 
