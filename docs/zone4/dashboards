@@ -1,1 +1,537 @@
+# Zone 4 — Kibana Dashboards & Detection Rules
 
+**Purpose:** Reference for the monitoring surface of the AEGIS SOC. Every
+dashboard, saved search, detection rule, and data view is documented here.
+
+**Access:** Kibana at `https://10.16.64.156:5601/kibana` (basic auth: `elastic`).
+
+**Time range note:** All dashboards default to **Last 7 days**. The `Identity
+& Access` dashboard was originally 24h — change it to 7d before defense.
+
+---
+
+## 1. Dashboard inventory
+
+| # | Dashboard | Data views | Panels | Status |
+|---|---|---|---|---|
+| 1 | **Identity & Access** | `traefik-*`, `authelia-*`, `keycloak-*` | 5 | ✅ Starred, live |
+| 2 | **Edge WAF Security** | `coraza-*` | 4 | ✅ Starred, live |
+| 3 | **AEGIS Overview (Zeek+Suricata)** | `filebeat-*` | 7 | ✅ Starred, tagged `threat intel` |
+| 4 | **wazuh-security-events-v1.0** | `wazuh-alerts-*` | 8 | ✅ Starred, live |
+| 5 | **wazuh-vulnerabilities-v1.0** | `wazuh-alerts-*` (vulnerability filter) | 8 | ✅ Starred, live |
+
+All five dashboards are starred for quick access. Four were built during the
+project; two (`wazuh-*`) ship with the Wazuh Kibana plugin and were verified
+against the current data.
+
+---
+
+## 2. Identity & Access
+
+**Data views:** `traefik-*`, `authelia-*`, `keycloak-*`
+**Time range:** 7d (was 24h — update for defense)
+**Purpose:** one-glance view of every identity decision — who is trying to
+reach what, whether they succeeded, and why they were denied.
+
+### Panels
+
+**Panel 1 — Access Decisions by Router**
+- Type: Stacked bar
+- Query: none
+- X-axis: `@timestamp` (3h intervals)
+- Y-axis: `Count of records`
+- Breakdown: `RouterName.keyword` (top 10)
+- Shows: `juiceshop-htt...`, `authelia-htt...`, `keycloak-htt...`, `Other`
+- **Reading it:** the top bar is which router (hostname) requests hit. Spikes
+  correspond to attack bursts or normal traffic peaks.
+
+**Panel 2 — Auth Events Breakdown**
+- Type: Stacked bar
+- Data view: `authelia-*`
+- Query: `path: "/api/firstfactor" or path: "/api/secondfactor/totp"`
+- X-axis: `@timestamp` (3h)
+- Y-axis: `Count of records`
+- Breakdown: `msg.keyword` (top 10)
+- Categories seen: **Successful**, **Failed**, **Redirected**, **Error**,
+  **Pending 2FA**, **Forbidden**
+- **Reading it:** the full auth funnel. `Forbidden` = group ACL denial.
+  `Failed` = bad password or wrong TOTP. `Pending 2FA` = user hasn't
+  completed the second factor yet.
+
+**Panel 3 — Top Auth-Failure Source IPs**
+- Type: Table
+- Data view: `authelia-*`
+- Query: `msg: "Unsuccessful 1FA authentication attempt*"`
+- Rows: `remote_ip.keyword` (top 10)
+- Column 1: `Count of records`
+- Column 2: `Unique count of msg.keyword`
+- **Observed data:** `192.168.50.11` (20), `192.168.19.174` (7),
+  `192.168.19.183` (5), `192.168.50.10` (3)
+- **Reading it:** `.11` = PC01, `.183` = Kali, `.10` = DC01. High count from
+  Kali = attacker; high count from a client = user forgetting their password.
+
+**Panel 4 — Admin Console Access Attempts**
+- Type: Stacked bar
+- Data view: `traefik-*`
+- Query: `RouterName.keyword: *keycloak* or RouterName.keyword: *traefik*`
+- X-axis: `@timestamp` (3h)
+- Y-axis: `Count of records`
+- Breakdown: `DownstreamStatus` (top 15)
+- Status codes seen: 200, 201, 204, 302, 303, 304, 400, 401, 403, 404, 431,
+  499, 500, 502
+- **Reading it:** `200` = allowed. `302` = redirected to login. `403` = denied
+  by group ACL. `401` = auth required. `502` = backend down. `499` = client
+  timeout.
+
+**Panel 5 — Keycloak Events by Logger**
+- Type: Line
+- Data view: `keycloak-*`
+- Query: none
+- X-axis: `@timestamp` (3h)
+- Y-axis: `Count of records`
+- Breakdown: `loggerName.keyword`
+- Loggers seen: `org.keycloak.h...`, `org.groups.pro...`, `io.quarkus`,
+  `org.infinispan...`, `org.keycloak.jg...`, `org.keycloak.c...`,
+  `org.keycloak.s...`, `org.hibernate.o...`, `org.groups.JC...`, `Other`
+- **Reading it:** `org.keycloak.*` = auth/session events. `io.quarkus` =
+  framework. `org.infinispan` = clustering.
+
+### Why this dashboard exists
+
+This is the **PFE money shot**. A single screen shows:
+- Who is trying to authenticate
+- Whether they succeeded
+- Which hostname they hit
+- Why they were denied
+- Whether the denial was a group ACL or an auth failure
+
+Every claim about "identity is the perimeter" is backed by this view.
+
+---
+
+## 3. Edge WAF Security
+
+**Data view:** `coraza-*`
+**Time range:** 7d
+**Purpose:** visibility into the WAF's block decisions. Answers "is Coraza
+actually defending Juice Shop?" with data.
+
+### Panels
+
+**Panel 1 — Blocked vs Allowed (socket.io FPs excluded)**
+- Type: Area (stacked)
+- Query: `status: (200 or 403 or 502) and not request.uri.keyword: *socket.io*`
+- X-axis: `@timestamp` (3h)
+- Y-axis: `Count of records`
+- Breakdown: `status`
+- Colors: 200 (green), 502 (blue), 403 (red)
+- **Reading it:** the massive red spike = a real attack wave from Kali
+  (16,922 blocked requests in a single window during sqlmap testing).
+
+**Panel 2 — Top WAF-Blocked Source IPs**
+- Type: Table
+- Query: `status: 403 and not request.uri.keyword: *socket.io*`
+- Rows: `request.headers.X-Forwarded-For.keyword`
+- Column: `Count of records`
+- **Observed data:** `192.168.19.183` (16,922), `192.168.19.173` (1)
+- **Reading it:** `.183` is Kali (the attacker). `.173` is the gateway itself
+  (self-test). This panel is the "who is attacking" answer.
+
+**Panel 3 — Top Blocked Request URIs**
+- Type: Table
+- Query: `status: 403 and not request.uri.keyword: *socket.io*`
+- Rows: `request.uri.keyword`
+- Split by `request.method` (GET, OPTIONS, POST, PROPFIND, HEAD, Other)
+- **Observed data:**
+  - `/` — 24 GET + 72 OPTIONS + 18 POST + 18 PROPFIND + 6 HEAD + 6 Other
+  - `/.git/HEAD` — 6 (attack: source code leak attempt)
+  - `/HNAP1` — 6 (attack: router backdoor probe)
+  - `/evox/about` — 6 (attack: scanner probe)
+  - `/favicon.ico` — 6
+  - `/robots.txt` — 6
+  - `/%23` — 4 (attack: URL-encoded `#`)
+  - `/rest/products/search?` — 4 (attack: SQLi endpoint)
+  - `/SFII` — 1
+- **Reading it:** the URI column is a mini-attack-signature list. `/HNAP1`,
+  `/.git/HEAD`, `/SFII` are all scanner fingerprints.
+
+**Panel 4 — HTTP Status Distribution**
+- Type: Pie
+- Query: `not request.uri.keyword: *socket.io*`
+- Slice by: `status`
+- **Observed data:** 403 (97.24%), 500 (0.02%), other minor
+- **Reading it:** 97% blocked = the WAF is doing its job. A shift toward 200
+  would indicate a bypass.
+
+### Why this dashboard exists
+
+Demonstrates WAF effectiveness with real numbers. The pie chart saying
+"97.24% of requests were blocked" is more compelling than any prose.
+
+---
+
+## 4. AEGIS Overview (Zeek + Suricata)
+
+**Data view:** `filebeat-*` (Zeek and Suricata ship here)
+**Tag:** `threat intel`
+**Time range:** 7d
+**Purpose:** network-layer visibility — flow, protocol, and IDS alert data
+from Zeek and Suricata.
+
+### Panels
+
+**Panel 1 — Destination Geo [Filebeat Zeek]**
+- Type: Map
+- Field: Zeek `destination.geo.*`
+- Shows destination countries for outbound traffic
+- **Reading it:** unusual destination countries → possible C2 or data
+  exfiltration. Baseline first, then alert on deviation.
+
+**Panel 2 — Event Count [Filebeat Suricata]**
+- Type: Metric
+- Query: `event.dataset: "suricata.eve"`
+- Aggregation: Count, over last 24h
+- **Observed value:** 10,910 events
+- **Reading it:** overall traffic volume as a sanity metric.
+
+**Panel 3 — Activity Types over Time [Filebeat Suricata]**
+- Type: Stacked bar
+- Field: Suricata `event.type`
+- Categories: `flow`, `dns`, `http`, `fileinfo`, `quic`, `dhcp`, `anomaly`,
+  `ssh`, `smb`, `dcerpc`, `krb5`
+- **Reading it:** protocol mix. Sudden `smb` or `dcerpc` spikes = possible
+  lateral movement. `anomaly` events always worth investigating.
+
+**Panel 4 — Top Hosts Generating Events [Filebeat Suricata]**
+- Type: Bar
+- Field: host that emitted the event
+- **Observed:** `ztagateway` dominates
+- **Reading it:** which host is loudest on the network. If it's not the
+  gateway, something is generating unexpected traffic.
+
+**Panel 5 — Top Alerting Hosts [Filebeat Suricata]**
+- Type: Bar
+- Field: host triggering Suricata alerts
+- **Observed:** `ztagateway`
+- **Reading it:** which host is being targeted or is misbehaving.
+- **Known issue:** this panel and Panel 4 look nearly identical. Consider
+  splitting by `source.ip` vs `destination.ip` if the field is available.
+
+**Panel 6 — Top Alert Signatures [Filebeat Suricata]**
+- Type: Table
+- Columns: Alert Signature, Alert Category, Count
+- **Observed top signatures:**
+  | Signature | Category | Count |
+  |---|---|---|
+  | SURICATA STREAM Packet with invalid ack | Generic Protocol Command Decode | 66,642 |
+  | SURICATA STREAM ESTABLISHED invalid ack | Generic Protocol Command Decode | 66,623 |
+  | SURICATA STREAM ESTABLISHED packet out of window | Generic Protocol Command Decode | 58,172 |
+  | ET SCAN Possible Nmap User-Agent Observed | Web Application Attack | 521 |
+  | ET INFO GNU/Linux APT User-Agent Outbound... | Not Suspicious Traffic | 443 |
+  | SURICATA HTTP request abnormal Content-Encoding header | Generic Protocol Command Decode | 222 |
+  | SURICATA Applayer Wrong direction first Data | Generic Protocol Command Decode | 180 |
+- **Reading it:** the STREAM signatures are noise (self-signed TLS,
+  fragmented packets). The interesting one is **ET SCAN Possible Nmap
+  User-Agent Observed** — a real scanner detection.
+
+**Panel 7 — Event Count Metric** (top right)
+- Same as Panel 2, larger display
+
+### Known limitations
+
+- Zeek and Suricata live in `filebeat-*`, separate from Wazuh's
+  `wazuh-alerts-*`. Cross-source correlation requires ECS normalization.
+- The STREAM signature noise dominates the counts. Consider adding a filter
+  to hide `SURICATA STREAM*` when presenting.
+
+---
+
+## 5. wazuh-security-events-v1.0
+
+**Data view:** `wazuh-alerts-*`
+**Time range:** 7d
+**Purpose:** MITRE-mapped view of every Wazuh alert. Comes from the Wazuh
+Kibana plugin (not custom-built).
+
+### Panels
+
+**Panel 1 — Total**
+- Metric: 70,052 events
+
+**Panel 2 — Level 12 or above alerts**
+- Metric: 36
+- **Reading it:** level 12+ is "high-severity" in Wazuh. 36 is the count of
+  events worth immediate attention.
+
+**Panel 3 — Authentication failure**
+- Metric: 5
+- Wazuh rule 5715 or similar
+
+**Panel 4 — Authentication success**
+- Metric: 6
+
+**Panel 5 — Alerts evolution - Top 5 agents**
+- Type: Bar
+- Breakdown: `agent.name`
+- **Observed:** `ztagateway`, `patient_zero`, `minisoc2`, `juiceshop`
+- Note: `patient_zero` and `juiceshop` are the **old agent names** for PC01
+  and WEB01 (from earlier deployments). The current agents register as
+  `CORP-PC01` and `CORP-WEB01`. The chart will separate them until the old
+  entries are cleaned up on minisoc2.
+
+**Panel 6 — Top MITRE ATT&CK tactics**
+- Type: Pie
+- Categories seen: **Privilege Escalation**, **Defense Evasion**, **Initial
+  Access**, **Persistence**, **Lateral Movement**
+- **Reading it:** demonstrates MITRE coverage. A jury-friendly panel.
+
+**Panel 7 — Security alerts table**
+- Columns: `@timestamp`, `agent.name`, `rule.mitre.id`, `rule.mitre.tactic`,
+  `rule.description`, `rule.level`, `rule.id`
+- **Sample rows:**
+  - `T1078` (Defense Evasion) — "PAM: Login session opened." — level 3, rule 5501
+  - `T1078` (Defense Evasion) — "sshd: authentication success." — level 3, rule 5715
+  - `T1078` (Initial Access) — "PAM: Login session opened." — level 3, rule 5501
+  - `T1078` (Initial Access) — "sshd: authentication success." — level 3, rule 5715
+- **Reading it:** the most actionable panel. Filter by `rule.level >= 10` for
+  real incidents.
+
+---
+
+## 6. wazuh-vulnerabilities-v1.0
+
+**Data view:** `wazuh-alerts-*` (filtered to CVE events)
+**Time range:** 7d
+**Purpose:** CVE inventory per agent. Wazuh Vulnerability Detector runs a
+daily scan; this is the result.
+
+### Panels
+
+**Panel 1 — Critical Severity Alerts**
+- Metric: 1
+
+**Panel 2 — High Severity Alerts**
+- Metric: 1
+
+**Panel 3 — Medium Severity Alerts**
+- Metric: 1
+
+**Panel 4 — Low Severity Alerts**
+- Metric: 1
+
+**Panel 5 — Alert severity**
+- Type: Area or bar over time
+- Breakdown: `data.vulnerability.severity`
+- Categories: `-`, `High`, `Medium`, `Critical`, `Low`
+
+**Panel 6 — Vulnerabilities heat map**
+- Type: Heat map
+- X: `agent.name`
+- Y: severity
+- **Observed:** `ztagateway` and `patient_zero` have vulnerabilities across
+  High / Medium categories
+- **Reading it:** quick scan of "which hosts need patching."
+
+**Panel 7 — Events table**
+- Columns: `@timestamp`, `agent.name`, `data.vulnerability.cve`,
+  `data.vulnerability.package.name`, `data.vulnerability.package.version`,
+  `data.vulnerability.severity`, `rule.id`
+- **Sample rows:**
+  | Agent | CVE | Package | Version | Rule |
+  |---|---|---|---|---|
+  | ztagateway | CVE-2026-39113 | libsqlite3-0 | 3.45.1-1ubuntu2.7 | 23502 |
+  | patient_zero | CVE-2026-62706 | Microsoft Windows 10 Pro | 10.0.19045.6466 | 23502 |
+  | patient_zero | CVE-2026-62727 | Microsoft Windows 10 Pro | 10.0.19045.6466 | 23502 |
+  | patient_zero | CVE-2026-62801 | Microsoft Windows 10 Pro | 10.0.19045.6466 | 23502 |
+  | ztagateway | CVE-2012-4542 | linux-image-6.8.0-138-generic | 6.8.0-138 | 23502 |
+  | ztagateway | CVE-2013-7445 | linux-image-6.8.0-138-generic | 6.8.0-138 | 23502 |
+  | ztagateway | CVE-2015-7837 | linux-image-6.8.0-138-generic | 6.8.0-138 | 23502 |
+- **Reading it:** the patch backlog. Not a security incident — an inventory.
+
+---
+
+## 7. Data views reference
+
+| Data view | Index pattern | Purpose | Timestamp |
+|---|---|---|---|
+| `filebeat-*` | Filebeat indices | Zeek, Suricata, network layer | `@timestamp` |
+| `traefik-*` | `traefik_logs/access.log` | Ingress and routing | `@timestamp` |
+| `authelia-*` | `authelia/authelia.log` | Auth decisions | `@timestamp` |
+| `keycloak-*` | `keycloak_logs/keycloak.log` | OIDC, tokens, sessions | `@timestamp` |
+| `coraza-*` | `coraza_logs/access.log` | WAF blocks and anomaly scores | `@timestamp` |
+| `wazuh-alerts-4.x-*` | Wazuh alerts | Agent alerts, AD events, Sysmon | `@timestamp` |
+| `wazuh-archives-4.x-*` | Wazuh archives | Raw agent events (all) | `@timestamp` |
+
+### Runtime fields
+
+| Data view | Runtime field | Purpose |
+|---|---|---|
+| `authelia-*` | `source.ip` | Alias of `remote_ip.keyword` — enables cross-source correlation with Traefik/Keycloak when ECS normalization lands |
+
+### Index patterns that shouldn't be edited
+
+- `authelia-*` uses `msg.keyword` (not `msg`) for the full event funnel.
+  Authelia logs successful auth only at debug level — see F-021 in the
+  friction register.
+- `coraza-*` uses `request.headers.X-Forwarded-For.keyword` for the client
+  IP. `.keyword` is required for aggregations.
+
+---
+
+## 8. Detection rules (SIEM)
+
+**Where:** Security → Detection rules (SIEM)
+**Count:** 8 enabled custom rules + 1,922 pre-built Elastic rules
+
+### Custom AEGIS rules
+
+| Rule | Data view | Query / Logic | Severity | Risk | Run every |
+|---|---|---|---|---|---|
+| **AEGIS - Suricata Priority Alert** | `filebeat-*` | `event.dataset: "suricata.eve" and event.kind: "alert" and event.severity <= 2` | High | 73 | 5m |
+| **AEGIS - Web Attack Pattern (SQLi/XSS/Traversal)** | `traefik-*` | `RequestPath.keyword: (*UNION* or *SELECT* or *1%3D1* or *=1* or *../* or *%2e%2e* or *%3Cscript* or *OR+1*)` | High | 73 | 6m |
+| **AEGIS - Authelia TOTP Bypass Attempt** | `authelia-*` | (TOTP-related) | High | 73 | 5m |
+| **AEGIS - Authelia Brute Force** | `authelia-*` | (repeated 1FA failure) | Medium | 47 | 5m |
+| **AEGIS - Traefik Directory Fuzzing** | `traefik-*` | `DownstreamStatus: (403 or 404)` — threshold `ClientHost.keyword >= 20` | Medium | 47 | 5m |
+| **AEGIS - Traefik 5xx Storm** | `traefik-*` | `DownstreamStatus >= 500 and <= 599` — threshold `RouterName.keyword >= 20` | Medium | 47 | 6m |
+| **AEGIS - Group ACL Denial** | `authelia-*` | `msg: *is forbidden to user*` | Low | 21 | 6m |
+
+**Note:** `Authelia TOTP Bypass Attempt` and `Group ACL Denial` both appear
+twice in the rules list screenshots — that's likely a UI quirk from the
+display or a duplicate. Verify in Kibana and delete any duplicate.
+
+### Alert volume by rule (last 7 days)
+
+| Rule | Alerts | Severity |
+|---|---|---|
+| AEGIS - Group ACL Denial | 383 | Low |
+| AEGIS - Suricata Priority Alert | 212 | High |
+| AEGIS - Traefik Directory Fuzzing | 62 | Medium |
+| AEGIS - Authelia TOTP Bypass Attempt | 8 | High |
+| AEGIS - Authelia Brute Force | 4 | Medium |
+| AEGIS - Web Attack Pattern | 3 | High |
+| AEGIS - Traefik 5xx Storm | 2 | Medium |
+
+**Total:** 674 alerts, 88.7% attributed to `ztagateway`.
+
+### Suppression / false positive notes
+
+- **Group ACL Denial** fires for every non-admin attempt to reach
+  `keycloak.zerotrust.lan`, `traefik.zerotrust.lan`, `portainer.zerotrust.lan`.
+  Legitimate user confusion drives the 383 count. Tune by excluding
+  `anonymous` sessions or users with a valid auth token.
+- **Traefik Directory Fuzzing** fires on any client hitting 20+ 403/404s in
+  a 5m window. Legitimate scanners (all Kali tests) trigger this. Expected.
+- **Suricata Priority Alert** fires on any alert with severity ≤ 2 (high).
+  The STREAM signatures are excluded by severity, but scanner detections are
+  not. Consider adding a suppression for known false positives.
+
+### Related rules not created
+
+| Rule | Status | Blocker |
+|---|---|---|
+| AEGIS - Scan to Auth Correlation (EQL) | ❌ Deleted | Field mismatch across data views — needs ECS normalization |
+| AEGIS - AD Group → Keycloak Admin Login | ⬜ Not built | Depends on ECS normalization |
+| AEGIS - WAF Block + Auth Failure + Token Request | ⬜ Not built | Depends on ECS normalization |
+
+---
+
+## 9. Alerts view (Security → Alerts)
+
+**Total open alerts (last 7d):** 674
+
+### Severity distribution
+
+| Severity | Count |
+|---|---|
+| High | 223 |
+| Medium | 68 |
+| Low | 383 |
+
+### Top alerting host
+
+`ztagateway` — 88.7% of all alerts.
+
+### Why so many from the gateway
+
+The gateway is on all three attack paths:
+- Ingress traffic (Traefik logs every request)
+- Auth decisions (Authelia emits every ACL denial)
+- WAF blocks (Coraza emits every 403)
+
+Consequently, most detections originate there. This is expected — but it also
+means **noise from the gateway can hide signal from other zones**. Mitigate by
+filtering the Alerts view by severity when triaging.
+
+---
+
+## 10. Outstanding items
+
+| Item | Priority | Notes |
+|---|---|---|
+| Duplicate rule check (`TOTP Bypass`, `Group ACL Denial`) | Low | Delete if duplicate |
+| Convert `Identity & Access` time range from 24h to 7d | Low | Before defense |
+| Suppress `SURICATA STREAM*` in AEGIS Overview | Medium | Visual noise |
+| Build **Juice Shop Application View** | Medium | See §11 |
+| Build **AD event dashboard** | Medium | Uses new `wazuh-alerts-*` data from CORP-DC01 |
+| Add `agent.name` filter options to `wazuh-security-events-v1.0` | Low | Makes agent-specific views easier |
+| Clean up orphaned agents (`patient_zero`, `juiceshop`) on minisoc2 | Medium | They pollute agent breakdowns |
+| ECS normalization | High | Unblocks cross-source correlation |
+
+---
+
+## 11. Proposed — Juice Shop Application View
+
+**Data views:** `traefik-*` + `coraza-*`
+**Filter:** `RouterName.keyword: *juiceshop*`
+**Purpose:** Juice Shop has no meaningful app-side admin panel. This dashboard
+is the app-level view.
+
+### Panels planned
+
+| # | Panel | Type | Data view |
+|---|---|---|---|
+| 1 | Requests/sec over time | Area | `traefik-*` |
+| 2 | Top URIs hit | Table | `traefik-*` |
+| 3 | HTTP status distribution | Pie | `traefik-*` |
+| 4 | Top client IPs | Table | `traefik-*` |
+| 5 | WAF block rate | Metric | `coraza-*` |
+| 6 | Recent 403s (URI + attacker IP) | Table | `coraza-*` |
+
+Estimated build time: 20 minutes. All fields verified present.
+
+---
+
+## 12. Proposed — AD Event Dashboard
+
+**Data view:** `wazuh-alerts-*` filtered to `agent.name: CORP-DC01`
+**Purpose:** identity events from the domain controller in one view.
+
+### Panels planned
+
+| # | Panel | Field |
+|---|---|---|
+| 1 | Group changes over time (4728/4732/4756) | `data.win.system.eventID` |
+| 2 | User account changes (4720/4722/4725/4726) | `data.win.system.eventID` |
+| 3 | Top users by event count | `data.win.eventdata.targetUserName` |
+| 4 | Failed logons (4625) | `data.win.system.eventID` |
+| 5 | Account lockouts (4740) | `data.win.system.eventID` |
+| 6 | Kerberos anomalies (4768/4769/4771) | `data.win.system.eventID` |
+| 7 | Recent privileged group memberships | `data.win.eventdata.memberName` |
+
+**Prerequisite:** ECS normalization for the `user.name` / `source.ip` fields
+(see `soc-integration.md` §10.2).
+
+---
+
+## 13. Change log
+
+| Date | Change |
+|---|---|
+| 2026-09-29 | Rewrite. Documented all 5 live dashboards, 8 detection rules, 674-alert state. |
+| 2026-09-23 | Built `Identity & Access` and `Edge WAF Security` dashboards |
+| 2026-09-22 | Created first 4 custom detection rules |
+| earlier | `AEGIS Overview` dashboard pre-existed (Zeek+Suricata) |
+
+---
+
+*End of dashboards reference.*
