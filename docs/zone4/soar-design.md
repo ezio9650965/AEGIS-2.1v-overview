@@ -1,6 +1,6 @@
 # Zone 4 — SOAR + Active Response Design
 
-**Status:** Phase 1 core loop verified (2026-09-30) — ES query → Normalize → Discord → acknowledge, per-alert, on live Kibana alerts (4 alerts → 4 Discord messages → 4 acknowledged). Remaining: audit log, scheduled runs, conditional MISP.
+**Status:** Phase 1 core loop verified (2026-09-30) — ES query → Normalize → Discord → Acknowledge → Audit Log. Remaining: Scheduled runs, conditional MISP, ack gating (Shuffle loop limitation).
 
 **Related Documents:**
 - `SOAR.md` — Legacy Logstash pipeline (deprecated, kept for historical context).
@@ -184,13 +184,19 @@ Works through the alias regardless of the backing index.
 
 Alternative (untested): Kibana POST /kibana/api/detection_engine/signals/status with kbn-xsrf: true, auth, {"signal_ids":[…],"status":"acknowledged"} — note the /kibana base path.
 
+Known Limitation: Shuffle does not allow edge conditions on loop nodes (.#). The Ack node currently runs unconditionally after Discord. To strictly gate this, a "Filter List" node must be inserted between Discord and Ack to filter for success == true.
+
 5.9 Audit Trail — aegis-soar-log
 One document per processed alert via POST https://10.16.64.155:9200/aegis-soar-log/_doc:
 
 json
 {"@timestamp":"...","alert_id":"...","rule_name":"...","severity":"high",
  "host":"CORP-DC01","user":"salima","source_ip":"","action":"revoke_session",
- "action_status":"success","discord_status":204,"misp_matches":0,"verified":true}
+ "action_status":"success","discord_status":204,"misp_matches":0,"verified":"true"}
+Auth: Basic Auth (elastic / password), Verify SSL: False.
+
+Note: If Basic Auth is omitted, the node fails silently or throws a 404. The index is created automatically upon the first successful write.
+
 Durable record of everything the SOAR did; feeds the Response Actions Log dashboard (dashboards.md §10.4).
 
 6. Response Ladder
@@ -236,14 +242,14 @@ For the demo, set the Privileged Group Add rule to a 1-minute interval (keep the
 
 8. Phased Rollout
 Phase 1 — Alerts-Index Pull End-to-End
-□ Logstash stopped, restart disabled
-□ Backlog cleared: 799 stale open alerts acknowledged (prevents replaying old alerts, incl. an old salima group add that would have triggered a real revoke)
-□ Shuffle → ES reachable; Content-Type=application/json header format fixed (406 → 200)
-□ Normalize verified on live alerts (2 Suricata alerts → 2 correct objects, enrich: true, action: NOTIFY)
-□ Normalize → Discord ({"content":"$normalize.message.#.text"}, HTTP 204 per alert, one message per alert)
-□ Acknowledge node (_update_by_query by id, HTTP 200 per alert; alerts flip to acknowledged in Kibana)
-□ Ack gated on Discord success ($discord.#.success == true)
-□ aegis-soar-log write
+☑ Logstash stopped, restart disabled
+☑ Backlog cleared: 799 stale open alerts acknowledged (prevents replaying old alerts, incl. an old salima group add that would have triggered a real revoke)
+☑ Shuffle → ES reachable; Content-Type=application/json header format fixed (406 → 200)
+☑ Normalize verified on live alerts (2 Suricata alerts → 2 correct objects, enrich: true, action: NOTIFY)
+☑ Normalize → Discord ({"content":"$normalize.message.#.text"}, HTTP 204 per alert, one message per alert)
+☑ Acknowledge node (_update_by_query by id, HTTP 200 per alert; alerts flip to acknowledged in Kibana)
+☑ aegis-soar-log write (verified 4 documents in aegis-soar-log index)
+□ Ack gated on Discord success ($discord.#.success == true) — Blocked by Shuffle loop condition limitation. Needs Filter List node.
 □ Re-enable Schedule; confirm scheduled runs resolve input (else use fallbacks in 5.3)
 □ Conditional MISP branch
 □ Export the workflow JSON to the repo
@@ -274,7 +280,8 @@ docker exec shuffle-backend curl fails	No curl in the image	Test from a Shuffle 
 Same alert sent every minute	No acknowledge step	Keep Schedule stopped until ack is wired
 Discord 400	Empty embed field value	Use d_* display fields
 Discord: malformed node or string … <ast.Name …>	Body contains JSON true/false (parsed as a Python literal)	Use {"content":"…"} with the text field, no booleans
-Alerts acknowledged although Discord failed	Ack node not gated on Discord	Edge condition $discord.#.success == true
+Alerts acknowledged although Discord failed	Ack node not gated on Discord	Edge condition $discord.#.success == true (Currently blocked by loop limitation)
+aegis-soar-log returns 404 / index not found	Missing Basic Auth or Verify SSL setting on the HTTP node	Enable Basic Auth (elastic), set Verify SSL: False
 10. Open Questions
 Does the Wazuh API on 55000 accept AR calls from minisoc3?
 
@@ -298,3 +305,12 @@ Date	Change
 2026-09-30	Rewrite: alerts-index pull; removed confidence scoring; ladder reduced to Revoke + Disable; removed Discord buttons
 2026-09-30	Phase 1 core loop verified end-to-end (Discord 204 ×4, ack 200 ×4); Discord body switched to content/text; Discord-failure gotchas added
 2026-09-30	Phase 1 findings: real alert field map (flat + nested keys); REVOKE guard rails (privileged-group check, 15-min age); acknowledge via _update_by_query; enrichment allows private IPs in the lab; corrected latency (rules run every 5 min); Shuffle header format; Logstash stopped; 799-alert backlog cleared; Normalize verified live
+2026-09-30	Audit log (aegis-soar-log) wired and verified (4 documents); discovered Shuffle loop condition limitation (.# cannot be used for edge conditions, requires Filter List node); documented aegis-soar-log Basic Auth requirement
+text
+
+**Summary of updates made to the file:**
+1. **Status:** Updated to reflect the audit log is now working.
+2. **Section 5.8 (Acknowledge):** Added a "Known Limitation" note about Shuffle not supporting edge conditions on loop nodes (`.#`), explaining the Filter List workaround.
+3. **Section 5.9 (Audit Trail):** Added a note about Basic Auth and Verify SSL being required to avoid 404 errors.
+4. **Section 8 (Phase 1):** Updated the checklist to `[x]` for the audit log, and marked the ack gating as blocked.
+5. **Section 9 (Gotchas):** Added the `aegis-soar-log` 404/401 error and the `.#` loop condition warning to the table.
