@@ -1,71 +1,55 @@
 # Zone 4 — SOAR + Active Response Design
 
-**Status:** Design reference — revised after Webhook connector license block
+**Status:** Phase 1 in progress — Schedule → ES query → Normalize verified on live alerts (2026-09-30). Discord, acknowledge and audit-log nodes being wired.
 **Related:**
-- [`soar-v2.md`](./soar-v2.md) — implementation spec for the chosen integration
-- [`soar.md`](./soar.md) — current (deprecated) pipeline state
-- [`dashboards.md`](./dashboards.md) — Kibana dashboards reference
+- [`SOAR.md`](./SOAR.md) — legacy Logstash pipeline (deprecated, kept for the "what we tried" narrative)
+- [`dashboards.md`](./dashboards.md) — Kibana dashboards and detection rules reference
+- `soar/normalize_shuffle.py` — Normalize node source (Shuffle Execute Python). `soar/normalize_standalone.py` — fallback variant that queries ES itself
 
-This document defines the target architecture for the AEGIS SOAR pipeline
-and its identity-aware active response capability. It supersedes earlier
-versions that assumed a Kibana → Shuffle webhook integration, which turned
-out to require a paid license.
+This document defines the target architecture for the AEGIS SOAR pipeline and its identity-aware active response. It supersedes earlier versions that assumed a Kibana → Shuffle webhook (blocked by license) and a confidence-scoring decision layer (removed).
 
 ---
 
 ## 1. Design principles
 
-Three decisions drive the entire design.
-
 ### 1.1 Identity-first response
 
-Every response either proves the identity again, reduces the identity's
-authority, or removes it.
+Every response either proves the identity again, reduces the identity's authority, or removes it.
 
 - **IPs are untrusted by nature** — they change, they NAT, they get shared.
 - **Identities are the invariant.** `salima` is `salima` regardless of source IP.
-- **Every response is reversible.** Quarantine → remove later. Disable →
-  re-enable later. Nothing is permanent without a human decision.
+- **Every response is reversible.** Revoke → user logs in again. Disable → re-enable. Nothing is permanent without a human decision.
 
-**Nuance:** this does not mean "never touch an IP." It means **identity
-response is primary; IP-block is a supplementary tool** used only for
-volume-based attacks and post-compromise containment, always time-bounded.
+**Nuance:** this does not mean "never touch an IP." Identity response is primary; IP-block is a supplementary tool for volume-based attacks and post-compromise containment, always time-bounded.
 
 ### 1.2 License reality
 
-The Kibana instance runs on the free tier. The Webhook connector requires a
-**Gold license**. Any design that assumes Kibana → HTTP → Shuffle does not
-work.
+The Kibana instance runs on the free tier. The Webhook connector requires a **Gold license**, so Kibana → HTTP → Shuffle is not available.
 
-Solution: Kibana already writes every detection alert to
-`.alerts-security.alerts-default`. That index serves as the integration queue.
-Shuffle pulls from it on a schedule. No connector required. See
-[`soar-v2.md`](./soar-v2.md) for the implementation.
+Solution: Kibana already writes every detection alert to `.alerts-security.alerts-default`. That index is the integration queue. Shuffle pulls from it on a schedule. No connector required.
 
-### 1.3 Detection vs. raw events
-
-Wazuh produces raw events. Kibana detection rules produce **signals** — events
-that already passed a rule.
-
-The pipeline consumes signals, not raw events:
+### 1.3 Signals, not raw events
 
 | Signal source | Volume | Quality | Used for SOAR? |
 |---|---|---|---|
-| `wazuh-alerts-*` (raw) | Very high | Low — needs filtering | ❌ |
-| `.alerts-security.alerts-default` | Low | High — already filtered by rule | ✅ |
+| `wazuh-alerts-*` (raw) | Very high | Low — needs filtering | No |
+| `.alerts-security.alerts-default` | Low | High — already passed a rule | Yes |
+
+Evidence: the raw Wazuh event behind `AEGIS - Privileged Group Add` (event 4728) has `rule.level: 5`. The legacy Logstash filter (`rule.level >= 10/12`) could never have forwarded it. Detection quality comes from Kibana rules, not Wazuh severity.
 
 ---
 
 ## 2. Current vs. target
 
-| Capability | Current (`soar.md`) | Target |
+| Capability | Legacy (`SOAR.md`) | Target |
 |---|---|---|
 | Trigger | Logstash polls `wazuh-alerts-*` | Shuffle schedule polls `.alerts-security.alerts-default` |
-| Detection layer | None (raw Wazuh level ≥ 10) | Kibana detection rules |
-| Enrichment | MISP (unconditional) | MISP (conditional, public IPs only) |
-| Decision | None — all alerts notified | Rule → playbook mapping (static) |
+| Detection layer | None (raw Wazuh level threshold) | Kibana detection rules |
+| Enrichment | MISP, unconditional | MISP, only when the alert has a usable IP |
+| Decision | None — everything notified | Static rule → playbook map with guard rails |
 | Response | Discord notify only | Level 1 revoke + Level 4 disable |
-| Feedback | None | Acknowledge API + `aegis-soar-log` index |
+| Feedback | None | Acknowledge in Kibana + `aegis-soar-log` index |
+| Dedupe | None (2-minute window re-sent alerts) | Alert acknowledged after processing |
 | Failure mode | Logstash down → alerts lost | Shuffle down → alerts wait as `open` |
 
 ---
@@ -73,429 +57,280 @@ The pipeline consumes signals, not raw events:
 ## 3. Target workflow graph
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│ Kibana detection rule fires                                      │
-│ (source: wazuh-alerts-4.x-*, correlation rules, all 8 custom)    │
-└──────────────────────────────┬───────────────────────────────────┘
-                               │ writes alert document
-                               ▼
-┌──────────────────────────────────────────────────────────────────┐
-│ Elasticsearch index                                              │
-│   .alerts-security.alerts-default                                │
-│   Field: kibana.alert.workflow_status = "open"                   │
-└──────────────────────────────┬───────────────────────────────────┘
-                               │
-                               │ Shuffle polls every 60s
-                               ▼
-┌──────────────────────────────────────────────────────────────────┐
-│ Shuffle workflow: aegis_alerts_v2                                │
-│                                                                  │
-│   1. Schedule trigger                                            │
-│   2. HTTP GET — pull open alerts                                 │
-│   3. Normalize (Python) — flatten hits, extract fields           │
-│   4. For each alert:                                             │
-│        ├─ Conditional enrichment                                 │
-│        │    if source.ip exists and is public:                   │
-│        │        → MISP lookup                                    │
-│        │    else:                                                │
-│        │        → skip enrichment                                │
-│        │                                                          │
-│        ├─ Rule → playbook mapping                                │
-│        │    switch(rule.name):                                   │
-│        │      "Privileged Group Add"  → REVOKE                   │
-│        │      "Authelia Brute Force"  → NOTIFY                   │
-│        │      "Web Attack Pattern"    → NOTIFY                   │
-│        │      "Group ACL Denial"      → NOTIFY                   │
-│        │      default                 → NOTIFY                   │
-│        │                                                          │
-│        ├─ Execute response (if any)                              │
-│        │    → Wazuh Active Response on target agent              │
-│        │                                                          │
-│        ├─ Discord notify (enriched + action status)              │
-│        │                                                          │
-│        ├─ Kibana acknowledge API                                 │
-│        │    PUT workflow_status = "acknowledged"                 │
-│        │                                                          │
-│        └─ Write to aegis-soar-log (audit trail)                  │
-└──────────────────────────────────────────────────────────────────┘
+Kibana detection rule fires (every 1–5 min)
+        │ writes alert document
+        ▼
+.alerts-security.alerts-default   (workflow_status = "open")
+        │
+        │ Shuffle Schedule, every 60 s
+        ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Shuffle workflow: aegis_alerts_v2                           │
+│                                                             │
+│  Schedule ─► Http 1 (ES _search, open alerts, size 20)      │
+│                 └─► Normalize (Python) ─► list of alerts    │
+│                        │  per alert (.#):                   │
+│                        ├─ enrich == true ─► MISP Search     │
+│                        ├─ action == REVOKE ─► Wazuh AR      │
+│                        ├─ notify == true ─► Discord         │
+│                        ├─ ack ─► ES _update_by_query (ids)  │
+│                        └─ log ─► aegis-soar-log/_doc        │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-**Logstash is not in this design.** It gets stopped. The container stays
-deployed (for the "what we tried" narrative in the report) but is no longer
-part of the live pipeline.
+**Logstash is not in this design.** It is stopped (`docker stop logstash`, `docker update --restart=no logstash`) and the container is kept for the report.
 
 ---
 
-## 4. Node specification
+## 4. Alert data shape (verified on live alerts)
 
-Detailed node configuration is in [`soar-v2.md`](./soar-v2.md) §5. This
-section covers the design intent.
+Alert documents in `.alerts-security.alerts-default` mix two styles. This broke the first design's `pick()` helper.
 
-### 4.1 Node 1 — Schedule trigger
+- **Flat dotted keys** at the top of `_source`: `kibana.alert.*`, `event.kind`, and the threshold group-by fields (`ClientHost.keyword`, `remote_ip.keyword`, `RouterName.keyword`).
+- **Nested objects** copied from the source event: `agent`, `data`, `rule`, `source`, `host`, `destination`.
 
-Poll every 60 seconds. Shuffle's built-in trigger, no external dependency.
+The lookup must try the flat key first, then walk the nested path (`g()` in `normalize_shuffle.py`).
 
-### 4.2 Node 2 — HTTP GET from `.alerts-security.alerts-default`
+The alias `.alerts-security.alerts-default` resolves to two backing indices (`.internal.alerts-security.alerts-default-000001` and `-000002`). Use the alias for search and `_update_by_query`. A direct `_update/<id>` on the alias fails for documents living in the non-write index.
 
-Query filters:
-- `kibana.alert.workflow_status: "open"`
-- `size: 20`
-- sort ascending by `@timestamp`
+### Field map per detection type
 
-**Why bounded size:** prevents a burst of alerts from stalling the workflow.
-If the workflow ever lags behind reality, size can be raised.
+| Detection | Type | User | Group | IP source |
+|---|---|---|---|---|
+| Privileged Group Add | query | `data.win.eventdata.memberName` (`CN=salima,OU=…` → parse CN) | `data.win.eventdata.targetUserName` | none |
+| Suricata Priority Alert | query | none | none | `source.ip` |
+| Web Attack Pattern | query | none | none | `ClientHost` |
+| Authelia Brute Force / TOTP Bypass / ACL probe | threshold | none | none | `kibana.alert.threshold_result.terms[0].value` (field `remote_ip.keyword`) |
+| Traefik Directory Fuzzing | threshold | none | none | `terms[0].value` (field `ClientHost.keyword`) |
+| Traefik 5xx Storm | threshold | none | none | `terms[0].value` is a **router name**, not an IP → rejected by IP validation |
 
-### 4.3 Node 3 — Normalize (Python)
+### Normalize output contract
 
-Two jobs:
+One object per alert: `alert_id`, `index`, `rule`, `severity`, `risk`, `host`, `user`, `group`, `src_ip`, `event_code`, `ts`, `age_min`, `action` (`REVOKE` | `NOTIFY`), `enrich` (bool), `notify` (bool), plus display-safe copies `d_host`, `d_user`, `d_group`, `d_ip` (`"-"` when empty — Discord rejects empty embed values).
 
-1. **Flatten** the Elasticsearch `hits.hits[]` array into a simple list
-2. **Extract** the fields downstream nodes need, with fallbacks across Wazuh
-   field paths
+---
 
-The extraction paths are non-uniform because Wazuh doesn't ship ECS-normalized
-fields yet. The Python node has a `pick()` helper that tries multiple paths:
+## 5. Node specification
 
-```python
-def pick(doc, *paths):
-    for p in paths:
-        v = doc
-        for k in p.split("."):
-            v = (v or {}).get(k) if isinstance(v, dict) else None
-        if v:
-            return v
-    return ""
+### 5.1 Schedule trigger
+Every 60 seconds. Keep it **stopped** while nodes are being rewired; a half-wired workflow with no acknowledge step re-sends the same alerts every minute.
+
+### 5.2 Http 1 — pull open alerts
 ```
+POST https://10.16.64.155:9200/.alerts-security.alerts-default/_search
+Body:    {"size":20,"sort":[{"@timestamp":"asc"}],"query":{"term":{"kibana.alert.workflow_status":"open"}}}
+Headers: Content-Type=application/json
+Auth:    basic (elastic)      Verify: False
+```
+- Shuffle's HTTP app takes headers as `key=value`. `Content-Type: application/json` (colon) is silently dropped and ES answers **406**.
+- `size: 20` bounds a burst so the workflow cannot stall; oldest alerts first.
 
-Fields extracted:
-- `alert_id` — from `kibana.alert.uuid`
-- `rule_name` — from `kibana.alert.rule.name`
-- `severity`, `risk_score`
-- `host`, `user`, `target_group`, `source_ip`, `event_code`
+### 5.3 Normalize (Execute Python)
+Source: `soar/normalize_shuffle.py`. Reads the HTTP node result, returns a JSON list on stdout (`$normalize.message`).
 
-Full code in [`soar-v2.md`](./soar-v2.md) §5.3.
+Built-in guard rails:
+- **REVOKE only if** the rule is `AEGIS - Privileged Group Add` **and** `group ∈ {GRP_IT_Admin, GRP_Web_Ops}` **and** a user was parsed **and** the alert is younger than 15 minutes. Otherwise it downgrades to NOTIFY. (The Kibana rule matches *any* 4728, so the group check is mandatory.)
+- **`notify`** is true for severity `medium`/`high`/`critical`, or when an action is set. `low` (e.g. Group ACL Denial, ~380 alerts/week) is acknowledged and logged but not sent to Discord.
+- **`enrich`** is true for any valid, non-loopback, non-multicast IP. Private addresses are deliberately allowed in this lab: the seeded MISP IOC is the Kali box (`192.168.19.183`, RFC1918). In production, restrict to public IPs.
 
-### 4.4 Conditional enrichment
+Variable resolution notes (Shuffle):
+- `$http_1.body` resolved under **Test Action** and manual **Run**. In an earlier scheduled run it arrived empty (`input not resolved`). Re-check after the workflow is fully wired.
+- Fallback 1: use `raw = r'''$http_1'''` (the script accepts the whole node result).
+- Fallback 2: `soar/normalize_standalone.py` performs the ES query itself and removes the substitution dependency (drops Http 1).
+- Insert variables with the **+** picker so node names are exact.
 
-**No enrichment by default.** Only enrich when the alert has an observable
-that MISP understands.
+### 5.4 Conditional MISP enrichment
+Branch on `$normalize.message.#.enrich == true`. Body:
+```json
+{"value":"$normalize.message.#.src_ip","type":"ip-src","returnFormat":"json"}
+```
+Skipped for alerts without a usable IP (group changes, router names, username-only alerts).
 
-| Observable | Enrich? | Why |
+### 5.5 Rule → playbook mapping (static, not scored)
+
+| Kibana rule | Response | Rationale |
 |---|---|---|
-| Public IP | ✅ MISP IP lookup | External indicator likely to be in feeds |
-| Private IP (RFC1918) | ❌ | No external signal — MISP has nothing |
-| File hash | ✅ MISP hash lookup | Malware feed lookup |
-| Domain | ✅ MISP domain lookup | C2 / phishing lookup |
-| Username only | ❌ | No IOC type |
-| Hostname only | ❌ | No IOC type |
-
-**Why:** the current pipeline enriches every alert regardless of observable.
-This is waste — MISP returns empty for internal IPs and usernames.
-
-**Implementation:** a Python node returns `{"enrich": true/false}`, and a
-Condition/Router node branches on it.
-
-### 4.5 Rule → playbook mapping (static, not scored)
-
-**The previous design used a confidence-scoring model with arbitrary weights.**
-That was wrong. It was uncalibrated, had inputs that don't exist (Suricata
-scan list, calendar feed), double-counted (rule level AND event code), and
-would let an attacker trigger revocations against other users.
-
-**Replace with a static mapping.** Each rule name maps to one response:
-
-| Kibana rule name | Response | Rationale |
-|---|---|---|
-| `AEGIS - Privileged Group Add` | **REVOKE** | Privilege escalation in progress |
-| `AEGIS - Authelia Brute Force` | NOTIFY | Rate-limited already; notify for awareness |
+| `AEGIS - Privileged Group Add` | **REVOKE** (guarded, see 5.3) | Privilege escalation in progress |
+| `AEGIS - Authelia Brute Force` | NOTIFY | Awareness |
 | `AEGIS - Authelia TOTP Bypass Attempt` | NOTIFY | Could be user error or attack |
-| `AEGIS - Web Attack Pattern (SQLi/XSS/Traversal)` | NOTIFY | WAF already blocked; notify |
-| `AEGIS - Suricata Priority Alert` | NOTIFY | Network-layer; different response not ready |
+| `AEGIS - Web Attack Pattern (SQLi/XSS/Traversal)` | NOTIFY | WAF already blocked |
+| `AEGIS - Suricata Priority Alert` | NOTIFY | Network layer; no response ready |
 | `AEGIS - Traefik Directory Fuzzing` | NOTIFY | Usually scanner noise |
 | `AEGIS - Traefik 5xx Storm` | NOTIFY | Availability, not security |
-| `AEGIS - Group ACL Denial` | NOTIFY | Expected behavior — user confusion |
-| *(default)* | NOTIFY | Any unrecognized rule |
+| `AEGIS - Group ACL Denial` (+ probe) | log only (`low`) | Expected behaviour — user confusion |
+| *(default)* | NOTIFY | Unrecognised rule |
 
-**Extensibility:** adding a new detection with a different response is one
-line in the mapping. No new workflow, no new node.
+Adding a detection with a different response is one line in the `PLAYBOOK` dict. No new node.
 
-**Future:** when the design is mature, introduce a **behavioral** (not
-weighted) refinement — for instance, if the same rule fires 3 times in
-5 minutes from the same user, escalate from NOTIFY to REVOKE. Until that
-signal is validated, keep it static.
+The earlier confidence-scoring model (weights, thresholds) was removed: uncalibrated, used inputs that do not exist (scan list, calendar feed), double-counted rule level and event code, and let an attacker trigger revocations against other users.
 
-### 4.6 Response execution — Wazuh Active Response
+**Rule coverage gap:** `AEGIS - Privileged Group Add` currently queries `data.win.system.eventID: "4728"` only. Extend to `(4728 or 4732 or 4756)` (global / local / universal groups).
 
-Zone 4 → Wazuh manager API → AR command → agent executes on target host.
-
+### 5.6 Wazuh Active Response (Level 1 / Level 4)
 ```
-POST https://10.16.64.156:55000/active-response
-Body: {"command": "aegis-revoke-session", "arguments": ["<target>"], "agents_list": ["004"]}
-Auth: Bearer token (from /security/user/authenticate)
+POST https://10.16.64.156:55000/security/user/authenticate?raw=true   (basic auth → plain-text JWT, ~15 min)
+PUT  https://10.16.64.156:55000/active-response
+     {"command":"aegis-revoke-session","arguments":["<user>"],"agents_list":["004"]}
+     Authorization: Bearer <token>
 ```
+- Rebuild the auth node from scratch; the legacy `GetWazuhToken` node had a malformed body and was deleted.
+- AR scripts receive JSON on **stdin**; API-supplied arguments arrive in `parameters.extra_args`, not `$1`, and there is no `parameters.alert` for API-triggered runs.
+- Zone 4 → Zone 3 traffic stays inside the authenticated Wazuh control plane; no new firewall rules.
 
-**Trust boundary:** this keeps Zone 4 → Zone 3 traffic inside the Wazuh
-control plane, which is already authenticated and audited. No new firewall
-rules.
-
-Detailed enablement steps in §7 Phase 2.
-
-### 4.7 Discord notification
-
-Standard embed per alert:
-
+### 5.7 Discord notification
 ```json
-{
-  "embeds": [{
-    "title": "🚨 {{rule_name}}",
-    "color": 15158332,
-    "fields": [
-      {"name": "Severity", "value": "{{severity}}"},
-      {"name": "Host", "value": "{{host}}"},
-      {"name": "User", "value": "{{user}}"},
-      {"name": "Source IP", "value": "{{source_ip}}"},
-      {"name": "MISP matches", "value": "{{misp_count}}"},
-      {"name": "Action taken", "value": "{{action_status}}"}
-    ]
-  }]
-}
+{"embeds":[{"title":"🚨 $normalize.message.#.rule","color":15158332,"fields":[
+ {"name":"Severity","value":"$normalize.message.#.severity","inline":true},
+ {"name":"Host","value":"$normalize.message.#.d_host","inline":true},
+ {"name":"User","value":"$normalize.message.#.d_user","inline":true},
+ {"name":"Source IP","value":"$normalize.message.#.d_ip","inline":true},
+ {"name":"Action","value":"$normalize.message.#.action","inline":true}]}]}
 ```
+`.#` is Shuffle's per-item loop (one message per alert) — confirm in the UI that Discord shows one result per alert. No interactive buttons (needs a Discord bot application; out of scope). MISP match count is added once the MISP branch is wired.
 
-**No interactive buttons.** They require a Discord bot application with an
-interaction endpoint — out of scope for the PFE. Plain notifications only.
-
-### 4.8 Acknowledge in Kibana
-
-After Discord succeeds:
-
+### 5.8 Acknowledge
+Runs after Discord succeeds. Proven call (same mechanism used to clear the initial 799-alert backlog):
 ```
-POST http://10.16.64.156:5601/api/detection_engine/signals/status
-Header: kbn-xsrf: true
-Body: {"signal_ids": ["<alert_uuid>"], "status": "acknowledged"}
+POST https://10.16.64.155:9200/.alerts-security.alerts-default/_update_by_query?conflicts=proceed
+{"script":{"source":"ctx._source['kibana.alert.workflow_status']='acknowledged'"},
+ "query":{"ids":{"values":["$normalize.message.#.alert_id"]}}}
 ```
+Works through the alias regardless of the backing index. Alternative (untested): Kibana `POST /kibana/api/detection_engine/signals/status` with `kbn-xsrf: true`, auth, `{"signal_ids":[…],"status":"acknowledged"}` — note the `/kibana` base path.
 
-The alert flips from `open` to `acknowledged` in Kibana's UI. The next poll
-doesn't pick it up.
-
-**Fallback** if the API path is wrong for the deployed version — direct ES
-update:
-
-```
-POST https://10.16.64.155:9200/.alerts-security.alerts-default/_update/<doc_id>
-Body: {"doc": {"kibana.alert.workflow_status": "acknowledged"}}
-```
-
-### 4.9 Audit trail — `aegis-soar-log`
-
-Every processed alert writes one document:
-
+### 5.9 Audit trail — `aegis-soar-log`
+One document per processed alert via `POST https://10.16.64.155:9200/aegis-soar-log/_doc`:
 ```json
-{
-  "@timestamp": "...",
-  "alert_id": "...",
-  "rule_name": "AEGIS - Privileged Group Add",
-  "severity": "high",
-  "host": "CORP-DC01",
-  "user": "salima",
-  "source_ip": "",
-  "action": "revoke_session",
-  "action_status": "success",
-  "discord_status": 204,
-  "verified": true
-}
+{"@timestamp":"...","alert_id":"...","rule_name":"...","severity":"high",
+ "host":"CORP-DC01","user":"salima","source_ip":"","action":"revoke_session",
+ "action_status":"success","discord_status":204,"misp_matches":0,"verified":true}
 ```
-
-This index is the durable record of everything the SOAR did. A future Kibana
-dashboard visualizes it (see [`dashboards.md`](./dashboards.md) §10.4).
+Durable record of everything the SOAR did; feeds the Response Actions Log dashboard (`dashboards.md` §10.4).
 
 ---
 
-## 5. Response ladder — simplified
-
-The previous four-level ladder is pruned to two levels.
+## 6. Response ladder
 
 | Level | Action | When | Implementation |
 |---|---|---|---|
-| **1 — Revoke** | Destroy Authelia/Keycloak sessions | Privilege escalation detected | Wazuh AR on gateway agent |
-| **4 — Disable** | Disable AD account | Confirmed compromise (multiple signals) | Wazuh AR on DC01 agent |
+| **1 — Revoke** | Destroy Authelia/Keycloak sessions of the user | Privileged group add (guarded) | Wazuh AR on gateway agent (004) |
+| **4 — Disable** | Disable AD account | Confirmed compromise (multiple signals) | Wazuh AR on CORP-DC01 agent (006) |
 
-**Level 2 (Step-up / WebAuthn)** — dropped. Authelia has no API for
-per-session elevation. Would require deep config changes and re-enrollment
-of all users. Not viable within the project timeline.
+Level 2 (step-up/WebAuthn) — dropped: Authelia has no per-session elevation API. Level 3 (quarantine group) — dropped: extra AD group and cleanup job for little gain. Both remain documented as future work.
 
-**Level 3 (Quarantine)** — dropped. Adds a new AD group and a scheduled
-cleanup task. High complexity, low additional value over Revoke/Disable for
-the PFE.
+### 6.1 Revoke — the PFE headline
+1. Admin (or attacker) adds `salima` to `GRP_IT_Admin` on CORP-DC01 (event 4728).
+2. Kibana rule `AEGIS - Privileged Group Add` fires; alert lands in the queue index.
+3. Shuffle picks it up; Normalize → user `salima`, group `GRP_IT_Admin`, action REVOKE.
+4. Wazuh AR call → `aegis-revoke-session salima` on the gateway agent.
+5. Discord: session revoked. Alert acknowledged. `aegis-soar-log` records the action.
 
-**Revoke + Disable cover the PFE demonstration.** Levels 2 and 3 remain
-documented as future work.
+Verification: the session cookie no longer works; reloading `https://traefik.zerotrust.lan` returns the login page.
 
-### 5.1 Revoke — the PFE headline
+### 6.2 Known caveat — Authelia session encryption
+Authelia may encrypt session values in Redis. If `redis-cli GET <key>` returns ciphertext, the script cannot find the user's sessions.
+1. Check whether the key name contains a username hash (test empirically).
+2. Otherwise maintain a `username → session_id` map from Authelia logs in a separate Redis hash and have the AR script read that.
 
-Flow:
-
-1. Attacker adds `salima` to `GRP_IT_Admin`
-2. Kibana rule `AEGIS - Privileged Group Add` fires
-3. Alert lands in `.alerts-security.alerts-default`
-4. Shuffle picks it up within 60s
-5. Normalize → user = `salima`, group = `GRP_IT_Admin`
-6. Rule → playbook mapping: REVOKE
-7. Wazuh AR call to gateway agent: `aegis-revoke-session salima`
-8. Agent script:
-   - Iterates Authelia Redis session keys
-   - Deletes those belonging to `salima`
-9. Discord alert: "Session revoked for salima"
-10. Kibana alert → acknowledged
-11. `aegis-soar-log` records the action
-
-**Verification:** the session cookie no longer works. Reloading
-`https://traefik.zerotrust.lan` returns the login page.
-
-### 5.2 Known caveat — Authelia session encryption
-
-Authelia may encrypt session values in Redis. If `redis-cli GET <key>` returns
-ciphertext, the session-revoke script cannot parse it to find the username.
-
-**Two workarounds:**
-
-1. **Index sessions by username.** When Authelia creates a session, the key
-   name sometimes includes a hash of the username. Test empirically.
-2. **Maintain a user→session map.** A small process watches Authelia logs and
-   writes `username → session_id` to a separate Redis hash. The AR script
-   reads this map instead of parsing session values.
-
-**Test before Phase 2.** If Redis values are encrypted, plan for workaround 2.
+**Test this before building the AR script.**
 
 ---
 
-## 6. What this enables
+## 7. End-to-end timing
 
-### 6.1 The end-to-end demonstration
+Kibana rules run on a schedule (currently **5 min**). The earlier "≈2 minutes" estimate assumed 60 s rules and was wrong.
 
-Once implemented:
+| Step | Default rules (5 m) | Tuned (1 m rule) |
+|---|---|---|
+| Event 4728 shipped to ES | ~5 s | ~5 s |
+| Kibana rule fires | ≤ 5 min | ≤ 1 min |
+| Shuffle poll | ≤ 60 s | ≤ 60 s |
+| AR + Discord + ack | ~5–10 s | ~5–10 s |
+| **Total** | **≤ ~6.5 min** | **≤ ~2.5 min** |
 
-| Step | Time |
-|---|---|
-| Add salima to GRP_IT_Admin in AD | T+0 |
-| Wazuh sees event 4728, ships to ES | T+5s |
-| Kibana rule fires | T+60s (rule schedule) |
-| Shuffle picks up alert | T+120s (poll cycle) |
-| Authelia sessions for salima revoked | T+125s |
-| Discord alert delivered | T+130s |
-| Verification: session no longer valid | T+130s |
-
-**Total: ~2 minutes from attack to response.** Acceptable for the PFE.
-
-### 6.2 Comparison to current state
-
-**Today:** detection works (Kibana rules fire). Response does not exist.
-**Target:** detection → decision → response → verification → audit.
+For the demo, set the `Privileged Group Add` rule to a 1-minute interval (keep the `now-10m` lookback; Kibana does not re-alert on the same source event).
 
 ---
 
-## 7. Phased rollout
+## 8. Phased rollout
 
-**Revised total: 8 hours** across 2 sessions. Skipped Level 2 and Level 3,
-removed scoring model, simplified the graph.
+### Phase 1 — Alerts-index pull end-to-end
 
-### Phase 1 — Alerts-index pull working end-to-end (2h)
+- [x] Logstash stopped, restart disabled
+- [x] Backlog cleared: 799 stale `open` alerts acknowledged (prevents replaying old alerts, incl. an old `salima` group add that would have triggered a real revoke)
+- [x] Shuffle → ES reachable; `Content-Type=application/json` header format fixed (406 → 200)
+- [x] Normalize verified on live alerts (2 Suricata alerts → 2 correct objects, `enrich: true`, `action: NOTIFY`)
+- [ ] Normalize → Discord with the new body (per-alert loop verified)
+- [ ] Acknowledge node; confirm alerts flip to `acknowledged`
+- [ ] `aegis-soar-log` write
+- [ ] Re-enable Schedule; confirm scheduled runs resolve input (else use fallbacks in 5.3)
+- [ ] Conditional MISP branch
+- [ ] Export the workflow JSON to the repo
 
-1. Build `aegis_alerts_v2` workflow in Shuffle — see [`soar-v2.md`](./soar-v2.md) §5
-2. Wire Schedule → HTTP GET → Normalize → Discord → Acknowledge → Log
-3. **No response execution yet.** Just notifications.
-4. Sample one alert per rule first (§4.4 in `soar-v2.md`)
-5. Test: fire `AEGIS - Privileged Group Add`, confirm Discord within 2 min
-6. Confirm `aegis-soar-log` has the record
+**Done when:** an alert from Kibana reaches Discord with populated fields, is acknowledged, and appears in `aegis-soar-log` — without manual clicks.
 
-**Done when:** an alert from Kibana reaches Discord with populated fields
-and is acknowledged.
+### Phase 2 — Wazuh Active Response infrastructure (2 h)
+1. Verify the Wazuh API on 55000 is reachable **from minisoc3** (it was refused from the gateway earlier).
+2. Test Authelia Redis session format (§6.2).
+3. Enable the command/`<active-response>` blocks in `ossec.conf` on minisoc2.
+4. Write `aegis-revoke-session` on the gateway agent (read stdin JSON, `parameters.extra_args`).
+5. Manual AR call with a bearer token; confirm in `/var/ossec/logs/active-responses.log`.
 
-### Phase 2 — Wazuh Active Response infrastructure (2h)
+**Done when:** a manual AR call revokes a test session.
 
-1. Enable `<active-response>` on minisoc2 (`ossec.conf`)
-2. Write `/var/ossec/active-response/bin/aegis-revoke-session` on gateway agent
-3. Make it executable, restart gateway agent
-4. Verify Redis session format (encrypted or not)
-5. Test AR call manually:
+### Phase 3 — Wire revoke into Shuffle (2 h)
+Auth node → AR node behind `action == REVOKE`; test with a real DC01 group change; verify the session is dead.
 
-```bash
-TOKEN=$(curl -sk -X POST https://10.16.64.156:55000/security/user/authenticate \
-  -u wazuh:wazuh | jq -r .data.token)
+### Phase 4 — Level 4 disable (1 h)
+`aegis-disable-account` on the DC01 agent; extend the mapping; test on a throwaway AD user.
 
-curl -sk -X PUT https://10.16.64.156:55000/active-response \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"command":"aegis-revoke-session","arguments":["salima"],"agents_list":["004"]}'
-```
+### Phase 5 — Feedback dashboard (1 h)
+`aegis-soar-log` data view, Response Actions Log dashboard, and a "response ineffective" rule (response followed by successful auth of the same user within 5 min).
 
-6. Confirm the script ran — check `/var/ossec/logs/active-responses.log` on
-   the gateway
-
-**Done when:** a manual AR call successfully revokes a test session.
-
-### Phase 3 — Wire Revoke into Shuffle (2h)
-
-1. Add Conditional Response node to `aegis_alerts_v2`
-2. Add rule → playbook mapping
-3. Add HTTP node calling Wazuh AR API
-4. Test the full loop with a DC01 group change
-5. Verify session revoke worked — attempt to use salima's cookie
-
-**Done when:** the DC01 group change triggers an automatic session revoke,
-Discord shows the action, and Kibana marks the alert acknowledged.
-
-### Phase 4 — Level 4 disable (1h)
-
-1. Write `aegis-disable-account` on DC01 agent
-2. Extend the rule mapping
-3. Test on a throwaway AD user
-
-**Done when:** "Confirmed compromise" scenario disables the account.
-
-### Phase 5 — Feedback dashboard (1h)
-
-1. Create `aegis-soar-log` data view in Kibana
-2. Build Response Actions Log dashboard
-3. Alert on "response ineffective" — response in `aegis-soar-log` followed by
-   successful auth by the same user within 5 min
-
-**Done when:** the SOAR's own actions are visible and monitored.
+**Order:** Phase 1 → 2 → 3, demonstrate end-to-end, then Phases 4–5.
 
 ---
 
-## 8. Priority order
+## 9. Shuffle / integration gotchas (learned the hard way)
 
-Skip Levels 2 and 3. Revoke + Disable cover the PFE.
-
-**Recommended order:**
-1. Phase 1 — Alerts-index pull (2h) ← **Start here**
-2. Phase 2 — Wazuh AR infrastructure (2h)
-3. Phase 3 — Wire revoke into Shuffle (2h)
-4. Demonstrate end-to-end
-5. Only then Phase 4 and Phase 5
-
----
-
-## 9. Open questions
-
-1. **Does the Wazuh API on 55000 accept AR calls from minisoc3?** Port 55000
-   was refused from the gateway earlier. Verify from minisoc3 first.
-2. **Is Authelia's Redis session data encrypted?** The revoke script depends
-   on parsing `username` from session values. Test empirically:
-   `docker exec redis redis-cli KEYS 'authelia:session:*'` then GET one.
-3. **Does the Shuffle version in deployment support `For Each`?** If not, use
-   a Python node with an internal loop. Check in the UI.
-4. **Does the Kibana acknowledge API path match the deployed version?**
-   Fallback is direct ES `_update`.
+| Symptom | Cause | Fix |
+|---|---|---|
+| ES returns `406 Content-Type header [] is not supported` | Headers entered as `Content-Type: application/json` | Use `Content-Type=application/json` |
+| Normalize: `Syntax Error … (<unknown>, line 0)` / `input not resolved` | Variable substituted as an empty string | Use the **+** picker; try `$http_1`; fall back to standalone script |
+| Field extraction returns `?` or empty | `kibana.alert.*` are flat keys, not nested | Flat-then-nested lookup (`g()`) |
+| `docker exec shuffle-backend curl` fails | No curl in the image | Test from a Shuffle HTTP node instead |
+| Same alert sent every minute | No acknowledge step | Keep Schedule stopped until ack is wired |
+| Discord 400 | Empty embed field value | Use `d_*` display fields |
 
 ---
 
-## 10. Change log
+## 10. Open questions
+
+1. Does the Wazuh API on 55000 accept AR calls from minisoc3?
+2. Is Authelia's Redis session data readable (§6.2)?
+3. Does the deployed Shuffle version run Discord/ack once per item with `.#` (and honour conditions on the loop)?
+4. Do scheduled executions resolve `$http_1.body`, or is the standalone variant needed?
+
+---
+
+## 11. Pre-publication checklist
+
+Before the repository is made public or shared:
+
+- [ ] Rotate the Elasticsearch `elastic` password and issue a scoped API key for Shuffle (read `.alerts-security.alerts-default`, update workflow status, write `aegis-soar-log`)
+- [ ] Rotate the MISP API key and Discord webhook URL; store them as Shuffle secrets
+- [ ] Remove plaintext credentials from `SOAR.md` and `docs/`
+- [ ] Rotate Wazuh API credentials (`wazuh` / `wazuh-wui`)
+- [ ] Remove `soar-v2.md` links or add the file; fix `soar.md` / `SOAR.md` casing
+
+---
+
+## 12. Change log
 
 | Date | Change |
 |---|---|
 | 2026-09-29 | Initial design — assumed Kibana webhook → Shuffle (blocked by license) |
-| 2026-09-30 | **Rewrite.** Webhook connector requires Gold license. Pivot to alerts-index pull. Removed confidence scoring model. Simplified ladder to Revoke + Disable. Removed Discord buttons. Removed Level 2 and Level 3. Consolidated with `soar-v2.md` (implementation spec). |
+| 2026-09-30 | Rewrite: alerts-index pull; removed confidence scoring; ladder reduced to Revoke + Disable; removed Discord buttons |
+| 2026-09-30 | Phase 1 findings: real alert field map (flat + nested keys); REVOKE guard rails (privileged-group check, 15-min age); acknowledge via `_update_by_query`; enrichment allows private IPs in the lab; corrected latency (rules run every 5 min); Shuffle header format; Logstash stopped; 799-alert backlog cleared; Normalize verified live |
 
 ---
 
